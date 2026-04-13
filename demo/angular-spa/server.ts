@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const server = createServer<JwtClaims>({
   app: {
-    name: 'web',
+    name: 'angular-spa',
     spa: {
       root: path.join(__dirname, './browser'),
       basePath: '/',

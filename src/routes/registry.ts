@@ -14,6 +14,7 @@ export function registerRoutes<TClaims = unknown>(app: Express, config: ServerCo
 
 export function registerProxyRoutes<TClaims = unknown>(app: Express, config: ServerConfig): void {
   const { proxy } = config;
+  if (!proxy) return;
   const secret = new TextEncoder().encode(config.auth.secret);
   const authMiddleware = createAuthMiddleware<TClaims>(secret);
 
@@ -31,6 +32,7 @@ export function registerProxyRoutes<TClaims = unknown>(app: Express, config: Ser
 
 export function registerApiRoutes<TClaims = unknown>(app: Express, config: ServerConfig): void {
   const { api } = config;
+  if (!api) return;
   const secret = new TextEncoder().encode(config.auth.secret);
   const authMiddleware = createAuthMiddleware<TClaims>(secret);
 

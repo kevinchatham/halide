@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises';
+import { rmSync } from 'node:fs';
 import { glob } from 'glob';
 
 const patterns = [
@@ -12,12 +12,12 @@ const patterns = [
 Promise.all(
   patterns.map(async (pattern) => {
     const files = await glob(pattern, { dot: true });
-    await Promise.all(
-      files.map((f) =>
-        rm(f, { recursive: true, force: true }).catch((err) => {
-          console.error(`Failed to remove ${f}:`, err.message);
-        })
-      )
-    );
+    for (const f of files) {
+      try {
+        rmSync(f, { recursive: true, force: true });
+      } catch (err) {
+        console.error(`Failed to remove ${f}:`, err);
+      }
+    }
   })
 ).catch(() => {});

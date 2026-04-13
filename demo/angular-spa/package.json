@@ -1,12 +1,12 @@
 {
-  "name": "angular-spa",
+  "name": "bspa-angular-spa-demo",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "ng": "ng",
     "serve": "ng serve",
     "serve:server":"nodemon",
-    "build": "npm run build:server && ng build",
+    "build": "ng build && npm run build:server",
     "build:server":"tsc --project tsconfig.server.json",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
@@ -20,7 +20,7 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "bspa": "file:../..",
+    "bspa": "1.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

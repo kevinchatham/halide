@@ -1,16 +1,12 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
     "module": "es2022",
     "target": "es2022",
     "moduleResolution": "bundler",
     "types": ["node"],
+    "rootDirs": ["."],
     "typeRoots": ["../../node_modules/@types"],
-    "paths": {
-      "bspa": ["../../src"],
-      "bspa/*": ["../../src/*"]
-    },
     "baseUrl": "."
   },
   "include": ["server.ts"]

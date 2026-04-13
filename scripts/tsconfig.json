@@ -13,8 +13,8 @@
     "moduleDetection": "force",
     "noUncheckedIndexedAccess": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDirs": ["./src","./scripts"],
     "types": ["node"]
   },
-  "include": ["src/**/*"]
+  "include": ["clean.ts"]
 }
