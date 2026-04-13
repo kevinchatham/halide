@@ -1,0 +1,27 @@
+import type { RequestHandler } from 'express';
+import { verifyJwt } from '../utils/jwt';
+
+const unauthorized = { error: 'Unauthorized' };
+
+export function createAuthMiddleware<TClaims = unknown>(secret: Uint8Array): RequestHandler {
+  return (req, res, next) => {
+    const authHeader: string | undefined = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      res.status(401).json(unauthorized);
+      return;
+    }
+    const token = authHeader.slice(7);
+    verifyJwt<TClaims>(token, secret)
+      .then((claims) => {
+        if (!claims) {
+          res.status(401).json(unauthorized);
+          return;
+        }
+        req.claims = claims;
+        next();
+      })
+      .catch(() => {
+        res.status(401).json(unauthorized);
+      });
+  };
+}

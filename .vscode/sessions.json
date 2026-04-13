@@ -1,0 +1,63 @@
+{
+  "$schema": "https://cdn.statically.io/gh/nguyenngoclongdev/cdn/main/schema/v11/terminal-keeper.json",
+  "activateOnStartup": true,
+  "active": "dev",
+  "keepExistingTerminals": false,
+  "sessions": {
+    "default": [
+      {
+        "color": "terminal.ansiBlue",
+        "commands": [],
+        "focus": false,
+        "icon": "terminal",
+        "name": "terminal"
+      }
+    ],
+    "dev": [
+      {
+        "autoExecuteCommands": true,
+        "color": "terminal.ansiBlue",
+        "commands": [
+          "npm run demo:angular:serve"
+        ],
+        "icon": "browser",
+        "name": "web"
+      },
+      {
+        "autoExecuteCommands": true,
+        "color": "terminal.ansiGreen",
+        "commands": [
+          "npm run demo:angular:serve:server"
+        ],
+        "icon": "server",
+        "name": "server"
+      },
+      {
+        "autoExecuteCommands": true,
+        "color": "terminal.ansiMagenta",
+        "commands": [
+          "npm run demo:backend:serve"
+        ],
+        "icon": "server",
+        "name": "mock-build"
+      },
+      {
+        "autoExecuteCommands": true,
+        "color": "terminal.ansiWhite",
+        "commands": [
+          "npm run lint:watch"
+        ],
+        "icon": "checklist",
+        "name": "lint:watch"
+      },
+      {
+        "color": "terminal.ansiBlue",
+        "commands": [],
+        "focus": false,
+        "icon": "terminal",
+        "name": "terminal"
+      }
+    ]
+  },
+  "theme": "chaos"
+}

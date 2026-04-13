@@ -1,0 +1,8 @@
+.kilo/agent-manager.json
+.kilo/plans/
+.scannerwork/
+**/.angular/
+**/dist/
+**/node_modules/
+setup-script
+temp/
