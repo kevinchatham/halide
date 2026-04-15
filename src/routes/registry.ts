@@ -1,22 +1,11 @@
 import type { Express, RequestHandler, Router } from 'express';
-import type { BffConfig } from '../config/types';
+import type { ServerConfig } from '../config/types';
 import { createAuthMiddleware } from '../middleware/auth';
 import { createProxyService } from '../services/proxy';
-import { createSpaHandler } from './spa';
-
-export function registerRoutes<TClaims = unknown>(app: Express, config: BffConfig): void {
-  registerProxyRoutes<TClaims>(app, config);
-  registerApiRoutes<TClaims>(app, config);
-
-  if (config.app.spa) {
-    const spaHandler = createSpaHandler(config.app.spa);
-    app.get(/^\/(.*)/, spaHandler);
-  }
-}
 
 export function registerProxyRoutes<TClaims = unknown>(
   app: Express | Router,
-  config: BffConfig
+  config: ServerConfig
 ): void {
   const { proxy } = config;
   if (!proxy) return;
@@ -37,7 +26,7 @@ export function registerProxyRoutes<TClaims = unknown>(
 
 export function registerApiRoutes<TClaims = unknown>(
   app: Express | Router,
-  config: BffConfig
+  config: ServerConfig
 ): void {
   const { api } = config;
   if (!api) return;

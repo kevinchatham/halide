@@ -1,6 +1,12 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
+export const SpaConfigSchema = z.object({
+  root: z.string(),
+  basePath: z.string().default('/'),
+  fallback: z.string().default('index.html'),
+});
+
 export const ProxyRouteSchema = z.object({
   path: z.string(),
   access: z.enum(['public', 'private']),
@@ -28,19 +34,13 @@ export const ApiConfigSchema = z.object({
   routes: z.array(ApiRouteSchema).default([]),
 });
 
-const AppConfigBase = z.object({
+export const AppConfigSchema = z.object({
   name: z.string().default('app'),
-  spa: z
-    .object({
-      root: z.string(),
-      basePath: z.string().default('/'),
-      fallback: z.string().default('index.html'),
-    })
-    .optional(),
+  spa: SpaConfigSchema,
 });
 
-export const BffConfigSchema = z.object({
-  app: AppConfigBase,
+export const ServerConfigSchema = z.object({
+  app: AppConfigSchema,
   proxy: ProxyConfigSchema.optional(),
   api: ApiConfigSchema.optional(),
   security: z
@@ -59,18 +59,4 @@ export const BffConfigSchema = z.object({
       message: 'auth.secret is required when strategy is bearer',
       path: ['auth', 'secret'],
     }),
-});
-
-const SpaConfigSchema = z.object({
-  root: z.string(),
-  basePath: z.string().default('/'),
-  fallback: z.string().default('index.html'),
-});
-
-const AppConfigServer = AppConfigBase.extend({
-  spa: SpaConfigSchema,
-});
-
-export const ServerConfigSchema = BffConfigSchema.extend({
-  app: AppConfigServer,
 });

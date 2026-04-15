@@ -6,21 +6,15 @@ output: markdown
 
 ## Steps
 
-1. Identify available submodules/subprojects by checking for:
-   - Git submodules (`.gitmodules`)
-   - Nested `package.json` files in subdirectories
-   - Separate git worktrees
-     Common submodules in this project include: `projects/site/`, `projects/tressi/` (with `projects/cli/`, `projects/ui/`, `projects/shared/`, `projects/e2e/`).
-2. Use the Question tool to ask the user which submodule they want to generate a PR description for, and specify:
-   - **Submodule:** The subproject to generate PR for (e.g., `projects/site/`, `projects/tressi/`, `projects/tressi/projects/cli/`, etc.)
+1. Use the Question tool to ask the user for:
    - **Current branch:** The branch containing the changes (defaults to current branch if not specified)
    - **Target branch:** The branch to merge into (e.g., main, master, develop)
-3. Determine the target merge branch and the current branch based on user input.
-4. Find the merge base using `git merge-base <current-branch> <target-branch>`.
-5. Retrieve commits with full message bodies using `git log <merge-base>..<current-branch> --format=full`. This ensures you get the complete commit messages including the body text, not just the short subject line.
-6. Retrieve the full diff using `git diff <merge-base>..<current-branch>`.
-7. Analyze extended commit messages (including body text) to understand intent, sequencing, and narrative.
-8. Analyze diffs to identify all changes including:
+2. Determine the target merge branch and the current branch based on user input.
+3. Find the merge base using `git merge-base <current-branch> <target-branch>`.
+4. Retrieve commits with full message bodies using `git log <merge-base>..<current-branch> --format=full`. This ensures you get the complete commit messages including the body text, not just the short subject line.
+5. Retrieve the full diff using `git diff <merge-base>..<current-branch>`.
+6. Analyze extended commit messages (including body text) to understand intent, sequencing, and narrative.
+7. Analyze diffs to identify all changes including:
    - New features and enhancements
    - Architectural changes
    - Refactoring efforts
@@ -29,8 +23,8 @@ output: markdown
    - Test coverage additions
    - Documentation updates
    - Breaking changes
-9. Synthesize the branch into a single cohesive story.
-10. Produce a PR description following this format (only include sections that apply):
+8. Synthesize the branch into a single cohesive story.
+9. Produce a PR description following this format (only include sections that apply):
 
 ```
 **<type>(<scope>): <description>**
@@ -60,8 +54,8 @@ output: markdown
 - **[Change]:** [Description of breaking change and migration path if applicable]
 ```
 
-11. For file references in bullet points, use markdown link format: [`filenameOrFunction()`](relative/path/file.ext)
-12. Do NOT include raw diffs, commit hashes, or speculative commentary.
-13. Do NOT explain your reasoning or how the description was generated.
-14. Output ONLY the final pull request description text as markdown.
-15. NEVER CHANGE MODES.
+10. For file references in bullet points, use markdown link format: [`filenameOrFunction()`](relative/path/file.ext)
+11. Do NOT include raw diffs, commit hashes, or speculative commentary.
+12. Do NOT explain your reasoning or how the description was generated.
+13. Output ONLY the final pull request description text as markdown.
+14. NEVER CHANGE MODES.

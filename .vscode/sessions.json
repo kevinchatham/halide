@@ -27,10 +27,10 @@
         "autoExecuteCommands": true,
         "color": "terminal.ansiMagenta",
         "commands": [
-          "npx concurrently --names \"angular-spa,angular-ssg,backend\" --prefix-colors \"blue,green,magenta\" \"npm run demo:angular:serve:server\" \"npm run demo:angular-ssg:serve:server\" \"npm run demo:backend:serve\""
+          "npx concurrently --names \"angular-spa,backend\" --prefix-colors \"blue,magenta\" \"npm run demo:angular:serve:server\" \"npm run demo:backend:serve\""
         ],
         "icon": "browser",
-        "name": "all-demos"
+        "name": "demos"
       },
       {
         "autoExecuteCommands": true,
