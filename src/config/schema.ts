@@ -28,15 +28,19 @@ export const ApiConfigSchema = z.object({
   routes: z.array(ApiRouteSchema).default([]),
 });
 
-export const ServerConfigSchema = z.object({
-  app: z.object({
-    name: z.string().default('app'),
-    spa: z.object({
+const AppConfigBase = z.object({
+  name: z.string().default('app'),
+  spa: z
+    .object({
       root: z.string(),
       basePath: z.string().default('/'),
       fallback: z.string().default('index.html'),
-    }),
-  }),
+    })
+    .optional(),
+});
+
+export const BffConfigSchema = z.object({
+  app: AppConfigBase,
   proxy: ProxyConfigSchema.optional(),
   api: ApiConfigSchema.optional(),
   security: z
@@ -55,4 +59,18 @@ export const ServerConfigSchema = z.object({
       message: 'auth.secret is required when strategy is bearer',
       path: ['auth', 'secret'],
     }),
+});
+
+const SpaConfigSchema = z.object({
+  root: z.string(),
+  basePath: z.string().default('/'),
+  fallback: z.string().default('index.html'),
+});
+
+const AppConfigServer = AppConfigBase.extend({
+  spa: SpaConfigSchema,
+});
+
+export const ServerConfigSchema = BffConfigSchema.extend({
+  app: AppConfigServer,
 });

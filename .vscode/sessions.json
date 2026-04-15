@@ -16,45 +16,36 @@
     "dev": [
       {
         "autoExecuteCommands": true,
-        "color": "terminal.ansiBlue",
-        "commands": [
-          "npm run demo:angular:serve"
-        ],
-        "icon": "browser",
-        "name": "web"
-      },
-      {
-        "autoExecuteCommands": true,
         "color": "terminal.ansiGreen",
         "commands": [
-          "npm run demo:angular:serve:server"
+          "npx nodemon"
         ],
-        "icon": "server",
-        "name": "server"
+        "icon": "sync",
+        "name": "build:watch"
       },
       {
         "autoExecuteCommands": true,
         "color": "terminal.ansiMagenta",
         "commands": [
-          "npm run demo:backend:serve"
+          "npx concurrently --names \"angular-spa,angular-ssg,backend\" --prefix-colors \"blue,green,magenta\" \"npm run demo:angular:serve:server\" \"npm run demo:angular-ssg:serve:server\" \"npm run demo:backend:serve\""
         ],
-        "icon": "server",
-        "name": "mock-build"
+        "icon": "browser",
+        "name": "all-demos"
       },
       {
         "autoExecuteCommands": true,
-        "color": "terminal.ansiWhite",
+        "color": "terminal.ansiYellow",
         "commands": [
           "npm run lint:watch"
         ],
-        "icon": "checklist",
-        "name": "lint:watch"
+        "icon": "check",
+        "name": "lint"
       },
       {
-        "color": "terminal.ansiBlue",
+        "color": "terminal.ansiCyan",
         "commands": [],
         "focus": false,
-        "icon": "terminal",
+        "icon": "console",
         "name": "terminal"
       }
     ]

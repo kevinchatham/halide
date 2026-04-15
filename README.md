@@ -39,8 +39,32 @@ flowchart LR
 | Package                   | Description                                           |
 | ------------------------- | ----------------------------------------------------- |
 | `src/`                    | bSPA BFF server library                               |
-| `demo/angular-spa`        | Angular SPA consuming bSPA                            |
+| `demo/angular-spa`        | Angular SPA consuming bSPA (standalone server)         |
+| `demo/angular-ssg`        | Angular SSG with bSPA middleware (composable)         |
 | `demo/backend`            | Example backend service proxied by bSPA                |
+
+### Demos
+
+**SPA Demo** (`demo/angular-spa`): Uses `createServer()` where bSPA owns the entire server.
+
+**SSG Demo** (`demo/angular-ssg`): Uses `createBffMiddleware()` to embed bSPA into an Angular SSR Express app. The Angular app controls static files and SSR; bFF handles `/api/*` and `/bff/*` routes.
+
+### Ports
+
+| Demo               | Port |
+| ------------------ | ---- |
+| `demo/backend`     | 3000 |
+| `demo/angular-spa` | 3001 |
+| `demo/angular-ssg` | 4001 |
+
+```ts
+import { createBffMiddleware } from 'bspa';
+
+// bSPA becomes middleware in your Express app
+app.use(createBffMiddleware({ proxy: {...}, api: {...}, auth: {...} }));
+```
+
+This pattern works with any Express-based server (Angular SSR, Next.js, custom Express, NestJS).
 
 ### Quick Start
 

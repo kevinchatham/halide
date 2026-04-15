@@ -1,0 +1,6 @@
+{
+  "watch": ["src/server.ts"],
+  "ext": "ts,json",
+  "ignore": ["dist", "node_modules"],
+  "exec": "npm run build && node dist/angular-ssg/server/server.mjs"
+}

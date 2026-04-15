@@ -1,18 +1,23 @@
-import type { Express } from 'express';
-import type { ServerConfig } from '../config/types';
+import type { Express, RequestHandler, Router } from 'express';
+import type { BffConfig } from '../config/types';
 import { createAuthMiddleware } from '../middleware/auth';
 import { createProxyService } from '../services/proxy';
 import { createSpaHandler } from './spa';
 
-export function registerRoutes<TClaims = unknown>(app: Express, config: ServerConfig): void {
+export function registerRoutes<TClaims = unknown>(app: Express, config: BffConfig): void {
   registerProxyRoutes<TClaims>(app, config);
   registerApiRoutes<TClaims>(app, config);
 
-  const spaHandler = createSpaHandler(config.app.spa);
-  app.get(/^\/(.*)/, spaHandler);
+  if (config.app.spa) {
+    const spaHandler = createSpaHandler(config.app.spa);
+    app.get(/^\/(.*)/, spaHandler);
+  }
 }
 
-export function registerProxyRoutes<TClaims = unknown>(app: Express, config: ServerConfig): void {
+export function registerProxyRoutes<TClaims = unknown>(
+  app: Express | Router,
+  config: BffConfig
+): void {
   const { proxy } = config;
   if (!proxy) return;
   const secret = new TextEncoder().encode(config.auth.secret);
@@ -22,15 +27,18 @@ export function registerProxyRoutes<TClaims = unknown>(app: Express, config: Ser
     const fullPath = `${proxy.basePath}${route.path}`;
     if (route.access === 'public') {
       const proxyHandler = createProxyService(route.target, route.path);
-      app.use(fullPath, proxyHandler);
+      (app as Router).use(fullPath, proxyHandler);
     } else {
       const proxyHandler = createProxyService(route.target, route.path);
-      app.use(fullPath, authMiddleware, proxyHandler);
+      (app as Router).use(fullPath, authMiddleware, proxyHandler);
     }
   }
 }
 
-export function registerApiRoutes<TClaims = unknown>(app: Express, config: ServerConfig): void {
+export function registerApiRoutes<TClaims = unknown>(
+  app: Express | Router,
+  config: BffConfig
+): void {
   const { api } = config;
   if (!api) return;
   const secret = new TextEncoder().encode(config.auth.secret);
@@ -39,9 +47,9 @@ export function registerApiRoutes<TClaims = unknown>(app: Express, config: Serve
   for (const route of api.routes) {
     const fullPath = `${api.basePath}${route.path}`;
     if (route.access === 'public') {
-      app.get(fullPath, route.handler);
+      (app as Router).get(fullPath, route.handler as RequestHandler);
     } else {
-      app.get(fullPath, authMiddleware, route.handler);
+      (app as Router).get(fullPath, authMiddleware, route.handler as RequestHandler);
     }
   }
 }

@@ -31,8 +31,8 @@ const server = createServer<JwtClaims>({
   proxy: {
     basePath: '/api',
     routes: [
-      { path: '/users', access: 'private', target: 'http://localhost:3001' },
-      { path: '/products', access: 'private', target: 'http://localhost:3001' },
+      { path: '/users', access: 'private', target: 'http://localhost:3000' },
+      { path: '/products', access: 'private', target: 'http://localhost:3000' },
     ],
   },
   api: {
@@ -50,7 +50,7 @@ const server = createServer<JwtClaims>({
         access: 'public',
         handler: (_req: Request, res: Response): void => {
           res.json({
-            apiUrl: 'http://localhost:3001',
+            apiUrl: 'http://localhost:3000',
             environment: process.env['NODE_ENV'] || 'development',
           });
         },
