@@ -1,110 +1,242 @@
-## bSPA - BFF Server Pattern for SPA Applications
+# bSPA
 
-bSPA (pronounced "spa", with a silent b) is the new name for a small, lightweight Backend‑for‑Frontend (BFF) library. The name reflects the idea that the backend layer is so small and unobtrusive that it's "barely there," just like the silent b. The library provides a minimal, nested backend layer that sits directly behind a SPA (Single‑Page Application) and exposes client‑specific API endpoints, routing, and data shaping.
+A Node runtime for defining the backend surface of a Single Page Application. It standardizes how SPAs are served, how identity is extracted and transformed, and how frontend requests are composed or routed to internal services. Unlike API gateways, it is not infrastructure-focused or protocol-agnostic; it is designed specifically around SPA application boundaries and developer-defined backend composition logic.
 
-The purpose of bSPA is to offer a tiny, focused backend layer that lives inside a larger system but remains simple, cute, and easy to integrate. It is not a full framework; it is a helper layer designed to be embedded within an existing application structure.
+bSPA is intended for teams that want a consistent way to build SPA backends without re-implementing the same patterns in every project.
 
-### Architecture
+In three words it's a “frontend ingress gateway”
 
-```mermaid
-flowchart LR
-    subgraph Client["Client (Browser Runtime)"]
-        SPA["SPA (Angular)"]
-    end
+## What problem this tries to solve
 
-    subgraph BFF["BFF Layer (src/)"]
-        Static["Static Asset Hosting"]
-        Config["Configuration Endpoint (/api/config)"]
-        Proxy["API Gateway / Proxy (/api/*)"]
-        Auth["Token Validation (JWT via JWKS)"]
-    end
+In many SPA setups, each application ends up with its own backend-for-frontend (BFF) implementation. Over time this leads to:
 
-    subgraph Services["Backend Services"]
-        API["Domain APIs"]
-    end
+* inconsistent auth handling
+* duplicated proxy logic
+* ad-hoc configuration endpoints
+* backend service URLs leaking into frontend code
+* CORS configuration repeated across services
+* unclear boundaries between frontend and backend responsibilities
 
-    JWKS["Identity Provider (JWKS)"]
+bSPA provides a shared structure for these concerns.
 
-    SPA -->|"Initial Load"| Static
-    SPA -->|"Bootstrap Config"| Config
-    SPA -->|"API Request (Bearer Token)"| Proxy
-    Proxy -->|"1. Validate Token"| Auth
-    Auth -.->|"Resolve Signing Keys"| JWKS
-    Auth -->|"2. Token Valid"| Proxy
-    Proxy -->|"3. Forward Request (Trusted Context)"| API
+It is not a full framework, and it does not try to replace existing backend systems.
+
+## Core idea
+
+bSPA sits between the browser and internal services:
+
+```
+Browser (SPA)
+   ↓
+bSPA (BFF runtime)
+   ↓
+Private backend services
 ```
 
-### Repository Structure
+Its role is to:
 
-| Package                   | Description                                           |
-| ------------------------- | ----------------------------------------------------- |
-| `src/`                    | bSPA BFF server library                               |
-| `demo/angular-spa`        | Angular SPA consuming bSPA (standalone server)         |
-| `demo/backend`            | Example backend service proxied by bSPA                |
+* serve the SPA
+* validate and interpret authentication (if enabled)
+* expose a controlled API surface to the frontend
+* route or compose requests to backend services
+* keep backend topology out of the browser
 
-### Demos
+## Key concepts
 
-**SPA Demo** (`demo/angular-spa`): Uses `createServer()` where bSPA owns the entire server.
+### 1. SPA hosting
 
-### Ports
+bSPA can serve built frontend assets directly.
 
-| Demo               | Port |
-| ------------------ | ---- |
-| `demo/backend`     | 3000 |
-| `demo/angular-spa` | 3001 |
+### 2. BFF routes
 
-### Quick Start
+You explicitly define what the frontend is allowed to call.
+
+Routes can either:
+
+* call backend services via a handler (recommended)
+* proxy requests to services (escape hatch)
+
+### 3. Services
+
+Backend systems are defined as named services rather than raw URLs inside route logic.
+
+### 4. Identity handling
+
+Authentication happens at the BFF boundary.
+
+bSPA can:
+
+* validate JWTs
+* extract claims
+* optionally propagate identity to backend services via headers
+
+It does not assume backend services share the same auth model.
+
+## Example
 
 ```ts
 import { createServer } from 'bspa';
 
-const server = createServer({
-  app: { spa: { root: './dist/browser' } }
+interface JwtClaims {
+  sub: string;
+  name: string;
+  admin: boolean;
+}
+
+const server = createServer<JwtClaims>({
+  app: {
+    name: 'angular-spa',
+    spa: {
+      root: './dist/browser',
+    },
+  },
+
+  security: {
+    cors: 'internal',
+    csp: 'strict',
+  },
+
+  auth: {
+    strategy: 'jwt',
+    jwks: 'https://idp/.well-known/jwks.json',
+    identityPropagation: 'headers',
+  },
+
+  identity: {
+    claims: ['sub', 'name', 'admin'],
+    headers: {
+      'x-user-id': 'sub',
+      'x-user-name': 'name',
+      'x-user-admin': 'admin',
+    },
+  },
+
+  services: {
+    users: {
+      baseUrl: 'http://users.internal',
+    },
+  },
+
+  routes: [
+    {
+      path: '/bff/config',
+      access: 'public',
+      handler: () => ({
+        environment: process.env.NODE_ENV,
+      }),
+    },
+
+    {
+      path: '/api/users',
+      access: 'private',
+      handler: async ({ services, claims }) => {
+        return services.users.get('/users', {
+          headers: {
+            'x-user-id': claims.sub,
+          },
+        });
+      },
+    },
+
+    {
+      path: '/bff/admin',
+      access: 'private',
+      authorize: ({ claims }) => claims.admin,
+      handler: ({ claims }) => ({
+        user: claims,
+        data: 'secret',
+      }),
+    },
+  ],
 });
 
 await server.start();
 ```
 
-### Endpoints
+## Routes
 
-**Public endpoints** are defined in `api.routes` with `access: 'public'`. For example, a typical config endpoint:
+Routes define the API surface exposed to the SPA.
+
+### Handler route (preferred)
+
+Used when you want to compose or shape data:
 
 ```ts
-api: {
-  basePath: '/bff',
-  routes: [
-    { path: '/config', access: 'public', method: 'get', handler: myConfigHandler }
-  ]
+{
+  path: '/api/users',
+  access: 'private',
+  handler: ({ services, claims }) => {
+    return services.users.get('/users', {
+      headers: { 'x-user-id': claims.sub },
+    });
+  },
 }
 ```
 
-**Proxy endpoints** forward requests to backend services. These are defined in `proxy.routes`:
+### Proxy route (escape hatch)
+
+Used for simple passthrough cases:
 
 ```ts
-proxy: {
-  basePath: '/api',
-  routes: [
-    { path: '/users', access: 'private', target: 'http://backend:3001' },
-    { path: '/products', access: 'private', target: 'http://backend:3001' }
-  ]
+{
+  path: '/api/products',
+  access: 'private',
+  proxy: {
+    service: 'products',
+    injectIdentity: true,
+  },
 }
 ```
 
-### Usage
+## Services
 
-**Development:** SPA dev server proxies API requests to BFF → BFF proxies to backend services.
+Services define backend endpoints in one place:
 
-**Production:** bSPA serves built SPA and handles all `/api` requests.
+```ts
+services: {
+  users: {
+    baseUrl: 'http://users.internal',
+  },
+}
+```
 
-### When This Pattern Fits
+Routes reference services by name rather than raw URLs.
 
-- Multiple SPAs need similar server behavior
-- Consistent API access patterns across apps
-- Runtime configuration preferred over build-time injection
-- Backend is separate (microservices, APIs)
+## Authentication model
 
-Less useful when frontend and backend are tightly coupled, or highly customized server behavior is needed per app.
+Authentication is handled at the BFF boundary.
 
-### Implementation
+bSPA supports extracting identity from JWTs and making it available to route handlers.
 
-Built with Express + Zod. Pre-wired middleware and routing with sensible defaults. Designed to serve SPAs and handle their API proxying needs.
+Identity can optionally be forwarded to backend services as headers.
+
+bSPA does not enforce how backend services validate or trust this identity.
+
+## Security defaults
+
+bSPA applies conservative defaults for SPA hosting environments:
+
+* internal CORS policy by default
+* strict CSP mode available
+* no direct exposure of backend service URLs to the browser
+
+## What this is (and isn’t)
+
+### This is:
+
+* a runtime layer for SPA backends
+* a way to standardize BFF structure across applications
+* a controlled entry point to backend services
+
+### This is not:
+
+* an API gateway replacement
+* a service mesh
+* a full backend framework
+* a distributed systems abstraction layer
+
+## Status
+
+This project is early-stage (`0.0.0`).
+
+The API is expected to evolve as it is used in real applications.
