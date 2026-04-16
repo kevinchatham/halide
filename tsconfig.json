@@ -14,7 +14,7 @@
     "noUncheckedIndexedAccess": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["node"]
+    "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*"]
 }

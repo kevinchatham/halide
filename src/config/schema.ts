@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
 export const SpaConfigSchema = z.object({
@@ -15,13 +15,14 @@ export const ProxyRouteSchema = z.object({
 
 export const ApiHandlerSchema = z
   .function()
-  .args(z.custom<Request>(), z.custom<Response>())
+  .args(z.custom<Request>(), z.custom<Response>(), z.custom<NextFunction>())
   .returns(z.void());
 
 export const ApiRouteSchema = z.object({
   path: z.string(),
   access: z.enum(['public', 'private']),
   handler: ApiHandlerSchema,
+  method: z.enum(['get', 'post', 'put', 'patch', 'delete']).default('get'),
 });
 
 export const ProxyConfigSchema = z.object({
@@ -46,6 +47,7 @@ export const ServerConfigSchema = z.object({
   security: z
     .object({
       cors: z.enum(['internal', 'public']).default('internal'),
+      corsOrigins: z.array(z.string()).default(['http://localhost:4200']),
       csp: z.enum(['strict', 'relaxed']).default('strict'),
     })
     .optional(),
@@ -58,5 +60,9 @@ export const ServerConfigSchema = z.object({
     .refine((data) => data.strategy !== 'bearer' || data.secret !== undefined, {
       message: 'auth.secret is required when strategy is bearer',
       path: ['auth', 'secret'],
+    })
+    .refine((data) => data.strategy !== 'jwks' || data.jwksUri !== undefined, {
+      message: 'auth.jwksUri is required when strategy is jwks',
+      path: ['auth', 'jwksUri'],
     }),
 });

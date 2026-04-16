@@ -11,16 +11,22 @@ import { createSpaHandler } from './routes/spa';
 
 export interface Server<TClaims = unknown> {
   start: () => Promise<void>;
+  stop: () => Promise<void>;
 }
 
 export function createServer<TClaims = unknown>(configInput: ServerConfig): Server<TClaims> {
   const config = ServerConfigSchema.parse(configInput);
   const app = express();
 
-  const security = config.security ?? { cors: 'internal', csp: 'strict' };
+  const security = config.security ?? {
+    cors: 'internal',
+    corsOrigins: ['http://localhost:4200'],
+    csp: 'strict',
+  };
 
   if (security.cors === 'internal') {
-    app.use(cors({ origin: 'http://localhost:4200' }));
+    const origins = security.corsOrigins ?? ['http://localhost:4200'];
+    app.use(cors({ origin: origins }));
   } else {
     app.use(cors());
   }
@@ -36,13 +42,30 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig): Serv
   const spaHandler = createSpaHandler(config.app.spa);
   app.get(/^\/(.*)/, spaHandler);
 
+  let httpServer: ReturnType<typeof app.listen> | undefined;
+
   return {
     start: async () => {
       const port = Number.parseInt(process.env['PORT'] || '3001', 10);
       await new Promise<void>((resolve) => {
-        app.listen(port, () => {
+        httpServer = app.listen(port, () => {
           console.log(`[${config.app.name}] Server running on port ${port}`);
           resolve();
+        });
+      });
+    },
+    stop: async () => {
+      const server = httpServer;
+      if (!server) {
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
         });
       });
     },

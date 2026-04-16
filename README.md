@@ -12,7 +12,7 @@ flowchart LR
         SPA["SPA (Angular)"]
     end
 
-    subgraph BFF["BFF Layer (packages/server)"]
+    subgraph BFF["BFF Layer (src/)"]
         Static["Static Asset Hosting"]
         Config["Configuration Endpoint (/api/config)"]
         Proxy["API Gateway / Proxy (/api/*)"]
@@ -73,7 +73,7 @@ await server.start();
 api: {
   basePath: '/bff',
   routes: [
-    { path: '/config', access: 'public', handler: myConfigHandler }
+    { path: '/config', access: 'public', method: 'get', handler: myConfigHandler }
   ]
 }
 ```

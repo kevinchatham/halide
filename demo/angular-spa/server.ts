@@ -41,6 +41,7 @@ const server = createServer<JwtClaims>({
       {
         path: '/token',
         access: 'public',
+        method: 'get',
         handler: (_req: Request, res: Response): void => {
           res.json({ token: generateMockJwt() });
         },
@@ -48,6 +49,7 @@ const server = createServer<JwtClaims>({
       {
         path: '/config',
         access: 'public',
+        method: 'get',
         handler: (_req: Request, res: Response): void => {
           res.json({
             apiUrl: 'http://localhost:3000',
@@ -58,6 +60,7 @@ const server = createServer<JwtClaims>({
       {
         path: '/admin',
         access: 'private',
+        method: 'get',
         handler: (req: Request, res: Response): void => {
           res.json({ user: req.claims, data: 'secret' });
         },
@@ -66,6 +69,7 @@ const server = createServer<JwtClaims>({
   },
   security: {
     cors: 'internal',
+    corsOrigins: ['http://localhost:4200', 'http://localhost:3001'],
     csp: 'strict',
   },
   auth: {

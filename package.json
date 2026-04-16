@@ -25,6 +25,9 @@
     "lint:fix": "biome check --write .",
     "lint:watch": "nodemon --exec 'biome check --fix .' --watch '**/*.ts' --watch '**/*.json' --ext '.ts,.json'",
     "lint": "biome check .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -46,6 +49,7 @@
     "concurrently": "^9.2.1",
     "rimraf": "^6.0.0",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.4"
   }
 }
