@@ -226,8 +226,6 @@ export type ProxyRoute<TClaims = unknown> = {
   path: string;
   /** Path to append to the target URL when proxying. */
   proxyPath?: string;
-  /** Retry configuration for failed proxy requests. */
-  retries?: { attempts: number; backoff: 'exponential' | 'linear' | 'fixed' };
   /** Target URL to proxy requests to. */
   target: string;
   /** Timeout in milliseconds for proxy requests. */

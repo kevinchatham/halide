@@ -3,7 +3,7 @@
  *
  * This file demonstrates how to configure a bSPA server with:
  * - API routes (public and private with authorization)
- * - Proxy routes with request transformation and retries
+ * - Proxy routes with request transformation
  * - Observability hooks for request/response logging
  * - Security configuration (CORS, CSP, JWT auth, rate limiting)
  * - SPA serving configuration
@@ -95,7 +95,6 @@ const healthRoute = apiRoute({
  * - `methods`: supports GET and POST
  * - `proxyPath`: rewrites the path from '/api/users' to '/users' on the target
  * - `timeout`: aborts the proxy request after 5000ms
- * - `retries`: up to 3 attempts with exponential backoff on failure
  * - `transform`: merges a `transformed: true` flag into the request body before forwarding
  */
 const usersProxyRoute = proxyRoute<UserClaims>({
@@ -105,10 +104,6 @@ const usersProxyRoute = proxyRoute<UserClaims>({
   proxyPath: '/users',
   target: 'https://api.example.com',
   timeout: 5000,
-  retries: {
-    attempts: 3,
-    backoff: 'exponential',
-  },
   transform: ({ body, headers }) => ({
     body: {
       ...(typeof body === 'object' && body ? body : {}),
@@ -214,7 +209,7 @@ const openapi: OpenApiConfig = {
  * - `security`: CORS, CSP, authentication, and rate limiting
  * - `observability`: request/response lifecycle hooks
  * - `apiRoutes`: direct API endpoint handlers (public and private)
- * - `proxyRoutes`: reverse proxy routes with optional transformation and retries
+ * - `proxyRoutes`: reverse proxy routes with optional transformation
  * - `openapi`: Swagger UI and OpenAPI spec configuration
  *
  * Passed to `createServer()` to bootstrap the bSPA BFF server.

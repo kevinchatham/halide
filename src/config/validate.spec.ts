@@ -258,7 +258,6 @@ describe('validateServerConfig', () => {
             methods: ['get', 'post'],
             target: 'https://api.example.com',
             proxyPath: '/users',
-            retries: { attempts: 3, backoff: 'exponential' },
             timeout: 5000,
           },
         ],
