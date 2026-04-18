@@ -43,7 +43,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/users',
@@ -80,7 +80,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/admin',
@@ -115,7 +115,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/users',
@@ -164,7 +164,7 @@ describe('registerRoutes', () => {
       security: {
         auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
       },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/admin',
@@ -204,7 +204,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/admin',
@@ -239,7 +239,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/users',
@@ -288,7 +288,7 @@ describe('registerRoutes', () => {
       security: {
         auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
       },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/admin',
@@ -493,7 +493,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      proxyRoutes: [
         {
           type: 'proxy',
           path: '/users',

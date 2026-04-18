@@ -1,5 +1,11 @@
 import type { Express, Request, RequestHandler, Router } from 'express';
-import type { ApiRoute, ProxyRoute, RequestContext, ServerConfig } from '../config/types';
+import type {
+  ApiRoute,
+  ObservabilityConfig,
+  ProxyRoute,
+  RequestContext,
+  ServerConfig,
+} from '../config/types';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
 import { createBodyValidationMiddleware } from '../middleware/validate';
 import { createProxyService } from '../services/proxy';
@@ -75,13 +81,44 @@ function createAuthorizeMiddleware<TClaims = unknown>(
   };
 }
 
+function createObservationMiddleware<TClaims = unknown>(
+  observability: ObservabilityConfig<TClaims>,
+  routeObserve: boolean | undefined
+): RequestHandler | undefined {
+  if (!observability.onRequest && !observability.onResponse) return undefined;
+  if (routeObserve === false) return undefined;
+
+  return (req, res, next) => {
+    const start = Date.now();
+    const ctx = buildRequestContext(req);
+    const claims = req.claims as TClaims | undefined;
+
+    observability.onRequest?.(ctx, claims);
+
+    if (observability.onResponse) {
+      res.on('finish', () => {
+        observability.onResponse?.(ctx, claims, {
+          statusCode: res.statusCode,
+          durationMs: Date.now() - start,
+          error: res.locals?.error,
+        });
+      });
+    }
+
+    next();
+  };
+}
+
 export async function registerRoutes<TClaims = unknown>(
   app: Express | Router,
   config: ServerConfig<TClaims>
 ): Promise<void> {
-  const { apiRoutes, proxyRoutes } = config;
+  const { apiRoutes, proxyRoutes, observability } = config;
   const router = app as Router;
   const authMiddleware = await createAuthMiddlewareFromConfig<TClaims>(config);
+  const obsMiddleware = observability
+    ? createObservationMiddleware<TClaims>(observability, undefined)
+    : undefined;
 
   if (apiRoutes) {
     for (const route of apiRoutes) {
@@ -93,6 +130,9 @@ export async function registerRoutes<TClaims = unknown>(
       }
       if (route.authorize) {
         middlewares.push(createAuthorizeMiddleware(route.authorize));
+      }
+      if (obsMiddleware) {
+        middlewares.push(obsMiddleware);
       }
       if (route.validationSchema) {
         middlewares.push(createBodyValidationMiddleware(route.validationSchema));
@@ -131,6 +171,9 @@ export async function registerRoutes<TClaims = unknown>(
         }
         if (route.authorize) {
           middlewares.push(createAuthorizeMiddleware(route.authorize));
+        }
+        if (obsMiddleware) {
+          middlewares.push(obsMiddleware);
         }
         middlewares.push(proxyHandler);
         router[method](fullPath, ...middlewares);

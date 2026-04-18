@@ -1,7 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import './types/express';
-import type { RequestContext, ServerConfig } from './config/types';
+import type { ServerConfig } from './config/types';
 import { validateServerConfig } from './config/validate';
 import { createErrorHandler } from './middleware/errorHandler';
 import { createRateLimitMiddleware } from './middleware/rateLimit';
@@ -52,41 +52,6 @@ export async function createServer<TClaims = unknown>(
   app.use(express.json());
   app.use(createSecurityMiddleware(cspConfig));
   app.use(createErrorHandler());
-
-  const observability = configInput.observability ?? {};
-  if (observability.onRequest || observability.onResponse) {
-    app.use((req, res, next) => {
-      const start = Date.now();
-
-      const ctx: RequestContext = {
-        method: req.method.toLowerCase() as RequestContext['method'],
-        path: req.path,
-        headers: req.headers as Record<string, string | string[]>,
-        params: Object.fromEntries(Object.entries(req.params).map(([k, v]) => [k, String(v)])),
-        query: Object.fromEntries(
-          Object.entries(req.query).map(([k, v]) => [
-            k,
-            Array.isArray(v) ? v.map(String) : String(v),
-          ])
-        ),
-        body: req.body,
-      };
-
-      observability.onRequest?.(ctx, undefined);
-
-      if (observability.onResponse) {
-        res.on('finish', async () => {
-          observability.onResponse?.(ctx, undefined, {
-            statusCode: res.statusCode,
-            durationMs: Date.now() - start,
-            error: res.locals?.error,
-          });
-        });
-      }
-
-      next();
-    });
-  }
 
   await registerRoutes<TClaims>(app, configInput);
 
