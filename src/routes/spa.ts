@@ -3,7 +3,7 @@ import type { RequestHandler } from 'express';
 import type { SpaConfig } from '../config/types';
 
 export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): RequestHandler {
-  const { root, fallback } = spaConfig;
+  const { root, fallback = 'index.html' } = spaConfig;
 
   return (req, res) => {
     const requestPath = req.path;

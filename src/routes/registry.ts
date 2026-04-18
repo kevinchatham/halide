@@ -1,6 +1,5 @@
 import type { Express, Request, RequestHandler, Router } from 'express';
-import type { RequestContext } from '../config/schema';
-import type { ApiRoute, ProxyRoute, ServerConfig } from '../config/types';
+import type { ApiRoute, ProxyRoute, RequestContext, ServerConfig } from '../config/types';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
 import { createProxyService } from '../services/proxy';
 

@@ -1,4 +1,4 @@
-import { type ServerConfig, apiRoute, proxyRoute } from './types';
+import { type RequestContext, type ServerConfig, apiRoute, proxyRoute } from './types';
 
 interface UserClaims {
   sub: string;
@@ -9,8 +9,11 @@ const exampleModularRoute = apiRoute<UserClaims>({
   path: '/profile',
   access: 'private',
   method: 'get',
-  authorize: async (_ctx, claims) => claims?.role === 'admin',
-  handler: async (ctx, claims) => ({ ctx: JSON.stringify(ctx), user: claims?.sub }),
+  authorize: (_ctx, claims) => !!claims?.role && claims.role === 'admin',
+  handler: async (ctx, claims) => ({
+    ctx: JSON.stringify(ctx),
+    user: claims?.sub,
+  }),
 });
 
 // this is only used for development purposes and will be removed when I am satisfied with the api design
@@ -54,9 +57,11 @@ const exampleServerConfig: ServerConfig<UserClaims> = {
       access: 'private',
       methods: ['get'],
       target: 'https://api.example.com',
-      authorize: async (_ctx, claims) => claims?.role === 'admin' || claims?.role === 'user',
+      authorize: (ctx: RequestContext, claims: UserClaims | undefined) =>
+        !!claims?.role && (claims.role === 'admin' || claims.role === 'user'),
     }),
   ],
+
   observability: {
     onRequest: (ctx, claims) => {
       console.log(`[Request] ${ctx.method} ${ctx.path} (user: ${claims?.sub ?? 'anonymous'})`);

@@ -1,7 +1,6 @@
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import type { RequestContext } from '../config/schema';
-import type { TransformFn } from '../config/types';
+import type { RequestContext, TransformFn } from '../config/types';
 
 export function createProxyService<TClaims = unknown>(
   target: string,

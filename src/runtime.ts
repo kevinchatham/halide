@@ -1,9 +1,8 @@
 import cors from 'cors';
 import express from 'express';
 import './types/express';
-import type { RequestContext } from './config/schema';
-import { CorsConfigSchema, ObservabilityConfigSchema, ServerConfigSchema } from './config/schema';
-import type { ServerConfig } from './config/types';
+import type { RequestContext, ServerConfig } from './config/types';
+import { validateServerConfig } from './config/validate';
 import { createErrorHandler } from './middleware/errorHandler';
 import { createRateLimitMiddleware } from './middleware/rateLimit';
 import { createSecurityMiddleware } from './middleware/security';
@@ -18,33 +17,43 @@ export interface Server<TClaims = unknown> {
 export async function createServer<TClaims = unknown>(
   configInput: ServerConfig<TClaims>
 ): Promise<Server<TClaims>> {
-  const { routes, ...configRest } = configInput;
-  const config = ServerConfigSchema.parse(configRest);
+  validateServerConfig(configInput);
+
   const app = express();
 
-  const corsConfig = config.security?.cors ?? CorsConfigSchema.parse({});
-  const cspConfig = config.security?.csp ?? {};
+  const security = configInput.security;
+  const corsConfig = security?.cors;
+  const cspConfig = security?.csp ?? {};
+  const corsMethods = corsConfig?.methods ?? ['get', 'post', 'put', 'delete', 'patch'];
+  const corsOrigin = corsConfig?.origin ?? ['*'];
+  const corsCredentials = corsConfig?.credentials ?? false;
 
   app.use(
     cors({
-      origin: corsConfig.origin,
-      methods: corsConfig.methods.map((m) => m.toUpperCase()),
-      allowedHeaders: corsConfig.allowedHeaders,
-      exposedHeaders: corsConfig.exposedHeaders,
-      credentials: corsConfig.credentials,
-      maxAge: corsConfig.maxAge,
+      origin: corsOrigin,
+      methods: corsMethods.map((m) => m.toUpperCase()),
+      allowedHeaders: corsConfig?.allowedHeaders,
+      exposedHeaders: corsConfig?.exposedHeaders,
+      credentials: corsCredentials,
+      maxAge: corsConfig?.maxAge,
     })
   );
 
-  if (config.security?.rateLimit) {
-    app.use(createRateLimitMiddleware(config.security.rateLimit));
+  if (security?.rateLimit) {
+    const rateLimitConfig = security.rateLimit;
+    app.use(
+      createRateLimitMiddleware({
+        windowMs: rateLimitConfig.windowMs ?? 900000,
+        maxRequests: rateLimitConfig.maxRequests ?? 100,
+      })
+    );
   }
 
   app.use(express.json());
   app.use(createSecurityMiddleware(cspConfig));
   app.use(createErrorHandler());
 
-  const observability = ObservabilityConfigSchema.parse(config.observability ?? {});
+  const observability = configInput.observability ?? {};
   if (observability.onRequest || observability.onResponse) {
     app.use((req, res, next) => {
       const start = Date.now();
@@ -79,9 +88,9 @@ export async function createServer<TClaims = unknown>(
     });
   }
 
-  await registerRoutes<TClaims>(app, { ...config, routes });
+  await registerRoutes<TClaims>(app, configInput);
 
-  const spaHandler = createSpaHandler(config.spa);
+  const spaHandler = createSpaHandler(configInput.spa);
   app.get(/^\/(.*)/, spaHandler);
 
   let httpServer: ReturnType<typeof app.listen> | undefined;
@@ -91,7 +100,7 @@ export async function createServer<TClaims = unknown>(
       const port = Number.parseInt(process.env['PORT'] || '3001', 10);
       await new Promise<void>((resolve) => {
         httpServer = app.listen(port, () => {
-          console.log(`[${config.spa.name}] Server running on port ${port}`);
+          console.log(`[${configInput.spa.name ?? 'app'}] Server running on port ${port}`);
           resolve();
         });
       });
