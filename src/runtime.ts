@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import './types/express';
+import { DEFAULTS } from './config/defaults';
 import type { ServerConfig } from './config/types';
 import { validateServerConfig } from './config/validate';
 import { createErrorHandler } from './middleware/errorHandler';
@@ -25,9 +26,9 @@ export async function createServer<TClaims = unknown>(
   const security = configInput.security;
   const corsConfig = security?.cors;
   const cspConfig = security?.csp ?? {};
-  const corsMethods = corsConfig?.methods ?? ['get', 'post', 'put', 'delete', 'patch'];
-  const corsOrigin = corsConfig?.origin ?? ['*'];
-  const corsCredentials = corsConfig?.credentials ?? false;
+  const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
+  const corsOrigin = corsConfig?.origin ?? DEFAULTS.cors.origin;
+  const corsCredentials = corsConfig?.credentials ?? DEFAULTS.cors.credentials;
 
   app.use(
     cors({
@@ -44,8 +45,8 @@ export async function createServer<TClaims = unknown>(
     const rateLimitConfig = security.rateLimit;
     app.use(
       createRateLimitMiddleware({
-        windowMs: rateLimitConfig.windowMs ?? 900000,
-        maxRequests: rateLimitConfig.maxRequests ?? 100,
+        windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
+        maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
       })
     );
   }
@@ -57,7 +58,7 @@ export async function createServer<TClaims = unknown>(
   await registerRoutes<TClaims>(app, configInput);
 
   if (configInput.openapi?.enabled) {
-    const swaggerPath = configInput.openapi.path ?? '/swagger';
+    const swaggerPath = configInput.openapi.path ?? DEFAULTS.openapi.path;
     const swaggerRouter = createSwaggerMiddleware(configInput, configInput.openapi.options);
     app.use(swaggerPath, swaggerRouter);
   }
@@ -72,7 +73,9 @@ export async function createServer<TClaims = unknown>(
       const port = Number.parseInt(process.env['PORT'] || '3001', 10);
       await new Promise<void>((resolve) => {
         httpServer = app.listen(port, () => {
-          console.log(`[${configInput.spa.name ?? 'app'}] Server running on port ${port}`);
+          console.log(
+            `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`
+          );
           resolve();
         });
       });

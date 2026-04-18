@@ -1,4 +1,5 @@
 import type { ZodSchema } from 'zod';
+import { defaultAuthorize } from './defaults';
 
 export type OpenApiRouteMeta = {
   /** Short summary of the operation. */
@@ -284,20 +285,14 @@ export function apiRoute<TClaims, TBody = unknown>(
   return {
     ...route,
     type: 'api',
-    authorize: route.authorize ?? (async () => true),
+    authorize: route.authorize ?? defaultAuthorize,
   };
 }
 
-/**
- * Factory function to create a proxy route with default values.
- * @template TClaims - The type of claims contained in the JWT.
- * @param route - The proxy route input configuration.
- * @returns A fully configured proxy route.
- */
 export function proxyRoute<TClaims>(route: ProxyRouteInput<TClaims>): ProxyRoute<TClaims> {
   return {
     ...route,
     type: 'proxy',
-    authorize: route.authorize ?? (async () => true),
+    authorize: route.authorize ?? defaultAuthorize,
   };
 }

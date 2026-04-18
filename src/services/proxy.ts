@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { DEFAULTS } from '../config/defaults';
 import type { RequestContext, TransformFn } from '../config/types';
 
 export function createProxyService<TClaims = unknown>(
@@ -7,12 +8,14 @@ export function createProxyService<TClaims = unknown>(
   routePath: string,
   proxyPath: string | undefined,
   identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined,
-  transform?: TransformFn
+  transform?: TransformFn,
+  timeout?: number
 ): RequestHandler {
   const rewritePath = proxyPath ?? routePath;
   return createProxyMiddleware({
     target,
     changeOrigin: true,
+    timeout: timeout ?? DEFAULTS.proxy.timeoutMs,
     pathRewrite: {
       [`^${routePath}`]: rewritePath,
     },

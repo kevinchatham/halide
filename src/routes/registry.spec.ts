@@ -513,6 +513,7 @@ describe('registerRoutes', () => {
       '/users',
       '/api/users',
       identityFn,
+      undefined,
       undefined
     );
   });

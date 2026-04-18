@@ -1,4 +1,5 @@
 import type { Express, Request, RequestHandler, Router } from 'express';
+import { DEFAULTS } from '../config/defaults';
 import type {
   ApiRoute,
   ObservabilityConfig,
@@ -123,7 +124,7 @@ export async function registerRoutes<TClaims = unknown>(
   if (apiRoutes) {
     for (const route of apiRoutes) {
       const fullPath = route.path;
-      const method = route.method ?? 'get';
+      const method = route.method ?? DEFAULTS.route.method;
       const middlewares: RequestHandler[] = [];
       if (route.access !== 'public' && authMiddleware) {
         middlewares.push(authMiddleware);
@@ -160,7 +161,8 @@ export async function registerRoutes<TClaims = unknown>(
         route.path,
         route.proxyPath,
         route.identity,
-        route.transform
+        route.transform,
+        route.timeout
       );
       type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
       const methods = route.methods as HttpMethod[];

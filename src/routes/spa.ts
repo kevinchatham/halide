@@ -1,9 +1,10 @@
 import path from 'node:path';
 import type { RequestHandler } from 'express';
+import { DEFAULTS } from '../config/defaults';
 import type { SpaConfig } from '../config/types';
 
 export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): RequestHandler {
-  const { root, fallback = 'index.html' } = spaConfig;
+  const { root, fallback = DEFAULTS.spa.fallback } = spaConfig;
 
   return (req, res) => {
     const requestPath = req.path;

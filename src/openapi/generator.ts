@@ -1,5 +1,6 @@
 import type { OpenAPIV3 } from 'openapi-types';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { DEFAULTS } from '../config/defaults';
 import type { ServerConfig } from '../config/types';
 import type { OpenApiOptions } from './types';
 
@@ -115,9 +116,9 @@ export function generateOpenApiSpec<TClaims>(
     dedup: new WeakMap(),
   };
 
-  const title = options?.title ?? 'bSPA API';
-  const version = options?.version ?? '1.0.0';
-  const includeProxyRoutes = options?.includeProxyRoutes ?? true;
+  const title = options?.title ?? DEFAULTS.openapi.title;
+  const version = options?.version ?? DEFAULTS.openapi.version;
+  const includeProxyRoutes = options?.includeProxyRoutes ?? DEFAULTS.openapi.includeProxyRoutes;
 
   const paths: MutablePaths = {};
   const components: Record<string, OpenAPIV3.SchemaObject> = {};
@@ -144,7 +145,7 @@ export function generateOpenApiSpec<TClaims>(
         paths[openApiPath] = {};
       }
       const pathItem = paths[openApiPath] as MutablePathItem;
-      const method = (route.method ?? 'get') as keyof MutablePathItem;
+      const method = (route.method ?? DEFAULTS.route.method) as keyof MutablePathItem;
 
       const parameters = extractPathParams(route.path);
       const operation: OpenAPIV3.OperationObject = {
