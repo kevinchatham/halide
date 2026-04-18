@@ -1,22 +1,26 @@
 import type { RequestHandler } from 'express';
 import helmet from 'helmet';
 
-export function createSecurityMiddleware(csp: 'strict' | 'relaxed'): RequestHandler {
+type CspConfig = Record<string, string[]>;
+
+export function createSecurityMiddleware(csp: CspConfig): RequestHandler {
   return (req, res, next) => {
-    const helmetInstance = helmet({
-      contentSecurityPolicy:
-        csp === 'strict'
-          ? {
-              directives: {
+    const helmetConfig: Parameters<typeof helmet>[0] = {
+      contentSecurityPolicy: {
+        directives:
+          Object.keys(csp).length > 0
+            ? csp
+            : {
                 defaultSrc: ["'self'"],
                 scriptSrc: ["'self'"],
                 scriptSrcAttr: ["'unsafe-inline'"],
                 styleSrc: ["'self'", "'unsafe-inline'"],
                 imgSrc: ["'self'"],
               },
-            }
-          : false,
-    });
+      },
+    };
+
+    const helmetInstance = helmet(helmetConfig);
     helmetInstance(req, res, next);
   };
 }

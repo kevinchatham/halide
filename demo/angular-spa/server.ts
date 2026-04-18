@@ -20,13 +20,10 @@ function generateMockJwt(): string {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const server = createServer<JwtClaims>({
-  app: {
+  spa: {
     name: 'angular-spa',
-    spa: {
-      root: path.join(__dirname, './browser'),
-      basePath: '/',
-      fallback: 'index.html',
-    },
+    root: path.join(__dirname, './browser'),
+    fallback: 'index.html',
   },
   proxy: {
     basePath: '/api',
@@ -68,9 +65,15 @@ const server = createServer<JwtClaims>({
     ],
   },
   security: {
-    cors: 'internal',
-    corsOrigins: ['http://localhost:4200', 'http://localhost:3001'],
-    csp: 'strict',
+    cors: {
+      origin: ['http://localhost:4200', 'http://localhost:3001'],
+      credentials: true,
+    },
+    csp: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
+    },
   },
   auth: {
     strategy: 'bearer',

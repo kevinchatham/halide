@@ -1,12 +1,13 @@
 import cors from 'cors';
 import express from 'express';
 import './types/express';
-import { ServerConfigSchema } from './config/schema';
+import type { RequestContext } from './config/schema';
+import { CorsConfigSchema, ObservabilityConfigSchema, ServerConfigSchema } from './config/schema';
 import type { ServerConfig } from './config/types';
 import { createErrorHandler } from './middleware/errorHandler';
-import { createLoggerMiddleware } from './middleware/logger';
+import { createRateLimitMiddleware } from './middleware/rateLimit';
 import { createSecurityMiddleware } from './middleware/security';
-import { registerApiRoutes, registerProxyRoutes } from './routes/registry';
+import { registerRoutes } from './routes/registry';
 import { createSpaHandler } from './routes/spa';
 
 export interface Server<TClaims = unknown> {
@@ -14,32 +15,73 @@ export interface Server<TClaims = unknown> {
   stop: () => Promise<void>;
 }
 
-export function createServer<TClaims = unknown>(configInput: ServerConfig): Server<TClaims> {
-  const config = ServerConfigSchema.parse(configInput);
+export async function createServer<TClaims = unknown>(
+  configInput: ServerConfig<TClaims>
+): Promise<Server<TClaims>> {
+  const { routes, ...configRest } = configInput;
+  const config = ServerConfigSchema.parse(configRest);
   const app = express();
 
-  const security = config.security ?? {
-    cors: 'internal',
-    corsOrigins: ['http://localhost:4200'],
-    csp: 'strict',
-  };
+  const corsConfig = config.security?.cors ?? CorsConfigSchema.parse({});
+  const cspConfig = config.security?.csp ?? {};
 
-  if (security.cors === 'internal') {
-    const origins = security.corsOrigins ?? ['http://localhost:4200'];
-    app.use(cors({ origin: origins }));
-  } else {
-    app.use(cors());
+  app.use(
+    cors({
+      origin: corsConfig.origin,
+      methods: corsConfig.methods.map((m) => m.toUpperCase()),
+      allowedHeaders: corsConfig.allowedHeaders,
+      exposedHeaders: corsConfig.exposedHeaders,
+      credentials: corsConfig.credentials,
+      maxAge: corsConfig.maxAge,
+    })
+  );
+
+  if (config.security?.rateLimit) {
+    app.use(createRateLimitMiddleware(config.security.rateLimit));
   }
 
   app.use(express.json());
-  app.use(createLoggerMiddleware(config.app.name));
-  app.use(createSecurityMiddleware(security.csp));
+  app.use(createSecurityMiddleware(cspConfig));
   app.use(createErrorHandler());
 
-  registerProxyRoutes<TClaims>(app, config);
-  registerApiRoutes<TClaims>(app, config);
+  const observability = ObservabilityConfigSchema.parse(config.observability ?? {});
+  if (observability.onRequest || observability.onResponse) {
+    app.use((req, res, next) => {
+      const start = Date.now();
 
-  const spaHandler = createSpaHandler(config.app.spa);
+      const ctx: RequestContext = {
+        method: req.method.toLowerCase() as RequestContext['method'],
+        path: req.path,
+        headers: req.headers as Record<string, string | string[]>,
+        params: Object.fromEntries(Object.entries(req.params).map(([k, v]) => [k, String(v)])),
+        query: Object.fromEntries(
+          Object.entries(req.query).map(([k, v]) => [
+            k,
+            Array.isArray(v) ? v.map(String) : String(v),
+          ])
+        ),
+        body: req.body,
+      };
+
+      observability.onRequest?.(ctx, undefined);
+
+      if (observability.onResponse) {
+        res.on('finish', async () => {
+          observability.onResponse?.(ctx, undefined, {
+            statusCode: res.statusCode,
+            durationMs: Date.now() - start,
+            error: res.locals?.error,
+          });
+        });
+      }
+
+      next();
+    });
+  }
+
+  await registerRoutes<TClaims>(app, { ...config, routes });
+
+  const spaHandler = createSpaHandler(config.spa);
   app.get(/^\/(.*)/, spaHandler);
 
   let httpServer: ReturnType<typeof app.listen> | undefined;
@@ -49,7 +91,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig): Serv
       const port = Number.parseInt(process.env['PORT'] || '3001', 10);
       await new Promise<void>((resolve) => {
         httpServer = app.listen(port, () => {
-          console.log(`[${config.app.name}] Server running on port ${port}`);
+          console.log(`[${config.spa.name}] Server running on port ${port}`);
           resolve();
         });
       });

@@ -13,34 +13,38 @@ describe('createProxyService', () => {
   });
 
   it('creates proxy middleware with correct configuration', () => {
-    createProxyService('https://api.example.com', '/api/users');
+    createProxyService('https://api.example.com', '/api/users', '/users');
 
-    expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith({
-      target: 'https://api.example.com',
-      changeOrigin: true,
-      pathRewrite: {
-        '^/api/users': '',
-      },
-    });
+    expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: 'https://api.example.com',
+        changeOrigin: true,
+        pathRewrite: {
+          '^/api/users': '/users',
+        },
+      })
+    );
   });
 
   it('creates middleware for different routes', () => {
-    createProxyService('https://backend.example.com', '/v1/data');
+    createProxyService('https://backend.example.com', '/v1/data', '/data');
 
-    expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith({
-      target: 'https://backend.example.com',
-      changeOrigin: true,
-      pathRewrite: {
-        '^/v1/data': '',
-      },
-    });
+    expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: 'https://backend.example.com',
+        changeOrigin: true,
+        pathRewrite: {
+          '^/v1/data': '/data',
+        },
+      })
+    );
   });
 
   it('returns a RequestHandler', () => {
     const mockHandler = vi.fn();
     mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
 
-    const result = createProxyService('https://api.example.com', '/api');
+    const result = createProxyService('https://api.example.com', '/api', '/api');
 
     expect(result).toBe(mockHandler);
   });

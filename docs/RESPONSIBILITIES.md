@@ -20,10 +20,9 @@
 │  Identity Extraction                         │
 │  Identity Mapping (claims → headers)         │
 │  Access Control (route-level)                │
-│  Service Abstraction Layer                   │
 │  Request Composition (handlers)              │
 │  Proxy (escape hatch)                        │
-│  Retries (bounded, per-service)              │
+│  Retries (bounded, per-route)                │
 │  Timeouts                                    │
 │  Observability hooks (request-level)         │
 └──────────────┬───────────────────────────────┘

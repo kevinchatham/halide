@@ -1,20 +1,14 @@
 import { createSecurityMiddleware } from './security';
 
 describe('createSecurityMiddleware', () => {
-  it('creates middleware for strict CSP mode', () => {
-    const handler = createSecurityMiddleware('strict');
+  it('creates middleware with default directives', () => {
+    const handler = createSecurityMiddleware({});
     expect(typeof handler).toBe('function');
     expect(handler.length).toBe(3);
   });
 
-  it('creates middleware for relaxed CSP mode', () => {
-    const handler = createSecurityMiddleware('relaxed');
-    expect(typeof handler).toBe('function');
-    expect(handler.length).toBe(3);
-  });
-
-  it('strict mode applies helmet with restrictive directives', () => {
-    const handler = createSecurityMiddleware('strict');
+  it('applies helmet with default directives', () => {
+    const handler = createSecurityMiddleware({});
 
     const req = { method: 'GET', path: '/', headers: {} } as any;
     const res = {
@@ -32,8 +26,11 @@ describe('createSecurityMiddleware', () => {
     );
   });
 
-  it('relaxed mode does not set CSP header', () => {
-    const handler = createSecurityMiddleware('relaxed');
+  it('uses custom directives when provided', () => {
+    const handler = createSecurityMiddleware({
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'none'"],
+    });
 
     const req = { method: 'GET', path: '/', headers: {} } as any;
     const res = {
@@ -45,14 +42,14 @@ describe('createSecurityMiddleware', () => {
 
     handler(req, res, next);
 
-    const cspCalls = res.setHeader.mock.calls.filter(
-      (call: any[]) => call[0] === 'Content-Security-Policy'
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Security-Policy',
+      expect.stringContaining("'none'")
     );
-    expect(cspCalls).toHaveLength(0);
   });
 
   it('calls next after applying helmet', () => {
-    const handler = createSecurityMiddleware('strict');
+    const handler = createSecurityMiddleware({});
 
     const req = { method: 'GET', path: '/', headers: {} } as any;
     const res = {

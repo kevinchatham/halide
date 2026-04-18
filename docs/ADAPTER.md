@@ -20,7 +20,6 @@ Think of bSPA like this:
      ┌──────────────────────────────┐
      │ routing                     │
      │ identity                   │
-     │ services                   │
      │ retries / observability    │
      └──────────────┬──────────────┘
                     │
@@ -65,7 +64,6 @@ type Context<TClaims, TIdentity> = {
   claims?: TClaims;
   identity?: TIdentity;
 
-  services: Services;
   params: Record<string, string>;
 };
 ```
@@ -102,7 +100,6 @@ Only adapters do.
 ```ts id="core_api"
 createRuntime({
   routes,
-  services,
   identity,
   auth,
 })

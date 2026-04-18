@@ -3,7 +3,11 @@ import { createSpaHandler } from './spa';
 
 describe('createSpaHandler', () => {
   it('returns 404 for /api paths', () => {
-    const handler = createSpaHandler({ root: '/var/www', basePath: '/', fallback: 'index.html' });
+    const handler = createSpaHandler({
+      name: 'test-app',
+      root: '/var/www',
+      fallback: 'index.html',
+    });
 
     const req = { path: '/api/users' } as any;
     const res = {
@@ -19,7 +23,11 @@ describe('createSpaHandler', () => {
   });
 
   it('sends file for root path', () => {
-    const handler = createSpaHandler({ root: '/var/www', basePath: '/', fallback: 'index.html' });
+    const handler = createSpaHandler({
+      name: 'test-app',
+      root: '/var/www',
+      fallback: 'index.html',
+    });
 
     const req = { path: '/' } as any;
     const res = {
@@ -33,7 +41,11 @@ describe('createSpaHandler', () => {
   });
 
   it('sends file for specific path', () => {
-    const handler = createSpaHandler({ root: '/var/www', basePath: '/', fallback: 'index.html' });
+    const handler = createSpaHandler({
+      name: 'test-app',
+      root: '/var/www',
+      fallback: 'index.html',
+    });
 
     const req = { path: '/about' } as any;
     const res = {
@@ -50,7 +62,11 @@ describe('createSpaHandler', () => {
   });
 
   it('falls back to index.html on file error', () => {
-    const handler = createSpaHandler({ root: '/var/www', basePath: '/', fallback: 'index.html' });
+    const handler = createSpaHandler({
+      name: 'test-app',
+      root: '/var/www',
+      fallback: 'index.html',
+    });
 
     const req = { path: '/nonexistent' } as any;
     const res = {
@@ -70,7 +86,11 @@ describe('createSpaHandler', () => {
   });
 
   it('does not call fallback on success', () => {
-    const handler = createSpaHandler({ root: '/var/www', basePath: '/', fallback: 'index.html' });
+    const handler = createSpaHandler({
+      name: 'test-app',
+      root: '/var/www',
+      fallback: 'index.html',
+    });
 
     const req = { path: '/styles.css' } as any;
     const res = {
@@ -88,7 +108,7 @@ describe('createSpaHandler', () => {
   });
 
   it('uses custom fallback file', () => {
-    const handler = createSpaHandler({ root: '/public', basePath: '/', fallback: 'app.html' });
+    const handler = createSpaHandler({ name: 'test-app', root: '/public', fallback: 'app.html' });
 
     const req = { path: '/deep/nested/route' } as any;
     const res = {

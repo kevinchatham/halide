@@ -56,10 +56,6 @@ Routes can either:
 * call backend services via a handler (recommended)
 * proxy requests to services (escape hatch)
 
-### 3. Services
-
-Backend systems are defined as named services rather than raw URLs inside route logic.
-
 ### 4. Identity handling
 
 Authentication happens at the BFF boundary.
@@ -84,16 +80,19 @@ interface JwtClaims {
 }
 
 const server = createServer<JwtClaims>({
-  app: {
+  spa: {
     name: 'angular-spa',
-    spa: {
-      root: './dist/browser',
-    },
+    root: './dist/browser',
   },
 
   security: {
     cors: 'internal',
-    csp: 'strict',
+    csp: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
+    },
+  },
   },
 
   auth: {
@@ -111,12 +110,6 @@ const server = createServer<JwtClaims>({
     },
   },
 
-  services: {
-    users: {
-      baseUrl: 'http://users.internal',
-    },
-  },
-
   routes: [
     {
       path: '/bff/config',
@@ -129,11 +122,14 @@ const server = createServer<JwtClaims>({
     {
       path: '/api/users',
       access: 'private',
-      handler: async ({ services, claims }) => {
-        return services.users.get('/users', {
+      handler: async ({ claims }) => {
+        return fetch('http://users.internal/users', {
           headers: {
             'x-user-id': claims.sub,
           },
+        });
+      },
+    },
         });
       },
     },
@@ -163,13 +159,13 @@ Used when you want to compose or shape data:
 
 ```ts
 {
-  path: '/api/users',
+  type: 'proxy',
+  path: '/api/products',
   access: 'private',
-  handler: ({ services, claims }) => {
-    return services.users.get('/users', {
-      headers: { 'x-user-id': claims.sub },
-    });
-  },
+  target: 'http://products.internal',
+  proxyPath: '/products',
+  identity: 'inject',
+  observe: true,
 }
 ```
 
@@ -179,28 +175,17 @@ Used for simple passthrough cases:
 
 ```ts
 {
+  type: 'proxy',
   path: '/api/products',
   access: 'private',
-  proxy: {
-    service: 'products',
-    injectIdentity: true,
-  },
+  target: 'http://products.internal',
+  proxyPath: '/products',
+  identity: 'inject',
+  observe: true,
 }
 ```
 
-## Services
-
-Services define backend endpoints in one place:
-
-```ts
-services: {
-  users: {
-    baseUrl: 'http://users.internal',
-  },
-}
-```
-
-Routes reference services by name rather than raw URLs.
+Routes reference backend endpoints directly rather than by service name.
 
 ## Authentication model
 
@@ -208,7 +193,7 @@ Authentication is handled at the BFF boundary.
 
 bSPA supports extracting identity from JWTs and making it available to route handlers.
 
-Identity can optionally be forwarded to backend services as headers.
+Identity can optionally be forwarded to backend services via headers.
 
 bSPA does not enforce how backend services validate or trust this identity.
 
@@ -226,7 +211,7 @@ bSPA applies conservative defaults for SPA hosting environments:
 
 * a runtime layer for SPA backends
 * a way to standardize BFF structure across applications
-* a controlled entry point to backend services
+* a controlled entry point to backend systems
 
 ### This is not:
 

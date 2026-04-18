@@ -1,10 +1,8 @@
 import {
-  ApiConfigSchema,
-  ApiHandlerSchema,
   ApiRouteSchema,
-  AppConfigSchema,
-  ProxyConfigSchema,
+  PathSchema,
   ProxyRouteSchema,
+  RequestContextSchema,
   ServerConfigSchema,
   SpaConfigSchema,
 } from './schema';
@@ -13,15 +11,15 @@ describe('SpaConfigSchema', () => {
   it('parses valid spa config', () => {
     const result = SpaConfigSchema.parse({ root: '/var/www' });
     expect(result).toEqual({
+      name: 'app',
       root: '/var/www',
-      basePath: '/',
       fallback: 'index.html',
     });
   });
 
-  it('uses defaults for basePath and fallback', () => {
+  it('uses defaults for name and fallback', () => {
     const result = SpaConfigSchema.parse({ root: '/public' });
-    expect(result.basePath).toBe('/');
+    expect(result.name).toBe('app');
     expect(result.fallback).toBe('index.html');
   });
 
@@ -36,165 +34,299 @@ describe('SpaConfigSchema', () => {
   });
 });
 
+describe('PathSchema', () => {
+  it('accepts valid paths starting with /', () => {
+    expect(PathSchema.parse('/')).toBe('/');
+    expect(PathSchema.parse('/users')).toBe('/users');
+    expect(PathSchema.parse('/api/v1/data')).toBe('/api/v1/data');
+  });
+
+  it('rejects empty strings', () => {
+    expect(PathSchema.safeParse('').success).toBe(false);
+  });
+
+  it('rejects paths not starting with /', () => {
+    expect(PathSchema.safeParse('users').success).toBe(false);
+    expect(PathSchema.safeParse('api/data').success).toBe(false);
+  });
+});
+
+describe('RequestContextSchema', () => {
+  it('parses headers with string values', () => {
+    const result = RequestContextSchema.parse({
+      method: 'get',
+      path: '/test',
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(result.headers['content-type']).toBe('application/json');
+  });
+
+  it('parses headers with array values', () => {
+    const result = RequestContextSchema.parse({
+      method: 'get',
+      path: '/test',
+      headers: { 'set-cookie': ['cookie1=value1', 'cookie2=value2'] },
+    });
+    expect(result.headers['set-cookie']).toEqual(['cookie1=value1', 'cookie2=value2']);
+  });
+
+  it('parses query params with string values', () => {
+    const result = RequestContextSchema.parse({
+      method: 'get',
+      path: '/test',
+      headers: {},
+      query: { foo: 'bar' },
+    });
+    expect(result.query['foo']).toBe('bar');
+  });
+
+  it('parses query params with array values', () => {
+    const result = RequestContextSchema.parse({
+      method: 'get',
+      path: '/test',
+      headers: {},
+      query: { tags: ['a', 'b', 'c'] },
+    });
+    expect(result.query['tags']).toEqual(['a', 'b', 'c']);
+  });
+
+  it('defaults query to empty object', () => {
+    const result = RequestContextSchema.parse({
+      method: 'get',
+      path: '/test',
+      headers: {},
+    });
+    expect(result.query).toEqual({});
+  });
+});
+
 describe('ProxyRouteSchema', () => {
   it('parses valid proxy route', () => {
     const result = ProxyRouteSchema.parse({
+      type: 'proxy',
       path: '/users',
       access: 'public',
+      methods: ['get'],
       target: 'https://api.example.com',
+      proxyPath: '/api/users',
     });
     expect(result.access).toBe('public');
+    expect(result.methods).toEqual(['get']);
   });
 
   it('rejects invalid access value', () => {
     const result = ProxyRouteSchema.safeParse({
+      type: 'proxy',
       path: '/users',
       access: 'invalid',
+      methods: ['get'],
       target: 'https://api.example.com',
+      proxyPath: '/api/users',
     });
     expect(result.success).toBe(false);
   });
 
   it('rejects invalid URL for target', () => {
     const result = ProxyRouteSchema.safeParse({
+      type: 'proxy',
       path: '/users',
       access: 'public',
+      methods: ['get'],
       target: 'not-a-url',
+      proxyPath: '/api/users',
     });
     expect(result.success).toBe(false);
   });
-});
 
-describe('ApiHandlerSchema', () => {
-  it('accepts a function', () => {
-    const handler = (_req: any, _res: any) => {};
-    const result = ApiHandlerSchema.safeParse(handler);
-    expect(result.success).toBe(true);
+  it('rejects proxyPath not starting with /', () => {
+    const result = ProxyRouteSchema.safeParse({
+      type: 'proxy',
+      path: '/users',
+      access: 'public',
+      methods: ['get'],
+      target: 'https://api.example.com',
+      proxyPath: 'api/users',
+    });
+    expect(result.success).toBe(false);
   });
 
-  it('rejects non-function values', () => {
-    const result = ApiHandlerSchema.safeParse('not a function');
+  it('requires methods field', () => {
+    const result = ProxyRouteSchema.safeParse({
+      type: 'proxy',
+      path: '/users',
+      access: 'public',
+      target: 'https://api.example.com',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty methods array', () => {
+    const result = ProxyRouteSchema.safeParse({
+      type: 'proxy',
+      path: '/users',
+      access: 'public',
+      methods: [],
+      target: 'https://api.example.com',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects path not starting with /', () => {
+    const result = ProxyRouteSchema.safeParse({
+      type: 'proxy',
+      path: 'users',
+      access: 'public',
+      methods: ['get'],
+      target: 'https://api.example.com',
+    });
     expect(result.success).toBe(false);
   });
 });
 
 describe('ApiRouteSchema', () => {
   it('parses valid api route', () => {
-    const handler = (_req: any, _res: any) => {};
+    const handler = async (_req: any, _res: any) => {};
     const result = ApiRouteSchema.parse({
+      type: 'api',
       path: '/data',
       access: 'private',
       handler,
     });
     expect(result.access).toBe('private');
   });
-});
 
-describe('ProxyConfigSchema', () => {
-  it('uses defaults', () => {
-    const result = ProxyConfigSchema.parse({});
-    expect(result.basePath).toBe('/api');
-    expect(result.routes).toEqual([]);
-  });
-
-  it('parses with custom routes', () => {
-    const result = ProxyConfigSchema.parse({
-      basePath: '/proxy',
-      routes: [{ path: '/users', access: 'public', target: 'https://api.example.com' }],
+  it('rejects path not starting with /', () => {
+    const handler = async (_req: any, _res: any) => {};
+    const result = ApiRouteSchema.safeParse({
+      type: 'api',
+      path: 'data',
+      access: 'private',
+      handler,
     });
-    expect(result.basePath).toBe('/proxy');
-    expect(result.routes).toHaveLength(1);
-  });
-});
-
-describe('ApiConfigSchema', () => {
-  it('uses defaults', () => {
-    const result = ApiConfigSchema.parse({});
-    expect(result.basePath).toBe('/bff');
-    expect(result.routes).toEqual([]);
-  });
-});
-
-describe('AppConfigSchema', () => {
-  it('parses valid app config', () => {
-    const result = AppConfigSchema.parse({
-      spa: { root: '/var/www' },
-    });
-    expect(result.name).toBe('app');
-    expect(result.spa.root).toBe('/var/www');
-  });
-
-  it('allows custom name', () => {
-    const result = AppConfigSchema.parse({
-      name: 'my-app',
-      spa: { root: '/var/www' },
-    });
-    expect(result.name).toBe('my-app');
+    expect(result.success).toBe(false);
   });
 });
 
 describe('ServerConfigSchema', () => {
   it('parses minimal valid config', () => {
     const result = ServerConfigSchema.parse({
-      app: { spa: { root: '/var/www' } },
-      auth: { strategy: 'bearer', secret: 'my-secret' },
+      spa: { root: '/var/www' },
     });
-    expect(result.security).toBeUndefined();
-    expect(result.auth.strategy).toBe('bearer');
+    expect(result.spa.root).toBe('/var/www');
   });
 
   it('parses full config', () => {
     const result = ServerConfigSchema.parse({
-      app: { name: 'test', spa: { root: '/public', fallback: 'index.html' } },
-      proxy: { basePath: '/api', routes: [] },
-      api: { basePath: '/bff', routes: [] },
-      security: { cors: 'public', csp: 'relaxed' },
-      auth: { strategy: 'bearer', secret: 'secret123' },
+      spa: { name: 'test', root: '/public', fallback: 'index.html' },
+      security: {
+        cors: { origin: ['http://localhost:3000'], credentials: true },
+        csp: { 'default-src': ["'self'"] },
+        auth: { strategy: 'bearer', secret: 'secret123' },
+      },
     });
-    expect(result.app.name).toBe('test');
-    expect(result.security?.cors).toBe('public');
-    expect(result.security?.csp).toBe('relaxed');
+    expect(result.spa.name).toBe('test');
+    expect(result.security?.cors?.origin).toEqual(['http://localhost:3000']);
+    expect(result.security?.cors?.credentials).toBe(true);
+  });
+
+  it('rejects wildcard origin with credentials', () => {
+    const result = ServerConfigSchema.safeParse({
+      spa: { root: '/var/www' },
+      security: {
+        cors: { origin: '*', credentials: true },
+        auth: { strategy: 'bearer', secret: 'secret' },
+      },
+    });
+    expect(result.success).toBe(false);
   });
 
   it('requires secret for bearer strategy', () => {
     const result = ServerConfigSchema.safeParse({
-      app: { spa: { root: '/var/www' } },
-      auth: { strategy: 'bearer' },
+      spa: { root: '/var/www' },
+      security: { auth: { strategy: 'bearer' } },
     });
     expect(result.success).toBe(false);
   });
 
   it('allows jwks strategy without secret', () => {
     const result = ServerConfigSchema.parse({
-      app: { spa: { root: '/var/www' } },
-      auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
+      spa: { root: '/var/www' },
+      security: {
+        auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
+      },
     });
-    expect(result.auth.strategy).toBe('jwks');
+    expect(result.security?.auth?.strategy).toBe('jwks');
   });
 
   it('rejects invalid cors value', () => {
     const result = ServerConfigSchema.safeParse({
-      app: { spa: { root: '/var/www' } },
-      auth: { strategy: 'bearer', secret: 'secret' },
-      security: { cors: 'invalid' },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects invalid csp value', () => {
-    const result = ServerConfigSchema.safeParse({
-      app: { spa: { root: '/var/www' } },
-      auth: { strategy: 'bearer', secret: 'secret' },
-      security: { cors: 'internal', csp: 'invalid' },
+      spa: { root: '/var/www' },
+      security: { cors: { origin: 123 }, auth: { strategy: 'bearer', secret: 'secret' } },
     });
     expect(result.success).toBe(false);
   });
 
   it('rejects empty secret', () => {
     const result = ServerConfigSchema.safeParse({
-      app: { spa: { root: '/var/www' } },
-      auth: { strategy: 'bearer', secret: '' },
+      spa: { root: '/var/www' },
+      security: { auth: { strategy: 'bearer', secret: '' } },
     });
     expect(result.success).toBe(false);
+  });
+
+  it('requires auth when routes have private access', () => {
+    const result = ServerConfigSchema.safeParse({
+      spa: { root: '/var/www' },
+      routes: [
+        {
+          type: 'api',
+          path: '/private',
+          access: 'private',
+          method: 'get',
+          handler: async () => ({}),
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.errors.some((e) => e.message.includes('security.auth is required'))).toBe(
+        true
+      );
+    }
+  });
+
+  it('allows private routes when auth is defined', () => {
+    const result = ServerConfigSchema.safeParse({
+      spa: { root: '/var/www' },
+      routes: [
+        {
+          type: 'api',
+          path: '/private',
+          access: 'private',
+          method: 'get',
+          handler: async () => ({}),
+        },
+      ],
+      security: {
+        auth: { strategy: 'bearer', secret: 'secret' },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('allows public routes without auth', () => {
+    const result = ServerConfigSchema.safeParse({
+      spa: { root: '/var/www' },
+      routes: [
+        {
+          type: 'api',
+          path: '/public',
+          access: 'public',
+          method: 'get',
+          handler: async () => ({}),
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
   });
 });
