@@ -9,14 +9,14 @@ import { createSecurityMiddleware } from './middleware/security';
 import { registerRoutes } from './routes/registry';
 import { createSpaHandler } from './routes/spa';
 
-export interface Server<TClaims = unknown> {
+export interface Server {
   start: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
 export async function createServer<TClaims = unknown>(
   configInput: ServerConfig<TClaims>
-): Promise<Server<TClaims>> {
+): Promise<Server> {
   validateServerConfig(configInput);
 
   const app = express();

@@ -319,7 +319,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [{ type: 'api', path: '/health', access: 'public', handler: mockHandler }],
+      apiRoutes: [{ type: 'api', path: '/health', access: 'public', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);
@@ -337,7 +337,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [{ type: 'api', path: '/profile', access: 'private', handler: mockHandler }],
+      apiRoutes: [{ type: 'api', path: '/profile', access: 'private', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);
@@ -356,7 +356,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      apiRoutes: [
         { type: 'api', path: '/public', access: 'public', handler: mockHandler1 },
         { type: 'api', path: '/private', access: 'private', handler: mockHandler2 },
       ],
@@ -378,7 +378,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      apiRoutes: [
         { type: 'api', path: '/create', access: 'public', handler: mockHandler, method: 'post' },
         { type: 'api', path: '/update', access: 'private', handler: mockHandler, method: 'post' },
       ],
@@ -399,7 +399,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      apiRoutes: [
         { type: 'api', path: '/update/:id', access: 'public', handler: mockHandler, method: 'put' },
       ],
     } as any;
@@ -418,7 +418,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [
+      apiRoutes: [
         {
           type: 'api',
           path: '/delete/:id',
@@ -445,7 +445,7 @@ describe('registerRoutes', () => {
     const config = {
       spa: { root: '/var/www' },
       security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      routes: [{ type: 'api', path: '/data', access: 'public', handler: mockHandler }],
+      apiRoutes: [{ type: 'api', path: '/data', access: 'public', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);
@@ -464,7 +464,7 @@ describe('registerRoutes', () => {
       security: {
         auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
       },
-      routes: [{ type: 'api', path: '/profile', access: 'private', handler: mockHandler }],
+      apiRoutes: [{ type: 'api', path: '/profile', access: 'private', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);

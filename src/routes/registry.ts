@@ -1,6 +1,7 @@
 import type { Express, Request, RequestHandler, Router } from 'express';
 import type { ApiRoute, ProxyRoute, RequestContext, ServerConfig } from '../config/types';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
+import { createBodyValidationMiddleware } from '../middleware/validate';
 import { createProxyService } from '../services/proxy';
 
 async function resolveSecret(
@@ -78,16 +79,13 @@ export async function registerRoutes<TClaims = unknown>(
   app: Express | Router,
   config: ServerConfig<TClaims>
 ): Promise<void> {
-  const { routes } = config;
-  if (!routes || routes.length === 0) return;
-
+  const { apiRoutes, proxyRoutes } = config;
+  const router = app as Router;
   const authMiddleware = await createAuthMiddlewareFromConfig<TClaims>(config);
 
-  for (const route of routes) {
-    const fullPath = route.path;
-    const router = app as Router;
-
-    if ('handler' in route && route.handler) {
+  if (apiRoutes) {
+    for (const route of apiRoutes) {
+      const fullPath = route.path;
       const method = route.method ?? 'get';
       const middlewares: RequestHandler[] = [];
       if (route.access !== 'public' && authMiddleware) {
@@ -96,8 +94,11 @@ export async function registerRoutes<TClaims = unknown>(
       if (route.authorize) {
         middlewares.push(createAuthorizeMiddleware(route.authorize));
       }
+      if (route.validationSchema) {
+        middlewares.push(createBodyValidationMiddleware(route.validationSchema));
+      }
       const handlerMiddleware: RequestHandler = async (req, res, next) => {
-        const ctx = buildRequestContext(req);
+        const ctx = buildRequestContext(req) as RequestContext & { body: unknown };
         const claims = req.claims as TClaims | undefined;
         try {
           const result = await route.handler(ctx, claims);
@@ -108,24 +109,28 @@ export async function registerRoutes<TClaims = unknown>(
       };
       middlewares.push(handlerMiddleware);
       router[method](fullPath, ...middlewares);
-    } else if ('target' in route && route.target) {
-      const proxyRoute = route as ProxyRoute<TClaims>;
+    }
+  }
+
+  if (proxyRoutes) {
+    for (const route of proxyRoutes) {
+      const fullPath = route.path;
       const proxyHandler = createProxyService<TClaims>(
-        proxyRoute.target,
-        proxyRoute.path,
-        proxyRoute.proxyPath,
-        proxyRoute.identity,
-        proxyRoute.transform
+        route.target,
+        route.path,
+        route.proxyPath,
+        route.identity,
+        route.transform
       );
       type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
-      const methods = proxyRoute.methods as HttpMethod[];
+      const methods = route.methods as HttpMethod[];
       for (const method of methods) {
         const middlewares: RequestHandler[] = [];
         if (route.access !== 'public' && authMiddleware) {
           middlewares.push(authMiddleware);
         }
-        if (proxyRoute.authorize) {
-          middlewares.push(createAuthorizeMiddleware(proxyRoute.authorize));
+        if (route.authorize) {
+          middlewares.push(createAuthorizeMiddleware(route.authorize));
         }
         middlewares.push(proxyHandler);
         router[method](fullPath, ...middlewares);

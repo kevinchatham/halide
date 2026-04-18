@@ -1,3 +1,5 @@
+import type { ZodSchema } from 'zod';
+
 /**
  * Context object for incoming HTTP requests.
  */
@@ -31,12 +33,13 @@ export type ResponseContext = {
 /**
  * Handler function for API routes.
  * @template TClaims - The type of claims contained in the JWT.
+ * @template TBody - The type of the request body.
  * @param ctx - The request context.
  * @param claims - The JWT claims, or undefined if not authenticated.
  * @returns The response body.
  */
-export type ApiRouteHandler<TClaims> = (
-  ctx: RequestContext,
+export type ApiRouteHandler<TClaims, TBody = unknown> = (
+  ctx: RequestContext & { body: TBody },
   claims: TClaims | undefined
 ) => Promise<unknown>;
 
@@ -144,8 +147,10 @@ export type SecurityConfig = {
 export type ServerConfig<TClaims = unknown> = {
   /** Observability hook configuration. */
   observability?: ObservabilityConfig<TClaims>;
-  /** List of route definitions. */
-  routes?: Route<TClaims>[];
+  /** List of API route definitions. */
+  apiRoutes?: ApiRoute<TClaims, any>[];
+  /** List of proxy route definitions. */
+  proxyRoutes?: ProxyRoute<TClaims>[];
   /** Security configuration. */
   security?: SecurityConfig;
   /** SPA serving configuration. */
@@ -155,8 +160,9 @@ export type ServerConfig<TClaims = unknown> = {
 /**
  * Definition for an API route handler.
  * @template TClaims - The type of claims contained in the JWT.
+ * @template TBody - The type of the request body.
  */
-export type ApiRoute<TClaims = unknown> = {
+export type ApiRoute<TClaims = unknown, TBody = unknown> = {
   /** Whether the route requires authentication. */
   access: 'public' | 'private';
   /** HTTP method for the route. */
@@ -170,7 +176,9 @@ export type ApiRoute<TClaims = unknown> = {
   /** Authorization function for the route. */
   authorize?: AuthorizeFn<TClaims>;
   /** Handler function for the route. */
-  handler: ApiRouteHandler<TClaims>;
+  handler: ApiRouteHandler<TClaims, TBody>;
+  /** Zod schema for validating request body. */
+  validationSchema?: ZodSchema<TBody>;
 };
 
 /**
@@ -208,13 +216,21 @@ export type ProxyRoute<TClaims = unknown> = {
  * Union type for all route definitions.
  * @template TClaims - The type of claims contained in the JWT.
  */
-export type Route<TClaims = unknown> = ApiRoute<TClaims> | ProxyRoute<TClaims>;
+export type Route<TClaims = unknown, TBody = unknown> =
+  | ApiRoute<TClaims, TBody>
+  | ProxyRoute<TClaims>;
 
 /**
  * Input type for creating an API route (excludes computed fields).
  * @template TClaims - The type of claims contained in the JWT.
+ * @template TBody - The type of the request body.
  */
-export type ApiRouteInput<TClaims> = Omit<ApiRoute<TClaims>, 'type' | 'authorize'> & {
+export type ApiRouteInput<TClaims, TBody = unknown> = Omit<
+  ApiRoute<TClaims, TBody>,
+  'type' | 'authorize' | 'handler'
+> & {
+  /** Handler function for the route. */
+  handler: ApiRouteHandler<TClaims, TBody>;
   /** Authorization function for the route. */
   authorize?: AuthorizeFn<TClaims>;
 };
@@ -228,10 +244,13 @@ export type ProxyRouteInput<TClaims> = Omit<ProxyRoute<TClaims>, 'type'>;
 /**
  * Factory function to create an API route with default values.
  * @template TClaims - The type of claims contained in the JWT.
+ * @template TBody - The type of the request body.
  * @param route - The API route input configuration.
  * @returns A fully configured API route.
  */
-export function apiRoute<TClaims>(route: ApiRouteInput<TClaims>): ApiRoute<TClaims> {
+export function apiRoute<TClaims, TBody = unknown>(
+  route: ApiRouteInput<TClaims, TBody>
+): ApiRoute<TClaims, TBody> {
   return {
     access: route.access,
     method: route.method,
