@@ -41,19 +41,20 @@ export async function createServer<TClaims = unknown>(
     })
   );
 
+  let rateLimitDispose: (() => void) | undefined;
+
   if (security?.rateLimit) {
     const rateLimitConfig = security.rateLimit;
-    app.use(
-      createRateLimitMiddleware({
-        windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
-        maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
-      })
-    );
+    const { middleware, dispose } = createRateLimitMiddleware({
+      windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
+      maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+    });
+    app.use(middleware);
+    rateLimitDispose = dispose;
   }
 
   app.use(express.json());
   app.use(createSecurityMiddleware(cspConfig));
-  app.use(createErrorHandler());
 
   await registerRoutes<TClaims>(app, configInput);
 
@@ -65,6 +66,8 @@ export async function createServer<TClaims = unknown>(
 
   const spaHandler = createSpaHandler(configInput.spa);
   app.get(/^\/(.*)/, spaHandler);
+
+  app.use(createErrorHandler());
 
   let httpServer: ReturnType<typeof app.listen> | undefined;
 
@@ -81,6 +84,7 @@ export async function createServer<TClaims = unknown>(
       });
     },
     stop: async () => {
+      rateLimitDispose?.();
       const server = httpServer;
       if (!server) {
         return;

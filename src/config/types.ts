@@ -1,5 +1,19 @@
+import type { contentSecurityPolicy } from 'helmet';
 import type { ZodSchema } from 'zod';
 import { defaultAuthorize } from './defaults';
+
+export type CspDirectiveValue =
+  | string
+  | ((req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => string);
+
+export type CspDirectives = Record<
+  string,
+  null | Iterable<CspDirectiveValue> | typeof contentSecurityPolicy.dangerouslyDisableDefaultSrc
+>;
+
+export type CspOptions = {
+  directives?: CspDirectives;
+};
 
 export type OpenApiRouteMeta = {
   /** Short summary of the operation. */
@@ -153,7 +167,7 @@ export type SecurityConfig = {
   /** CORS configuration. */
   cors?: CorsConfig;
   /** Content Security Policy directives. */
-  csp?: Record<string, string[]>;
+  csp?: CspOptions;
   /** Rate limiting configuration. */
   rateLimit?: { maxRequests?: number; windowMs?: number };
 };

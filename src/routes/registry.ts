@@ -34,14 +34,14 @@ async function createAuthMiddlewareFromConfig<TClaims = unknown>(
   const secret = auth.secret;
 
   if (auth.strategy === 'jwks' && jwksUri) {
-    return createJwksAuthMiddleware<TClaims>(jwksUri);
+    return createJwksAuthMiddleware<TClaims>(jwksUri, auth.audience);
   }
 
   if (secret !== undefined) {
     const resolvedSecret = await resolveSecret(
       secret as string | (() => string) | (() => Promise<string>)
     );
-    return createAuthMiddleware<TClaims>(new TextEncoder().encode(resolvedSecret));
+    return createAuthMiddleware<TClaims>(new TextEncoder().encode(resolvedSecret), auth.audience);
   }
 
   return undefined;
@@ -117,9 +117,6 @@ export async function registerRoutes<TClaims = unknown>(
   const { apiRoutes, proxyRoutes, observability } = config;
   const router = app as Router;
   const authMiddleware = await createAuthMiddlewareFromConfig<TClaims>(config);
-  const obsMiddleware = observability
-    ? createObservationMiddleware<TClaims>(observability, undefined)
-    : undefined;
 
   if (apiRoutes) {
     for (const route of apiRoutes) {
@@ -132,8 +129,9 @@ export async function registerRoutes<TClaims = unknown>(
       if (route.authorize) {
         middlewares.push(createAuthorizeMiddleware(route.authorize));
       }
-      if (obsMiddleware) {
-        middlewares.push(obsMiddleware);
+      if (observability) {
+        const routeObs = createObservationMiddleware(observability, route.observe);
+        if (routeObs) middlewares.push(routeObs);
       }
       if (route.validationSchema) {
         middlewares.push(createBodyValidationMiddleware(route.validationSchema));
@@ -174,8 +172,9 @@ export async function registerRoutes<TClaims = unknown>(
         if (route.authorize) {
           middlewares.push(createAuthorizeMiddleware(route.authorize));
         }
-        if (obsMiddleware) {
-          middlewares.push(obsMiddleware);
+        if (observability) {
+          const routeObs = createObservationMiddleware(observability, route.observe);
+          if (routeObs) middlewares.push(routeObs);
         }
         middlewares.push(proxyHandler);
         router[method](fullPath, ...middlewares);

@@ -1,4 +1,4 @@
-import type { CorsConfig, Route, SecurityConfig, SpaConfig } from './types';
+import type { CorsConfig, CspOptions, Route, SecurityConfig, SpaConfig } from './types';
 
 type RouteInput<TClaims = unknown> =
   | Partial<Extract<Route<TClaims>, { type: 'api' }>>
@@ -8,13 +8,14 @@ type CorsInput = Partial<CorsConfig>;
 type AuthInput = Partial<NonNullable<SecurityConfig['auth']>>;
 type SecurityInput = {
   cors?: CorsInput;
-  csp?: Record<string, string[]>;
+  csp?: CspOptions;
   auth?: AuthInput;
   rateLimit?: { windowMs?: number; maxRequests?: number };
 };
 type ServerConfigInput<TClaims = unknown> = {
   spa?: SpaInput;
-  routes?: RouteInput<TClaims>[];
+  apiRoutes?: RouteInput<TClaims>[];
+  proxyRoutes?: RouteInput<TClaims>[];
   observability?: unknown;
   security?: SecurityInput;
 };
@@ -27,7 +28,7 @@ function validateSpaConfig(spa?: SpaInput): void {
 
 function validateRoute<TClaims = unknown>(route: RouteInput<TClaims>): void {
   if (!route.path?.startsWith('/')) {
-    throw new Error(`Route path must start with /: ${route.path}`);
+    throw new Error(`Route path must start with / (${route.type ?? 'api'}): ${route.path}`);
   }
   const isApiRoute = route.type === 'api' || route.type === undefined;
   if (isApiRoute && !('handler' in route)) {
@@ -81,8 +82,12 @@ function validateAuth(auth?: AuthInput): void {
 
 export function validateServerConfig<TClaims = unknown>(config: ServerConfigInput<TClaims>): void {
   validateSpaConfig(config.spa);
-  validateRoutes(config.routes);
-  validateSecurityForRoutes(config.routes, config.security);
+  validateRoutes(config.apiRoutes);
+  validateRoutes(config.proxyRoutes);
+  validateSecurityForRoutes(
+    [...(config.apiRoutes ?? []), ...(config.proxyRoutes ?? [])],
+    config.security
+  );
   validateCors(config.security?.cors);
   validateAuth(config.security?.auth);
 }

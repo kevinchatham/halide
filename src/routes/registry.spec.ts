@@ -179,7 +179,8 @@ describe('registerRoutes', () => {
     await registerRoutes(app, config);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
-      'https://auth.example.com/.well-known/jwks.json'
+      'https://auth.example.com/.well-known/jwks.json',
+      undefined
     );
     expect(app.get).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
     expect(app.post).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
@@ -303,7 +304,8 @@ describe('registerRoutes', () => {
     await registerRoutes(app, config);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
-      'https://auth.example.com/.well-known/jwks.json'
+      'https://auth.example.com/.well-known/jwks.json',
+      undefined
     );
     expect(app.get).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
     expect(app.post).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
@@ -470,7 +472,8 @@ describe('registerRoutes', () => {
     await registerRoutes(app, config);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
-      'https://auth.example.com/.well-known/jwks.json'
+      'https://auth.example.com/.well-known/jwks.json',
+      undefined
     );
     expect(app.get).toHaveBeenCalledWith('/profile', mockJwksMiddleware, expect.any(Function));
   });

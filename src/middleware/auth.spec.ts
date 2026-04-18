@@ -104,7 +104,7 @@ describe('createAuthMiddleware', () => {
     handler(req, res, next);
 
     await vi.waitFor(() => {
-      expect(verifyJwt).toHaveBeenCalledWith('valid-token', secret);
+      expect(verifyJwt).toHaveBeenCalledWith('valid-token', secret, undefined);
       expect(req.claims).toEqual(claims);
       expect(next).toHaveBeenCalled();
       expect(res.status).not.toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe('createAuthMiddleware', () => {
     handler(req, res, next);
 
     await vi.waitFor(() => {
-      expect(verifyJwt).toHaveBeenCalledWith('my-token-here', secret);
+      expect(verifyJwt).toHaveBeenCalledWith('my-token-here', secret, undefined);
     });
   });
 });

@@ -15,7 +15,7 @@ describe('validateServerConfig', () => {
         spa: { name: 'test', root: '/public', fallback: 'index.html' },
         security: {
           cors: { origin: ['http://localhost:3000'], credentials: true },
-          csp: { 'default-src': ["'self'"] },
+          csp: { directives: { 'default-src': ["'self'"] } },
           auth: { strategy: 'bearer', secret: () => 'secret123' },
         },
       })
@@ -38,7 +38,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             type: 'api',
             path: 'invalid',
@@ -47,14 +47,14 @@ describe('validateServerConfig', () => {
           },
         ],
       })
-    ).toThrow('Route path must start with /: invalid');
+    ).toThrow('Route path must start with / (api): invalid');
   });
 
   it('rejects API route without handler', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             type: 'api',
             path: '/test',
@@ -69,7 +69,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        proxyRoutes: [
           {
             type: 'proxy',
             path: '/test',
@@ -85,7 +85,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        proxyRoutes: [
           {
             type: 'proxy',
             path: '/test',
@@ -102,7 +102,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        proxyRoutes: [
           {
             type: 'proxy',
             path: '/test',
@@ -199,7 +199,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             type: 'api',
             path: '/private',
@@ -215,7 +215,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             type: 'api',
             path: '/private',
@@ -234,7 +234,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             type: 'api',
             path: '/public',
@@ -250,7 +250,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        proxyRoutes: [
           {
             type: 'proxy',
             path: '/api/users',
@@ -269,7 +269,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             path: '/test',
             access: 'public',
@@ -284,7 +284,7 @@ describe('validateServerConfig', () => {
     expect(() =>
       validateServerConfig({
         spa: { root: '/var/www' },
-        routes: [
+        apiRoutes: [
           {
             path: '/test',
             access: 'public',
@@ -292,5 +292,42 @@ describe('validateServerConfig', () => {
         ],
       })
     ).toThrow('API route requires handler');
+  });
+
+  it('rejects private proxy route without auth config', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            type: 'proxy',
+            path: '/private',
+            access: 'private',
+            methods: ['get'],
+            target: 'https://api.example.com',
+          },
+        ],
+      })
+    ).toThrow("security.auth is required when routes have access: 'private'");
+  });
+
+  it('accepts private proxy route with auth config', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            type: 'proxy',
+            path: '/private',
+            access: 'private',
+            methods: ['get'],
+            target: 'https://api.example.com',
+          },
+        ],
+        security: {
+          auth: { strategy: 'bearer', secret: () => 'secret' },
+        },
+      })
+    ).not.toThrow();
   });
 });

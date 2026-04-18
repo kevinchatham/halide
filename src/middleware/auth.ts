@@ -4,7 +4,10 @@ import { verifyJwt } from '../utils/jwt';
 
 const unauthorized = { error: 'Unauthorized' };
 
-export function createAuthMiddleware<TClaims = unknown>(secret: Uint8Array): RequestHandler {
+export function createAuthMiddleware<TClaims = unknown>(
+  secret: Uint8Array,
+  audience?: string
+): RequestHandler {
   return (req, res, next) => {
     const authHeader: string | undefined = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -12,7 +15,7 @@ export function createAuthMiddleware<TClaims = unknown>(secret: Uint8Array): Req
       return;
     }
     const token = authHeader.slice(7);
-    verifyJwt<TClaims>(token, secret)
+    verifyJwt<TClaims>(token, secret, audience ? { audience } : undefined)
       .then((claims) => {
         if (!claims) {
           res.status(401).json(unauthorized);
@@ -27,7 +30,10 @@ export function createAuthMiddleware<TClaims = unknown>(secret: Uint8Array): Req
   };
 }
 
-export function createJwksAuthMiddleware<TClaims = unknown>(jwksUri: string): RequestHandler {
+export function createJwksAuthMiddleware<TClaims = unknown>(
+  jwksUri: string,
+  audience?: string
+): RequestHandler {
   const JWKS = createRemoteJWKSet(new URL(jwksUri));
 
   return async (req, res, next) => {
@@ -38,7 +44,7 @@ export function createJwksAuthMiddleware<TClaims = unknown>(jwksUri: string): Re
     }
     const token = authHeader.slice(7);
     try {
-      const { payload } = await jwtVerify(token, JWKS);
+      const { payload } = await jwtVerify(token, JWKS, audience ? { audience } : undefined);
       req.claims = payload as TClaims;
       next();
     } catch {

@@ -2,13 +2,13 @@ import { createSecurityMiddleware } from './security';
 
 describe('createSecurityMiddleware', () => {
   it('creates middleware with default directives', () => {
-    const handler = createSecurityMiddleware({});
+    const handler = createSecurityMiddleware({ directives: undefined });
     expect(typeof handler).toBe('function');
     expect(handler.length).toBe(3);
   });
 
   it('applies helmet with default directives', () => {
-    const handler = createSecurityMiddleware({});
+    const handler = createSecurityMiddleware({ directives: undefined });
 
     const req = { method: 'GET', path: '/', headers: {} } as any;
     const res = {
@@ -28,8 +28,10 @@ describe('createSecurityMiddleware', () => {
 
   it('uses custom directives when provided', () => {
     const handler = createSecurityMiddleware({
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'none'"],
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'none'"],
+      },
     });
 
     const req = { method: 'GET', path: '/', headers: {} } as any;
@@ -49,7 +51,7 @@ describe('createSecurityMiddleware', () => {
   });
 
   it('calls next after applying helmet', () => {
-    const handler = createSecurityMiddleware({});
+    const handler = createSecurityMiddleware({ directives: undefined });
 
     const req = { method: 'GET', path: '/', headers: {} } as any;
     const res = {

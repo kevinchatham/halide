@@ -163,7 +163,9 @@ const security: SecurityConfig = {
     origin: ['http://localhost:4200'],
   },
   csp: {
-    'default-src': ["'self'"],
+    directives: {
+      'default-src': ["'self'"],
+    },
   },
   auth: {
     strategy: 'bearer',

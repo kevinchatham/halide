@@ -10,8 +10,6 @@ interface WindowEntry {
   resetTime: number;
 }
 
-const store = new Map<string, WindowEntry>();
-
 function getClientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string') {
@@ -23,8 +21,27 @@ function getClientIp(req: Request): string {
   return req.ip || 'unknown';
 }
 
-export function createRateLimitMiddleware(config: RateLimitConfig): RequestHandler {
-  return (req, res, next) => {
+export function createRateLimitMiddleware(config: RateLimitConfig): {
+  middleware: RequestHandler;
+  dispose: () => void;
+} {
+  const store = new Map<string, WindowEntry>();
+
+  const sweep = () => {
+    const now = Date.now();
+    for (const ip of store.keys()) {
+      const entry = store.get(ip);
+      if (entry && now > entry.resetTime) {
+        store.delete(ip);
+      }
+    }
+  };
+
+  const sweepInterval = Math.max(config.windowMs * 2, 60_000);
+  const timer = setInterval(sweep, sweepInterval);
+  timer.unref();
+
+  const middleware: RequestHandler = (req, res, next) => {
     const clientIp = getClientIp(req);
     const now = Date.now();
     const entry = store.get(clientIp);
@@ -48,8 +65,9 @@ export function createRateLimitMiddleware(config: RateLimitConfig): RequestHandl
 
     next();
   };
-}
 
-export function resetRateLimitStore(): void {
-  store.clear();
+  return {
+    middleware,
+    dispose: () => clearInterval(timer),
+  };
 }

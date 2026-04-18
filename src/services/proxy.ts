@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middleware';
 import { DEFAULTS } from '../config/defaults';
 import type { RequestContext, TransformFn } from '../config/types';
 
@@ -19,6 +19,7 @@ export function createProxyService<TClaims = unknown>(
     pathRewrite: {
       [`^${routePath}`]: rewritePath,
     },
+    selfHandleResponse: !!transform,
     on: {
       proxyReq: (proxyReq, req) => {
         if (identity && (req as any).claims) {
@@ -41,30 +42,42 @@ export function createProxyService<TClaims = unknown>(
         }
       },
       proxyRes: transform
-        ? (proxyRes, req) => {
-            const chunks: Buffer[] = [];
-            proxyRes.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-            proxyRes.on('end', async () => {
-              const body = Buffer.concat(chunks).toString();
-              const ctx: RequestContext = {
-                method: req.method.toLowerCase() as RequestContext['method'],
-                path: req.path,
-                headers: req.headers as Record<string, string>,
-                params: (req as any).params || {},
-                query: (req as any).query || {},
-                body: (req as any).body,
-              };
-              try {
-                const parsed = JSON.parse(body);
-                const transformed = transform(parsed);
-                (proxyRes as any).transformedBody = JSON.stringify(transformed);
-                (proxyRes as any).transformed = true;
-              } catch {
-                (proxyRes as any).transformedBody = body;
-                (proxyRes as any).transformed = false;
+        ? responseInterceptor(async (responseBuffer, proxyRes) => {
+            const body = responseBuffer.toString();
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(body);
+            } catch {
+              return responseBuffer;
+            }
+            const headers: Record<string, string> = {};
+            const setCookieValues: string[] = [];
+            for (const [key, value] of Object.entries(proxyRes.headers)) {
+              if (value === undefined) continue;
+              if (key.toLowerCase() === 'set-cookie') {
+                const values = Array.isArray(value) ? value : [value];
+                setCookieValues.push(...values);
+                delete proxyRes.headers[key];
+              } else {
+                headers[key] = Array.isArray(value) ? value.join(', ') : value;
               }
-            });
-          }
+            }
+            if (setCookieValues.length > 0) {
+              proxyRes.headers['set-cookie'] = setCookieValues;
+            }
+            try {
+              const transformed = await transform({ body: parsed, headers });
+              for (const [key, value] of Object.entries(transformed.headers)) {
+                if (value !== undefined && value !== null) {
+                  proxyRes.headers[key] = value;
+                }
+              }
+              return JSON.stringify(transformed.body);
+            } catch (err) {
+              console.error('[bspa] Transform error:', err);
+              return responseBuffer;
+            }
+          })
         : undefined,
     },
   });

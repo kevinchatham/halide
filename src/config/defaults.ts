@@ -1,3 +1,5 @@
+import { contentSecurityPolicy } from 'helmet';
+
 export const DEFAULTS = {
   spa: {
     fallback: 'index.html',
@@ -13,13 +15,7 @@ export const DEFAULTS = {
     maxRequests: 100,
   },
   csp: {
-    default: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'"],
-    },
+    default: contentSecurityPolicy.getDefaultDirectives(),
   },
   openapi: {
     path: '/swagger',
