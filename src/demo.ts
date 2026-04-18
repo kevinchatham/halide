@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import {
   type ObservabilityConfig,
+  type OpenApiConfig,
   type RequestContext,
   type SecurityConfig,
   type ServerConfig,
@@ -40,7 +41,9 @@ type CreateUserSchema = z.infer<typeof CreateUserSchema>;
 
 /**
  * Private GET /profile route.
- * Requires a valid JWT and restricts access to users with the 'admin' role.
+ * - `access: 'private'`: requires a valid JWT bearer token
+ * - `authorize`: restricts access to users with the 'admin' role
+ * - `handler`: returns the request context and authenticated user subject
  */
 const profileRoute = apiRoute<UserClaims>({
   access: 'private',
@@ -55,7 +58,9 @@ const profileRoute = apiRoute<UserClaims>({
 
 /**
  * Public POST /users route.
- * Demonstrates request body validation using a Zod schema.
+ * - `access: 'public'`: no authentication required
+ * - `validationSchema`: Zod schema validating that body contains a valid email and non-empty name
+ * - `handler`: creates a user with a generated UUID, timestamp, and the validated body fields
  */
 const userRoute = apiRoute<UserClaims, CreateUserSchema>({
   access: 'public',
@@ -74,7 +79,8 @@ const userRoute = apiRoute<UserClaims, CreateUserSchema>({
 
 /**
  * Public GET /health route.
- * Simple endpoint that requires no authentication, useful for load balancer health checks.
+ * - `access: 'public'`: no authentication required
+ * - `handler`: returns `{ status: 'ok' }`, useful for load balancer health checks
  */
 const healthRoute = apiRoute({
   access: 'public',
@@ -85,8 +91,12 @@ const healthRoute = apiRoute({
 
 /**
  * Private proxy route forwarding /api/users to https://api.example.com/users.
- * Demonstrates path rewriting, exponential backoff retries, request transformation, and a timeout.
- * Supports GET and POST methods.
+ * - `access: 'private'`: requires a valid JWT bearer token
+ * - `methods`: supports GET and POST
+ * - `proxyPath`: rewrites the path from '/api/users' to '/users' on the target
+ * - `timeout`: aborts the proxy request after 5000ms
+ * - `retries`: up to 3 attempts with exponential backoff on failure
+ * - `transform`: merges a `transformed: true` flag into the request body before forwarding
  */
 const usersProxyRoute = proxyRoute<UserClaims>({
   access: 'private',
@@ -110,8 +120,10 @@ const usersProxyRoute = proxyRoute<UserClaims>({
 
 /**
  * Private proxy route forwarding /api/orders to https://api.example.com/api/orders.
- * Demonstrates role-based authorization where both 'admin' and 'user' roles are allowed.
- * `proxyPath` is omitted, so the matched path is forwarded as-is.
+ * - `access: 'private'`: requires a valid JWT bearer token
+ * - `methods`: supports GET only
+ * - `proxyPath`: omitted, so '/api/orders' is forwarded as-is to the target
+ * - `authorize`: allows both 'admin' and 'user' roles
  */
 const ordersProxyRoute = proxyRoute<UserClaims>({
   access: 'private',
@@ -123,8 +135,9 @@ const ordersProxyRoute = proxyRoute<UserClaims>({
 });
 
 /**
- * Observability hooks for request lifecycle logging.
- * Logs each incoming request and its corresponding response with status code and duration.
+ * Observability hooks for request/response lifecycle logging.
+ * - `onRequest`: called on every incoming request with the request context and decoded JWT claims
+ * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
  */
 const observability: ObservabilityConfig<UserClaims> = {
   onRequest: (ctx, claims) => {
@@ -139,10 +152,14 @@ const observability: ObservabilityConfig<UserClaims> = {
 
 /**
  * Security configuration for the server.
- * - CORS: allows requests from the Angular dev server on localhost:4200
- * - CSP: restricts resource loading to same-origin
- * - Auth: bearer token strategy using the JWT_SECRET environment variable
- * - Rate limiting: 100 requests per 15-minute window
+ * - `cors.credentials`: allows cookies and credentials in cross-origin requests
+ * - `cors.methods`: HTTP methods permitted for cross-origin requests
+ * - `cors.origin`: allowed origins for cross-origin requests (Angular dev server)
+ * - `csp['default-src']`: Content-Security-Policy directive restricting resource loading to same-origin
+ * - `auth.strategy`: authentication strategy ('bearer' for JWT bearer tokens)
+ * - `auth.secret`: function returning the JWT secret from the JWT_SECRET environment variable
+ * - `rateLimit.maxRequests`: maximum number of requests allowed per window
+ * - `rateLimit.windowMs`: time window in milliseconds for rate limiting (15 minutes)
  */
 const security: SecurityConfig = {
   cors: {
@@ -165,7 +182,9 @@ const security: SecurityConfig = {
 
 /**
  * SPA serving configuration.
- * Specifies the static file root and fallback for client-side routing.
+ * - `name`: application identifier used for caching headers and logging
+ * - `root`: absolute path to the directory containing static assets
+ * - `fallback`: file served for unmatched routes to support client-side routing
  */
 const spa: SpaConfig = {
   name: 'my-app',
@@ -174,7 +193,30 @@ const spa: SpaConfig = {
 };
 
 /**
+ * OpenAPI/Swagger UI configuration.
+ * - `enabled`: toggles the Swagger UI endpoint and OpenAPI spec serving
+ * - `path`: URL path where Swagger UI is served (defaults to '/swagger')
+ * - `options.title`: title displayed in the Swagger UI page header
+ * - `options.description`: description shown below the title in Swagger UI
+ */
+const openapi: OpenApiConfig = {
+  enabled: true,
+  path: '/swagger',
+  options: {
+    title: 'My App API',
+    description: 'Auto-generated API documentation',
+  },
+};
+
+/**
  * Complete server configuration combining all settings.
+ * - `spa`: static file serving and client-side routing fallback
+ * - `security`: CORS, CSP, authentication, and rate limiting
+ * - `observability`: request/response lifecycle hooks
+ * - `apiRoutes`: direct API endpoint handlers (public and private)
+ * - `proxyRoutes`: reverse proxy routes with optional transformation and retries
+ * - `openapi`: Swagger UI and OpenAPI spec configuration
+ *
  * Passed to `createServer()` to bootstrap the bSPA BFF server.
  */
 const exampleConfig: ServerConfig<UserClaims> = {
@@ -183,6 +225,7 @@ const exampleConfig: ServerConfig<UserClaims> = {
   observability,
   apiRoutes: [profileRoute, userRoute, healthRoute],
   proxyRoutes: [usersProxyRoute, ordersProxyRoute],
+  openapi,
 };
 
 createServer(exampleConfig).then((server) => server.start());

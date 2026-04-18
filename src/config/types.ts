@@ -1,5 +1,22 @@
 import type { ZodSchema } from 'zod';
 
+export type OpenApiRouteMeta = {
+  /** Short summary of the operation. */
+  summary?: string;
+  /** Detailed description of the operation. */
+  description?: string;
+  /** Tags for grouping operations in the OpenAPI document. */
+  tags?: string[];
+  /** Explicit name for the response schema in components/schemas. Only used with responseSchema, not multi-status responses. */
+  schemaName?: string;
+  /** Explicit name for the request body schema in components/schemas. Overrides auto-generated names. */
+  requestSchemaName?: string;
+  /** Zod schema for the default 200 response body. */
+  responseSchema?: ZodSchema;
+  /** Map of HTTP status codes to response definitions with optional schemas. */
+  responses?: Record<number, { description: string; schema?: ZodSchema }>;
+};
+
 /**
  * Context object for incoming HTTP requests.
  */
@@ -144,6 +161,15 @@ export type SecurityConfig = {
  * Main server configuration.
  * @template TClaims - The type of claims contained in the JWT.
  */
+export type OpenApiConfig = {
+  /** Whether OpenAPI spec generation is enabled. */
+  enabled?: boolean;
+  /** URL path where the OpenAPI spec is served. */
+  path?: string;
+  /** Options for customizing the generated OpenAPI document. */
+  options?: import('../openapi/types').OpenApiOptions;
+};
+
 export type ServerConfig<TClaims = unknown> = {
   /** Observability hook configuration. */
   observability?: ObservabilityConfig<TClaims>;
@@ -155,6 +181,8 @@ export type ServerConfig<TClaims = unknown> = {
   security?: SecurityConfig;
   /** SPA serving configuration. */
   spa: SpaConfig;
+  /** OpenAPI spec generation configuration. */
+  openapi?: OpenApiConfig;
 };
 
 /**
@@ -179,6 +207,8 @@ export type ApiRoute<TClaims = unknown, TBody = unknown> = {
   handler: ApiRouteHandler<TClaims, TBody>;
   /** Zod schema for validating request body. */
   validationSchema?: ZodSchema<TBody>;
+  /** OpenAPI metadata for the route. */
+  openapi?: OpenApiRouteMeta;
 };
 
 /**
@@ -210,6 +240,8 @@ export type ProxyRoute<TClaims = unknown> = {
   identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined;
   /** Function to transform proxy responses. */
   transform?: TransformFn;
+  /** OpenAPI metadata for the route. */
+  openapi?: OpenApiRouteMeta;
 };
 
 /**
@@ -252,12 +284,8 @@ export function apiRoute<TClaims, TBody = unknown>(
   route: ApiRouteInput<TClaims, TBody>
 ): ApiRoute<TClaims, TBody> {
   return {
-    access: route.access,
-    method: route.method,
-    observe: route.observe,
-    path: route.path,
+    ...route,
     type: 'api',
-    handler: route.handler,
     authorize: route.authorize ?? (async () => true),
   };
 }
@@ -270,17 +298,8 @@ export function apiRoute<TClaims, TBody = unknown>(
  */
 export function proxyRoute<TClaims>(route: ProxyRouteInput<TClaims>): ProxyRoute<TClaims> {
   return {
-    access: route.access,
-    methods: route.methods,
-    observe: route.observe,
-    path: route.path,
-    proxyPath: route.proxyPath,
-    retries: route.retries,
-    target: route.target,
-    timeout: route.timeout,
+    ...route,
     type: 'proxy',
-    identity: route.identity,
     authorize: route.authorize ?? (async () => true),
-    transform: route.transform,
   };
 }

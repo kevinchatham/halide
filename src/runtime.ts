@@ -6,6 +6,7 @@ import { validateServerConfig } from './config/validate';
 import { createErrorHandler } from './middleware/errorHandler';
 import { createRateLimitMiddleware } from './middleware/rateLimit';
 import { createSecurityMiddleware } from './middleware/security';
+import { createSwaggerMiddleware } from './middleware/swagger';
 import { registerRoutes } from './routes/registry';
 import { createSpaHandler } from './routes/spa';
 
@@ -54,6 +55,12 @@ export async function createServer<TClaims = unknown>(
   app.use(createErrorHandler());
 
   await registerRoutes<TClaims>(app, configInput);
+
+  if (configInput.openapi?.enabled) {
+    const swaggerPath = configInput.openapi.path ?? '/swagger';
+    const swaggerRouter = createSwaggerMiddleware(configInput, configInput.openapi.options);
+    app.use(swaggerPath, swaggerRouter);
+  }
 
   const spaHandler = createSpaHandler(configInput.spa);
   app.get(/^\/(.*)/, spaHandler);
