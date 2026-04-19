@@ -19,8 +19,6 @@
 
 Halide is a purpose-built, declarative BFF runtime that standardizes how your SPA communicates with backend services. It gives these concerns a shared, predictable structure, configured once rather than assembled from scratch every time.
 
-> Halides are compounds that bond separate elements into a stable structure.
-
 ```text
 Browser (SPA)
     ↓
@@ -30,6 +28,8 @@ Private backend services
 ```
 
 It is not an API gateway, a service mesh, or a full backend framework. It is specifically designed around SPA application boundaries.
+
+> Halides are compounds that bond separate elements into a stable structure.
 
 ## Why Halide?
 
