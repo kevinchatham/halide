@@ -59,31 +59,39 @@ npm install halide
 ```
 
 ```ts
-import { createServer, apiRoute } from 'halide';
+import { createServer, apiRoute, proxyRoute } from 'halide';
+
+const healthRoute = apiRoute({
+  access: 'public',
+  method: 'get',
+  path: '/api/health',
+  handler: async (ctx, claims, logger) => ({ status: 'ok' }),
+});
+
+const userRoute = proxyRoute({
+  access: 'private',
+  methods: ['get', 'post'],
+  path: '/api/users',
+  target: 'http://user-svc:3000',
+});
 
 const server = await createServer({
   spa: {
-    root: './dist/browser',
+    root: './browser',
   },
-  apiRoutes: [
-    apiRoute({
-      access: 'public',
-      method: 'get',
-      path: '/health',
-      handler: async () => ({ status: 'ok' }),
-    }),
-  ],
+  apiRoutes: [healthRoute],
+  proxyRoutes: [userRoute],
 });
 
 await server.start();
 ```
 
-The server starts on port 3001 (override with the `PORT` environment variable).
+> The server starts on port 3001 (override with the `PORT` environment variable).
 
 ## When not to use Halide
 
-Halide is intentionally narrow. Consider alternatives if:
+Halide is opinionated but extensible. API route handlers are arbitrary async functions, and proxy routes support per-route `authorize`, `transform`, and `identity` hooks. Consider alternatives if:
 
-- **You need complex backend orchestration or domain logic.** Halide routes and proxies requests. It is not a place for business rules or multi-service orchestration. A full backend framework or dedicated microservice is a better fit.
+- **You need direct control over the HTTP layer.** Halide abstracts Express behind a typed config. If you need to set custom response headers/status codes, stream responses, handle file uploads, or run arbitrary Express middleware, a full backend framework gives you that access.
 - **You're building a multi-service backend, not just a BFF layer.** Halide sits between a frontend and its backends. If you need inter-service communication, routing, or discovery, an API gateway or service mesh is designed for that.
-- **You need fine-grained infrastructure control.** Halide abstracts away proxy configuration, TLS termination, and load balancing. If you need custom middleware chains, circuit breakers, or service-level routing policies, an API gateway gives you that control.
+- **You need infrastructure-level proxy control.** Halide provides per-route request transformation, identity header injection, and path rewriting, but does not expose response transformation, circuit breakers, TLS termination, load balancing, or retry policies. An API gateway or service mesh is a better fit for those.
