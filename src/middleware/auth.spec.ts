@@ -1,281 +1,160 @@
-import type { Request, Response } from 'express';
-import { SignJWT } from 'jose';
-import { verifyJwt } from '../utils/jwt';
-import { createAuthMiddleware, createJwksAuthMiddleware } from './auth';
+import { Hono } from 'hono';
+import { sign } from 'hono/jwt';
+import { extractBearerClaims, extractJwksClaims } from './auth';
 
-vi.mock('../utils/jwt', () => ({
-  verifyJwt: vi.fn(),
-}));
-
-const mockJwksVerify: ReturnType<typeof vi.fn> = vi.fn();
-vi.mock('jose', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('jose')>();
-  return {
-    ...actual,
-    createRemoteJWKSet: vi.fn(() => mockJwksVerify),
-    jwtVerify: vi.fn(async (token: string, JWKS: (...args: unknown[]) => unknown) => {
-      return JWKS(token);
-    }),
-  };
-});
-
-const secret: Uint8Array = new TextEncoder().encode('test-secret');
+const secret = 'test-secret';
 
 interface TestClaims {
   role: string;
   sub: string;
 }
 
-async function _createValidToken(claims: Record<string, unknown>): Promise<string> {
-  return new SignJWT(claims as unknown as import('jose').JWTPayload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .sign(secret);
+async function createValidToken(claims: Record<string, unknown>): Promise<string> {
+  return sign(claims, secret, 'HS256');
 }
 
-describe('createAuthMiddleware', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when authorization header is missing', () => {
-    const handler = createAuthMiddleware<TestClaims>(secret);
-
-    const req = { headers: {} } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('returns 401 when authorization header does not start with Bearer', () => {
-    const handler = createAuthMiddleware<TestClaims>(secret);
-
-    const req = { headers: { authorization: 'Basic abc123' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('returns 401 when verifyJwt returns null', async () => {
-    vi.mocked(verifyJwt).mockResolvedValue(null);
-
-    const handler = createAuthMiddleware<TestClaims>(secret);
-
-    const req = { headers: { authorization: 'Bearer invalid-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    await vi.waitFor(() => {
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
-      expect(next).not.toHaveBeenCalled();
+describe('extractBearerClaims', () => {
+  it('returns null when authorization header is missing', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret);
+      return c.json({});
     });
+    await app.request('/test');
+    expect(result).toBeNull();
   });
 
-  it('calls next with valid token and attaches claims', async () => {
+  it('returns null when authorization header does not start with Bearer', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret);
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Basic abc123' } });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when token is invalid', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret);
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer invalid-token' } });
+    expect(result).toBeNull();
+  });
+
+  it('returns claims with valid token', async () => {
+    const app = new Hono();
     const claims = { role: 'admin', sub: 'user-123' };
-    vi.mocked(verifyJwt).mockResolvedValue(claims);
-
-    const handler = createAuthMiddleware<TestClaims>(secret);
-
-    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    await vi.waitFor(() => {
-      expect(verifyJwt).toHaveBeenCalledWith('valid-token', secret, undefined);
-      expect(req.claims).toEqual(claims);
-      expect(next).toHaveBeenCalled();
-      expect(res.status).not.toHaveBeenCalled();
+    const token = await createValidToken(claims);
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret);
+      return c.json({});
     });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toMatchObject(claims);
   });
 
-  it('returns 401 when verifyJwt throws', async () => {
-    vi.mocked(verifyJwt).mockRejectedValue(new Error('Verification failed'));
-
-    const handler = createAuthMiddleware<TestClaims>(secret);
-
-    const req = { headers: { authorization: 'Bearer bad-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    await vi.waitFor(() => {
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
-      expect(next).not.toHaveBeenCalled();
+  it('returns null when audience does not match', async () => {
+    const app = new Hono();
+    const token = await createValidToken({ aud: 'wrong-audience', sub: 'user-123' });
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret, 'my-api');
+      return c.json({});
     });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toBeNull();
+  });
+
+  it('returns claims when audience matches string aud', async () => {
+    const app = new Hono();
+    const claims = { aud: 'my-api', sub: 'user-123' };
+    const token = await createValidToken(claims);
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret, 'my-api');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toMatchObject(claims);
+  });
+
+  it('returns claims when audience matches array aud', async () => {
+    const app = new Hono();
+    const claims = { aud: ['my-api', 'other-api'], sub: 'user-123' };
+    const token = await createValidToken(claims);
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret, 'my-api');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toMatchObject(claims);
+  });
+
+  it('returns null when token has no aud but audience is required', async () => {
+    const app = new Hono();
+    const token = await createValidToken({ sub: 'user-123' });
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret, 'my-api');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toBeNull();
   });
 
   it('extracts token correctly from Bearer header', async () => {
-    vi.mocked(verifyJwt).mockResolvedValue({ sub: 'test' });
-
-    const handler = createAuthMiddleware(secret);
-
-    const req = { headers: { authorization: 'Bearer my-token-here' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    await vi.waitFor(() => {
-      expect(verifyJwt).toHaveBeenCalledWith('my-token-here', secret, undefined);
+    const app = new Hono();
+    const claims = { sub: 'test' };
+    const token = await createValidToken(claims);
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret);
+      return c.json({});
     });
-  });
-
-  it('passes audience to verifyJwt when provided', async () => {
-    vi.mocked(verifyJwt).mockResolvedValue({ sub: 'test' });
-
-    const handler = createAuthMiddleware<TestClaims>(secret, 'my-audience');
-
-    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    await vi.waitFor(() => {
-      expect(verifyJwt).toHaveBeenCalledWith('valid-token', secret, { audience: 'my-audience' });
-    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toMatchObject(claims);
   });
 });
 
-describe('createJwksAuthMiddleware', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when authorization header is missing', () => {
-    const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
-
-    const req = { headers: {} } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('returns 401 when authorization header does not start with Bearer', () => {
-    const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
-
-    const req = { headers: { authorization: 'Basic abc123' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('calls next with valid token and attaches claims', async () => {
-    mockJwksVerify.mockResolvedValueOnce({
-      payload: { role: 'admin', sub: 'user-123' },
-      protectedHeader: { alg: 'RS256' },
+describe('extractJwksClaims', () => {
+  it('returns null when authorization header is missing', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
     });
-
-    const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
-
-    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    await handler(req, res, next);
-
-    expect(req.claims).toEqual({ role: 'admin', sub: 'user-123' });
-    expect(next).toHaveBeenCalled();
-    expect(res.status).not.toHaveBeenCalled();
+    await app.request('/test');
+    expect(result).toBeNull();
   });
 
-  it('returns 401 when JWKS verification fails', async () => {
-    mockJwksVerify.mockRejectedValueOnce(new Error('Invalid token'));
-
-    const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
-
-    const req = { headers: { authorization: 'Bearer invalid-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    await handler(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
-    expect(next).not.toHaveBeenCalled();
+  it('returns null when authorization header does not start with Bearer', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Basic abc123' } });
+    expect(result).toBeNull();
   });
 
-  it('passes audience to jwtVerify when provided', async () => {
-    const { jwtVerify: mockedJwtVerify } = await import('jose');
-    mockJwksVerify.mockResolvedValueOnce({
-      payload: { role: 'admin', sub: 'user-123' },
-      protectedHeader: { alg: 'RS256' },
+  it('returns null when JWKS verification fails', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
     });
-
-    const handler = createJwksAuthMiddleware<TestClaims>(
-      'https://auth.example.com/jwks.json',
-      'my-api',
-    );
-
-    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    await handler(req, res, next);
-
-    expect(mockedJwtVerify).toHaveBeenCalledWith('valid-token', expect.anything(), {
-      audience: 'my-api',
-    });
+    await app.request('/test', { headers: { authorization: 'Bearer invalid-token' } });
+    expect(result).toBeNull();
   });
 });

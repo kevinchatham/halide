@@ -4,6 +4,7 @@ export type {
   ApiRouteHandler,
   ApiRouteInput,
   AuthorizeFn,
+  ClaimExtractor,
   CorsConfig,
   CspDirectives,
   CspDirectiveValue,
@@ -25,8 +26,7 @@ export type {
 } from './config/types';
 export { apiRoute, proxyRoute } from './config/types';
 export { createRequestIdMiddleware } from './middleware/requestId';
-export { createSwaggerMiddleware } from './middleware/swagger';
-export { generateOpenApiSpec } from './openapi/generator';
+export { createOpenApiRoutes } from './middleware/swagger';
 export type { OpenApiOptions } from './openapi/types';
 export type { Server } from './runtime';
 export { createServer } from './runtime';

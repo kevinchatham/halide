@@ -1,51 +1,26 @@
 {
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.0.0",
-    "helmet": "^8.0.0",
-    "http-proxy-middleware": "^3.0.0",
-    "jose": "^5.9.0",
-    "nodemon": "^3.1.14",
-    "swagger-ui-express": "^5.0.1",
-    "zod": "^3.23.0",
-    "zod-to-json-schema": "^3.25.2"
-  },
-  "devDependencies": {
-    "@angular/cli": "^21.0.0",
-    "@angular/core": "^21.0.0",
-    "@biomejs/biome": "2.4.7",
-    "@sonar/scan": "^4.3.5",
-    "@types/cors": "^2.8.0",
-    "@types/express": "^5.0.0",
-    "@types/node": "^24.0.0",
-    "@types/swagger-ui-express": "^4.1.8",
-    "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.15",
-    "concurrently": "^9.2.1",
-    "dotenv-cli": "^11.0.0",
-    "openapi-types": "^12.1.3",
-    "prettier": "^3.6.2",
-    "prettier-plugin-tailwindcss": "^0.7.1",
-    "rimraf": "^6.0.0",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.0",
-    "vitest": "^4.1.4"
-  },
-  "engines": {
-    "node": ">=24.0.0"
-  },
+  "name": "halide",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./*": "./dist/*"
   },
-  "license": "MIT",
-  "main": "./dist/index.js",
-  "name": "halide",
   "scripts": {
-    "build": "tsup",
+    "build": "tsc && tsup",
     "clean": "npx tsx scripts/clean.ts",
     "demo:angular:build": "cd demo/angular && npm run build",
     "demo:angular:install": "cd demo/angular && npm install",
@@ -56,6 +31,7 @@
     "demo:backend:serve": "cd demo/backend && npm run serve",
     "demo:install": "npm run demo:link && npm run demo:angular:install && npm run demo:backend:install",
     "demo:link": "npm run build && npm link && cd demo/angular && npm link halide",
+    "kill": "fuser -k 3000/tcp && fuser -k 3001/tcp && fuser -k 4200/tcp",
     "lint": "biome check --config-path biome.json .",
     "lint:fix": "biome check --config-path biome.json  --write . && prettier --write . --config .prettierrc --ignore-path .prettierignore",
     "lint:watch": "nodemon --exec 'npm run lint:fix' --watch '**/*.ts' --watch '**/*.json' --ext '.ts,.json'",
@@ -65,6 +41,34 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "type": "module",
-  "version": "1.0.0"
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.14",
+    "@hono/standard-validator": "^0.2.2",
+    "@scalar/hono-api-reference": "^0.10.9",
+    "hono": "^4.12.14",
+    "hono-openapi": "^1.3.0",
+    "nodemon": "^3.1.14",
+    "zod": "^3.23.0",
+    "zod-openapi": "^4.2.4"
+  },
+  "devDependencies": {
+    "@angular/cli": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@biomejs/biome": "2.4.7",
+    "@sonar/scan": "^4.3.5",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.15",
+    "concurrently": "^9.2.1",
+    "dotenv-cli": "^11.0.0",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.7.1",
+    "rimraf": "^6.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.4"
+  }
 }

@@ -10,6 +10,7 @@ npm run lint:watch     # nodemon reruns lint:fix on .ts/.json changes
 npm run typecheck      # tsc --noEmit
 npm run test           # vitest run --coverage (single run + coverage)
 npm run test:watch     # vitest (watch, no coverage)
+npm run test:ui        # vitest --ui
 npm run clean          # npx tsx scripts/clean.ts
 npx vitest run src/config/validate.spec.ts  # single test file
 ```
@@ -30,34 +31,34 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 
 ## Architecture
 
+- **Framework**: Hono (not Express). All HTTP types come from `hono`, not `express`
 - **Entry**: `src/index.ts` → re-exports `createServer<TClaims>` from `src/runtime.ts`
 - `ServerConfig` uses **separate arrays**: `apiRoutes` (type `'api'`) + `proxyRoutes` (type `'proxy'`), not a single `routes` array
 - Auth config is nested: `security.auth.strategy` (`'bearer'` | `'jwks'`), not a top-level `auth` key
-- API route handler signature is `(ctx, claims, logger)` — 3 params, not 2. `claims` is `TClaims | undefined`, `logger` is `Logger`
+- API route handler signature is `(ctx, claims, logger)` — 3 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context), `claims` is `TClaims | undefined`, `logger` is `Logger`
+- Auth uses `hono/jwt` (bearer) and `hono/jwk` (JWKS) — not `jose`
 - Validation is imperative (`validateServerConfig` in `src/config/validate.ts`), not Zod — Zod is only used for route body validation and OpenAPI schema generation
-- `src/middleware/validate.ts` — per-route body validation using Zod schemas (distinct from config validation)
+- CSP directives must use camelCase (`defaultSrc`), not kebab-case (`default-src`) — validator throws on kebab
 - SPA `apiPrefix` defaults to `'/api'` — paths starting with that prefix get 404 instead of SPA fallback (set `apiPrefix: ''` to disable)
-- `src/types/express.ts` — augments `Express.Request` with `claims?: unknown`
 - `src/demo.ts` exists but is **not exported** — used by demo apps only
 - **src/config/** — types, defaults, validation
-- **src/middleware/** — auth (bearer + JWKS), CORS, CSP, rate limit, request ID, error handler, Swagger UI, body validation
+- **src/middleware/** — auth (bearer + JWKS via hono/jwt + hono/jwk), CORS, CSP, rate limit, request ID, error handler, Swagger UI
 - **src/routes/** — `registry.ts` (route registration), `spa.ts` (static file serving)
 - **src/services/** — proxy handler
-- **src/openapi/** — spec generator (uses `zod-to-json-schema`)
-- **src/utils/** — JWT helpers (uses `jose`)
+- **src/openapi/** — spec generator (uses `hono-openapi` + `zod-openapi`)
+- **src/utils/** — does not exist; JWT helpers are in `src/middleware/auth.ts`
 
 ## Testing
 
 - Test files co-located as `*.spec.ts` alongside source
 - Vitest `globals: true` — use `describe`/`it`/`expect`/`vi` without imports
-- Auth tests mock `jose` and `../utils/jwt` with `vi.mock()`
+- Auth tests use real `hono/jwt` `sign()` for tokens and `Hono` app instances (no mocking)
 - Test environment is `node`
 
 ## TypeScript
 
 - Strict mode + `noUncheckedIndexedAccess`
 - Module: `es2022` / `bundler` resolution — use `.js` extensions in relative imports
-- Express 5 types (`@types/express@^5`)
 - Target: ES2022
 
 ## Demo
@@ -86,3 +87,4 @@ npm run demo:angular:serve       # port 3001
 - Node.js >=24.0.0 required (enforced in `engines`)
 - CORS wildcard origin (`*`) cannot be combined with `credentials: true` — config validator will throw
 - `apiRoute()` and `proxyRoute()` factory functions fill in `type` and default `authorize` — prefer them over raw route objects
+- `proxyRoute` requires `methods` array (not optional like `apiRoute.method`)

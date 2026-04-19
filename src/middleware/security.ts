@@ -1,18 +1,10 @@
-import type { RequestHandler } from 'express';
-import helmet from 'helmet';
+import { secureHeaders } from 'hono/secure-headers';
 import { DEFAULTS } from '../config/defaults';
 import type { CspOptions } from '../config/types';
 
-type HelmetCspDirectives = NonNullable<
-  Parameters<typeof helmet.contentSecurityPolicy>[0]
->['directives'];
-
-export function createSecurityMiddleware(csp: CspOptions): RequestHandler {
-  const directives = (csp.directives ?? DEFAULTS.csp.default) as HelmetCspDirectives;
-  const helmetInstance = helmet({
-    contentSecurityPolicy: {
-      directives,
-    },
+export function createSecurityMiddleware(csp: CspOptions): ReturnType<typeof secureHeaders> {
+  const directives = csp.directives ?? DEFAULTS.csp.default;
+  return secureHeaders({
+    contentSecurityPolicy: directives as never,
   });
-  return helmetInstance;
 }

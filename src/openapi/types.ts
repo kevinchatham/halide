@@ -3,5 +3,4 @@ export type OpenApiOptions = {
   version?: string;
   description?: string;
   servers?: Array<{ url: string; description?: string }>;
-  includeProxyRoutes?: boolean;
 };

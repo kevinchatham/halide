@@ -192,7 +192,7 @@ const security: SecurityConfig = {
   },
   csp: {
     directives: {
-      'default-src': ["'self'"],
+      defaultSrc: ["'self'"],
     },
   },
   rateLimit: {

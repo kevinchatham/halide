@@ -15,7 +15,7 @@ describe('validateServerConfig', () => {
         security: {
           auth: { secret: () => 'secret123', strategy: 'bearer' },
           cors: { credentials: true, origin: ['http://localhost:3000'] },
-          csp: { directives: { 'default-src': ["'self'"] } },
+          csp: { directives: { defaultSrc: ["'self'"] } },
         },
         spa: { fallback: 'index.html', name: 'test', root: '/public' },
       }),
@@ -332,5 +332,17 @@ describe('validateServerConfig', () => {
         spa: { root: '/var/www' },
       }),
     ).not.toThrow();
+  });
+
+  it('rejects kebab-case CSP directive keys', () => {
+    expect(() =>
+      validateServerConfig({
+        security: {
+          // @ts-expect-error - intentionally passing kebab-case for runtime validation test
+          csp: { directives: { 'default-src': ["'self'"] } },
+        },
+        spa: { root: '/var/www' },
+      }),
+    ).toThrow("CSP directive 'default-src' uses kebab-case");
   });
 });

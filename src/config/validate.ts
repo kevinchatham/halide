@@ -80,6 +80,18 @@ function validateAuth(auth?: AuthInput): void {
   }
 }
 
+function validateCspDirectives(csp?: CspOptions): void {
+  if (!csp?.directives) return;
+  const kebabPattern = /^[a-z]+-[a-z]/;
+  for (const key of Object.keys(csp.directives)) {
+    if (kebabPattern.test(key)) {
+      throw new Error(
+        `CSP directive '${key}' uses kebab-case. Use camelCase instead (e.g., 'defaultSrc' not 'default-src').`,
+      );
+    }
+  }
+}
+
 export function validateServerConfig<TClaims = unknown>(config: ServerConfigInput<TClaims>): void {
   validateSpaConfig(config.spa);
   validateRoutes(config.apiRoutes);
@@ -90,4 +102,5 @@ export function validateServerConfig<TClaims = unknown>(config: ServerConfigInpu
   );
   validateCors(config.security?.cors);
   validateAuth(config.security?.auth);
+  validateCspDirectives(config.security?.csp);
 }

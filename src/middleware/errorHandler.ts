@@ -1,10 +1,10 @@
-import type { ErrorRequestHandler, NextFunction, Request, Response } from 'express';
+import type { Context } from 'hono';
 import type { Logger } from '../config/types';
 
-export function createErrorHandler(logger: Logger): ErrorRequestHandler {
-  return (err: unknown, req: Request, res: Response, _next: NextFunction) => {
-    logger.error(`[error] ${req.method} ${req.path}:`, err);
-    res.locals.error = err instanceof Error ? err : new Error(String(err));
-    res.status(500).json({ error: 'Internal Server Error' });
+export function createErrorHandler(logger: Logger): (err: unknown, c: Context) => Response {
+  return (err: unknown, c: Context) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error(`[error] ${c.req.method} ${c.req.path}:`, error);
+    return c.json({ error: 'Internal Server Error' }, 500);
   };
 }

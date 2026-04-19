@@ -1,28 +1,7 @@
-import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import { Hono } from 'hono';
 import { createRateLimitMiddleware } from './rateLimit';
 
 describe('createRateLimitMiddleware', () => {
-  function makeMockRequest(ip?: string, forwardedFor?: string): Request {
-    return {
-      headers: forwardedFor ? { 'x-forwarded-for': forwardedFor } : {},
-      ip,
-    } as unknown as Request;
-  }
-
-  function makeMockResponse(): {
-    res: Response;
-    next: NextFunction;
-    status: ReturnType<typeof vi.fn>;
-    json: ReturnType<typeof vi.fn>;
-    set: ReturnType<typeof vi.fn>;
-  } {
-    const status = vi.fn().mockReturnThis();
-    const json = vi.fn();
-    const set = vi.fn();
-    const res = { json, set, status } as unknown as Response;
-    return { json, next: vi.fn() as unknown as NextFunction, res, set, status };
-  }
-
   let disposeFns: Array<() => void>;
 
   beforeEach(() => {
@@ -35,130 +14,111 @@ describe('createRateLimitMiddleware', () => {
     }
   });
 
-  function create(config: { windowMs: number; maxRequests: number }): RequestHandler {
+  function createApp(config: { windowMs: number; maxRequests: number }): Hono {
+    const app = new Hono();
     const { middleware, dispose } = createRateLimitMiddleware(config);
     disposeFns.push(dispose);
-    return middleware;
+    app.use('*', middleware);
+    app.get('/test', (c) => c.json({ ok: true }));
+    return app;
   }
 
-  it('allows requests within the limit', () => {
-    const middleware = create({ maxRequests: 2, windowMs: 1000 });
-    const req = makeMockRequest('127.0.0.1');
-    const { res, next } = makeMockResponse();
+  it('allows requests within the limit', async () => {
+    const app = createApp({ maxRequests: 2, windowMs: 1000 });
 
-    middleware(req, res, next);
-    expect(next).toHaveBeenCalled();
-    expect(res.status).not.toHaveBeenCalled();
+    const res = await app.request('/test', {
+      headers: { 'x-forwarded-for': '127.0.0.1' },
+    });
+
+    expect(res.status).toBe(200);
   });
 
-  it('blocks requests exceeding the limit', () => {
-    const middleware = create({ maxRequests: 2, windowMs: 1000 });
-    const { res, next } = makeMockResponse();
-    const req = makeMockRequest('127.0.0.1');
+  it('blocks requests exceeding the limit', async () => {
+    const app = createApp({ maxRequests: 2, windowMs: 1000 });
+    const headers = { 'x-forwarded-for': '127.0.0.1' };
 
-    middleware(req, res, next);
-    middleware(req, res, next);
-    middleware(req, res, next);
+    await app.request('/test', { headers });
+    await app.request('/test', { headers });
+    const res = await app.request('/test', { headers });
 
-    expect(next).toHaveBeenCalledTimes(2);
-    expect(res.status).toHaveBeenCalledWith(429);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Too Many Requests' });
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Too Many Requests' });
   });
 
-  it('includes Retry-After header on 429 response', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const { res, set, next } = makeMockResponse();
-    const req = makeMockRequest('127.0.0.1');
+  it('includes Retry-After header on 429 response', async () => {
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
+    const headers = { 'x-forwarded-for': '127.0.0.1' };
 
-    middleware(req, res, next);
-    middleware(req, res, next);
+    await app.request('/test', { headers });
+    const res = await app.request('/test', { headers });
 
-    expect(set).toHaveBeenCalledWith('Retry-After', expect.any(String));
+    expect(res.headers.get('Retry-After')).toBeTruthy();
   });
 
-  it('resets window after time expires', () => {
+  it('resets window after time expires', async () => {
     vi.useFakeTimers();
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = makeMockRequest('127.0.0.1');
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
+    const headers = { 'x-forwarded-for': '127.0.0.1' };
 
-    const { res: res1, next: next1 } = makeMockResponse();
-    middleware(req, res1, next1);
+    const res1 = await app.request('/test', { headers });
+    expect(res1.status).toBe(200);
 
-    const { res: res2, next: next2 } = makeMockResponse();
-    middleware(req, res2, next2);
-    expect(next2).not.toHaveBeenCalled();
+    const res2 = await app.request('/test', { headers });
+    expect(res2.status).toBe(429);
 
     vi.advanceTimersByTime(1100);
 
-    const { res: res3, next: next3 } = makeMockResponse();
-    middleware(req, res3, next3);
-    expect(next3).toHaveBeenCalled();
+    const res3 = await app.request('/test', { headers });
+    expect(res3.status).toBe(200);
 
     vi.useRealTimers();
   });
 
-  it('tracks different IPs separately', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req1 = makeMockRequest('127.0.0.1');
-    const req2 = makeMockRequest('192.168.1.1');
+  it('tracks different IPs separately', async () => {
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
 
-    const { res: res1, next: next1 } = makeMockResponse();
-    middleware(req1, res1, next1);
+    const res1 = await app.request('/test', {
+      headers: { 'x-forwarded-for': '127.0.0.1' },
+    });
+    const res2 = await app.request('/test', {
+      headers: { 'x-forwarded-for': '192.168.1.1' },
+    });
 
-    const { res: res2, next: next2 } = makeMockResponse();
-    middleware(req2, res2, next2);
-
-    expect(next1).toHaveBeenCalled();
-    expect(next2).toHaveBeenCalled();
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
   });
 
-  it('uses X-Forwarded-For for client identification', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = makeMockRequest('127.0.0.1', '10.0.0.1');
+  it('uses X-Forwarded-For for client identification', async () => {
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
+    const headers = { 'x-forwarded-for': '10.0.0.1' };
 
-    const { res: res1, next: next1 } = makeMockResponse();
-    middleware(req, res1, next1);
+    const res1 = await app.request('/test', { headers });
+    const res2 = await app.request('/test', { headers });
 
-    const req2 = makeMockRequest('127.0.0.1', '10.0.0.1');
-    const { res: res2, next: next2 } = makeMockResponse();
-    middleware(req2, res2, next2);
-
-    expect(next1).toHaveBeenCalled();
-    expect(next2).not.toHaveBeenCalled();
-    expect(res2.status).toHaveBeenCalledWith(429);
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(429);
   });
 
-  it('uses req.ip when x-forwarded-for is not present', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = makeMockRequest('192.168.1.100');
+  it('falls back to unknown when no x-forwarded-for', async () => {
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
 
-    const { next } = makeMockResponse();
-    middleware(req, {} as Response, next);
-
-    expect(next).toHaveBeenCalled();
+    const res1 = await app.request('/test');
+    expect(res1.status).toBe(200);
   });
 
-  it('falls back to unknown when ip is undefined', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = { headers: {} } as unknown as Request;
+  it('handles x-forwarded-for with multiple IPs', async () => {
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
 
-    const { next } = makeMockResponse();
-    middleware(req, {} as Response, next);
+    const res1 = await app.request('/test', {
+      headers: { 'x-forwarded-for': '10.0.0.1, 10.0.0.2, 10.0.0.3' },
+    });
+    const res2 = await app.request('/test', {
+      headers: { 'x-forwarded-for': '10.0.0.1, 10.0.0.2' },
+    });
 
-    expect(next).toHaveBeenCalled();
-  });
-
-  it('handles empty x-forwarded-for first entry', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = {
-      headers: { 'x-forwarded-for': ', 10.0.0.2' },
-      ip: '127.0.0.1',
-    } as unknown as Request;
-
-    const { next } = makeMockResponse();
-    middleware(req, {} as Response, next);
-
-    expect(next).toHaveBeenCalled();
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(429);
   });
 
   it('dispose function clears the timer', () => {
@@ -167,39 +127,19 @@ describe('createRateLimitMiddleware', () => {
     expect(() => dispose()).not.toThrow();
   });
 
-  it('handles x-forwarded-for with multiple IPs', () => {
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = makeMockRequest('127.0.0.1', '10.0.0.1, 10.0.0.2, 10.0.0.3');
-
-    const { res: res1, next: next1 } = makeMockResponse();
-    middleware(req, res1, next1);
-
-    const req2 = makeMockRequest('127.0.0.1', '10.0.0.1, 10.0.0.2');
-    const { res: res2, next: next2 } = makeMockResponse();
-    middleware(req2, res2, next2);
-
-    expect(next1).toHaveBeenCalled();
-    expect(next2).not.toHaveBeenCalled();
-  });
-
-  it('sweeps expired entries after window expires', () => {
+  it('sweeps expired entries after window expires', async () => {
     vi.useFakeTimers();
-    const middleware = create({ maxRequests: 1, windowMs: 1000 });
-    const req = makeMockRequest('127.0.0.1');
+    const app = createApp({ maxRequests: 1, windowMs: 1000 });
+    const headers = { 'x-forwarded-for': '127.0.0.1' };
 
-    const { res: res1, next: next1 } = makeMockResponse();
-    middleware(req, res1, next1);
-    expect(next1).toHaveBeenCalled();
-
-    const { res: res2, next: next2 } = makeMockResponse();
-    middleware(req, res2, next2);
-    expect(res2.status).toHaveBeenCalledWith(429);
+    await app.request('/test', { headers });
+    const res2 = await app.request('/test', { headers });
+    expect(res2.status).toBe(429);
 
     vi.advanceTimersByTime(200_000);
 
-    const { res: res3, next: next3 } = makeMockResponse();
-    middleware(req, res3, next3);
-    expect(next3).toHaveBeenCalled();
+    const res3 = await app.request('/test', { headers });
+    expect(res3.status).toBe(200);
 
     vi.useRealTimers();
   });

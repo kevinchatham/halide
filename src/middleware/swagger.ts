@@ -1,23 +1,28 @@
-import type { Router } from 'express';
-import { Router as createRouter } from 'express';
-import swaggerUi from 'swagger-ui-express';
+import { Scalar } from '@scalar/hono-api-reference';
+import type { Hono } from 'hono';
+import { openAPIRouteHandler } from 'hono-openapi';
 import type { ServerConfig } from '../config/types';
-import { generateOpenApiSpec } from '../openapi/generator';
-import type { OpenApiOptions } from '../openapi/types';
 
-export function createSwaggerMiddleware<TClaims>(
-  config: ServerConfig<TClaims>,
-  options?: OpenApiOptions,
-): Router {
-  const spec = generateOpenApiSpec(config, options);
-  const router = createRouter();
+export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app: Hono): void {
+  const openapiConfig = config.openapi;
+  if (!openapiConfig?.enabled) return;
 
-  router.get('/openapi.json', (_req, res) => {
-    res.json(spec);
-  });
+  const swaggerPath = openapiConfig.path ?? '/swagger';
+  const options = openapiConfig.options;
 
-  router.use('/', swaggerUi.serve);
-  router.get('/', swaggerUi.setup(spec));
+  app.get(
+    `${swaggerPath}/openapi.json`,
+    openAPIRouteHandler(app as Hono, {
+      documentation: {
+        info: {
+          title: options?.title ?? 'Halide API',
+          version: options?.version ?? '1.0.0',
+          ...(options?.description && { description: options.description }),
+        },
+        ...(options?.servers?.length && { servers: options.servers }),
+      },
+    }),
+  );
 
-  return router;
+  app.get(swaggerPath, Scalar({ url: `${swaggerPath}/openapi.json` }));
 }

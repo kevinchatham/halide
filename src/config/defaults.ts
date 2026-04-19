@@ -1,4 +1,3 @@
-import { contentSecurityPolicy } from 'helmet';
 import type { Logger } from './types';
 
 export const DEFAULTS = {
@@ -8,10 +7,22 @@ export const DEFAULTS = {
     origin: ['*'] as string[],
   },
   csp: {
-    default: contentSecurityPolicy.getDefaultDirectives(),
+    default: {
+      baseUri: ["'self'"],
+      defaultSrc: ["'self'"],
+      fontSrc: ["'self'", 'https:', 'data:'],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      frameSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+      upgradeInsecureRequests: [],
+    },
   },
   openapi: {
-    includeProxyRoutes: true,
     path: '/swagger',
     title: 'Halide API',
     version: '1.0.0',

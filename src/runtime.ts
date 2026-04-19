@@ -1,6 +1,6 @@
-import cors from 'cors';
-import express from 'express';
-import './types/express';
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { createNoopLogger, DEFAULTS } from './config/defaults';
 import type { ServerConfig } from './config/types';
 import { validateServerConfig } from './config/validate';
@@ -8,9 +8,11 @@ import { createErrorHandler } from './middleware/errorHandler';
 import { createRateLimitMiddleware } from './middleware/rateLimit';
 import { createRequestIdMiddleware } from './middleware/requestId';
 import { createSecurityMiddleware } from './middleware/security';
-import { createSwaggerMiddleware } from './middleware/swagger';
+import { createOpenApiRoutes } from './middleware/swagger';
 import { registerRoutes } from './routes/registry';
 import { createSpaHandler } from './routes/spa';
+
+type HalideVariables = { rawBody?: unknown };
 
 export interface Server {
   start: () => Promise<void>;
@@ -23,22 +25,22 @@ export async function createServer<TClaims = unknown>(
   validateServerConfig(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
-  const app = express();
+  const app = new Hono<{ Variables: HalideVariables }>();
 
   const security = configInput.security;
   const corsConfig = security?.cors;
-  const cspConfig = security?.csp ?? {};
   const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
   const corsOrigin = corsConfig?.origin ?? DEFAULTS.cors.origin;
   const corsCredentials = corsConfig?.credentials ?? DEFAULTS.cors.credentials;
 
   app.use(
+    '*',
     cors({
-      allowedHeaders: corsConfig?.allowedHeaders,
+      allowHeaders: corsConfig?.allowedHeaders,
+      allowMethods: corsMethods.map((m) => m.toUpperCase()),
       credentials: corsCredentials,
-      exposedHeaders: corsConfig?.exposedHeaders,
+      exposeHeaders: corsConfig?.exposedHeaders,
       maxAge: corsConfig?.maxAge,
-      methods: corsMethods.map((m) => m.toUpperCase()),
       origin: corsOrigin,
     }),
   );
@@ -51,44 +53,44 @@ export async function createServer<TClaims = unknown>(
       maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
       windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
     });
-    app.use(middleware);
+    app.use('*', middleware);
     rateLimitDispose = dispose;
   }
 
-  app.use(express.json());
-  app.use(createSecurityMiddleware(cspConfig));
+  app.use('*', createSecurityMiddleware(security?.csp ?? {}));
 
   if (configInput.observability?.requestId) {
-    app.use(createRequestIdMiddleware());
+    app.use('*', createRequestIdMiddleware());
   }
 
   await registerRoutes<TClaims>(app, configInput, logger);
 
-  if (configInput.openapi?.enabled) {
-    const swaggerPath = configInput.openapi.path ?? DEFAULTS.openapi.path;
-    const swaggerRouter = createSwaggerMiddleware(configInput, configInput.openapi.options);
-    app.use(swaggerPath, swaggerRouter);
-  }
+  createOpenApiRoutes(configInput, app as unknown as Hono);
 
-  const spaMiddlewares = createSpaHandler(configInput.spa);
-  for (const mw of spaMiddlewares) {
-    app.use(mw);
-  }
+  const { staticMiddleware, spaFallback } = createSpaHandler(configInput.spa);
+  app.get('/*', staticMiddleware);
+  app.all('/*', spaFallback);
 
-  app.use(createErrorHandler(logger));
+  app.onError(createErrorHandler(logger));
 
-  let httpServer: ReturnType<typeof app.listen> | undefined;
+  let httpServer: ReturnType<typeof serve> | undefined;
 
   return {
     start: async () => {
       const port = Number.parseInt(process.env.PORT || '3001', 10);
       await new Promise<void>((resolve) => {
-        httpServer = app.listen(port, () => {
-          logger.info(
-            `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`,
-          );
-          resolve();
-        });
+        httpServer = serve(
+          {
+            fetch: app.fetch,
+            port,
+          },
+          () => {
+            logger.info(
+              `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`,
+            );
+            resolve();
+          },
+        );
       });
     },
     stop: async () => {

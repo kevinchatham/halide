@@ -5,7 +5,7 @@
     "outDir": "./out-tsc/app",
     "types": []
   },
-  "exclude": ["src/**/*.spec.ts"],
+  "exclude": ["src/**/*.spec.ts", "server.ts"],
   "extends": "./tsconfig.json",
   "include": ["src/**/*.ts"]
 }
