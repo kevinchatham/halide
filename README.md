@@ -3,10 +3,12 @@
   <br/>
   <em>Stability by composition</em>
   <br/><br/>
-  <a href="./LICENSE">
+  <a style="color:unset;" href="./LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
-  <a style="margin-left:8px;" href="https://github.com/kevinchatham/halide/tree/main/docs"><img src="https://img.shields.io/badge/docs-teal" alt="Documentation"/></a>
+  <a style="margin-left:8px;color:unset;" href="https://github.com/kevinchatham/halide/tree/main/docs">
+    <img src="https://img.shields.io/badge/docs-1.0.0-cyan" alt="Documentation"/>
+  </a>
   <img style="margin-left:8px;" src="https://img.shields.io/badge/node-%3E%3D24-1e293b" alt="Node.js"/>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
 </p>
