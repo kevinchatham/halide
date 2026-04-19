@@ -68,7 +68,7 @@ const server: Server = await createServer<JwtClaims>({
     },
     cors: {
       credentials: true,
-      origin: ['http://localhost:4200', 'http://localhost:3001'],
+      origin: ['http://localhost:4200', 'http://localhost:3553'],
     },
     csp: {
       directives: {

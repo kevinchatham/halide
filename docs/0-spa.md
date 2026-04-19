@@ -8,7 +8,10 @@ spa: {
   root: './dist/browser',  // directory of built static assets
   fallback: 'index.html',  // served for unmatched routes (client-side routing)
   apiPrefix: '/api',       // paths with this prefix get 404 instead of SPA fallback
+  port: 3553,              // server listen port
 }
 ```
 
 `spa.root` is the only required field. `apiPrefix` defaults to `'/api'`. Set it to `''` to disable the 404 behavior.
+
+Port resolution order: `PORT` environment variable → `spa.port` → default `3553`.

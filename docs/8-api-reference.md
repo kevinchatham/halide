@@ -6,10 +6,10 @@ Creates and returns a Halide server. Validates the config before starting.
 
 ### `Server`
 
-| Method    | Description                                                   |
-| --------- | ------------------------------------------------------------- |
-| `start()` | Starts listening on `PORT` (default 3001)                     |
-| `stop()`  | Gracefully shuts down the HTTP server and cleans up resources |
+| Method    | Description                                                               |
+| --------- | ------------------------------------------------------------------------- |
+| `start()` | Starts listening. Port resolution: `PORT` env → `spa.port` → default 3553 |
+| `stop()`  | Gracefully shuts down the HTTP server and cleans up resources             |
 
 ### `apiRoute<TClaims, TBody>(input): ApiRoute`
 
@@ -41,7 +41,7 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function.
 | `CspOptions`                      | Content Security Policy directives                                      |
 | `CspDirectives`                   | CSP directive map (keys are directive names)                            |
 | `CspDirectiveValue`               | Single CSP directive value (string or function)                         |
-| `SpaConfig`                       | Static file serving configuration                                       |
+| `SpaConfig`                       | Static file serving and port configuration                              |
 | `ObservabilityConfig<TClaims>`    | Logger, request ID, lifecycle hooks                                     |
 | `OpenApiConfig`                   | Swagger UI toggle, path, and options                                    |
 | `OpenApiOptions`                  | OpenAPI document options (title, version, description, servers)         |

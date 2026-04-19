@@ -1,6 +1,6 @@
 {
   "name": "halide",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.cjs",
@@ -31,7 +31,7 @@
     "demo:backend:serve": "cd demo/backend && npm run serve",
     "demo:install": "npm run demo:link && npm run demo:angular:install && npm run demo:backend:install",
     "demo:link": "npm run build && npm link && cd demo/angular && npm link halide",
-    "kill": "fuser -k 3000/tcp && fuser -k 3001/tcp && fuser -k 4200/tcp",
+    "kill": "fuser -k 3000/tcp && fuser -k 3553/tcp && fuser -k 4200/tcp",
     "lint": "biome check --config-path biome.json .",
     "lint:fix": "biome check --config-path biome.json  --write . && prettier --write . --config .prettierrc --ignore-path .prettierignore",
     "lint:watch": "nodemon --exec 'npm run lint:fix' --watch '**/*.ts' --watch '**/*.json' --ext '.ts,.json'",

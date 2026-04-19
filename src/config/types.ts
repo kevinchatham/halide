@@ -88,6 +88,7 @@ export type SpaConfig = {
   apiPrefix?: string;
   fallback?: string;
   name?: string;
+  port?: number;
   root: string;
 };
 

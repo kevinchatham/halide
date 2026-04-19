@@ -66,7 +66,7 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 ```bash
 npm run demo:install             # build + link + install both demos
 npm run demo:backend:serve       # port 3000
-npm run demo:angular:serve       # port 3001
+npm run demo:angular:serve       # port 3553
 ```
 
 `demo:link` builds the library and runs `npm link` so demos resolve `halide` locally. Demo apps are in `demo/backend/` and `demo/angular/`.
@@ -81,7 +81,7 @@ npm run demo:angular:serve       # port 3001
 - `noConfusingVoidType` is a Biome error — use `undefined` instead of `void` in return types
 - `noNonNullAssertion` is off — `!` is allowed when needed
 - Biome assist auto-runs on `lint:fix`: organizes imports, sorts interface members, object keys, and attributes
-- Default server port is 3001 (from `process.env.PORT` fallback in `runtime.ts`)
+- Default server port is 3553 (from `process.env.PORT` fallback in `runtime.ts`)
 - Private routes require `security.auth` to be configured — validation will throw otherwise
 - `package.json` declares `"type": "module"` — this is an ESM project
 - Node.js >=24.0.0 required (enforced in `engines`)

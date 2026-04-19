@@ -1,16 +1,16 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createNoopLogger, DEFAULTS } from './config/defaults';
-import type { ServerConfig } from './config/types';
-import { validateServerConfig } from './config/validate';
-import { createErrorHandler } from './middleware/errorHandler';
-import { createRateLimitMiddleware } from './middleware/rateLimit';
-import { createRequestIdMiddleware } from './middleware/requestId';
-import { createSecurityMiddleware } from './middleware/security';
-import { createOpenApiRoutes } from './middleware/swagger';
-import { registerRoutes } from './routes/registry';
-import { createSpaHandler } from './routes/spa';
+import { createErrorHandler } from '../middleware/errorHandler.js';
+import { createRateLimitMiddleware } from '../middleware/rateLimit.js';
+import { createRequestIdMiddleware } from '../middleware/requestId.js';
+import { createSecurityMiddleware } from '../middleware/security.js';
+import { createOpenApiRoutes } from '../middleware/swagger.js';
+import { registerRoutes } from '../routes/registry.js';
+import { createSpaHandler } from '../routes/spa.js';
+import { createNoopLogger, DEFAULTS } from './defaults.js';
+import type { ServerConfig } from './types.js';
+import { validateServerConfig } from './validate.js';
 
 type HalideVariables = { rawBody?: unknown };
 
@@ -77,7 +77,8 @@ export async function createServer<TClaims = unknown>(
 
   return {
     start: async () => {
-      const port = Number.parseInt(process.env.PORT || '3001', 10);
+      const port =
+        Number.parseInt(process.env.PORT || '', 10) || (configInput.spa.port ?? DEFAULTS.spa.port);
       await new Promise<void>((resolve) => {
         httpServer = serve(
           {

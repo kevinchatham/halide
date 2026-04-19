@@ -41,6 +41,7 @@ export const DEFAULTS = {
     apiPrefix: '/api',
     fallback: 'index.html',
     name: 'app',
+    port: 3553,
   },
 } as const;
 

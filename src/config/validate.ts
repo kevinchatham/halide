@@ -24,6 +24,11 @@ function validateSpaConfig(spa?: SpaInput): void {
   if (!spa?.root) {
     throw new Error('spa.root is required');
   }
+  if (spa.port !== undefined) {
+    if (!Number.isInteger(spa.port) || spa.port < 1 || spa.port > 65535) {
+      throw new Error('spa.port must be an integer between 1 and 65535');
+    }
+  }
 }
 
 function validateRoute<TClaims = unknown>(route: RouteInput<TClaims>): void {

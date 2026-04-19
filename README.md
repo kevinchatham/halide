@@ -97,7 +97,7 @@ const server = await createServer({
 await server.start();
 ```
 
-> The server starts on port 3001 (override with the `PORT` environment variable).
+> The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
 
 ## When not to use Halide
 
