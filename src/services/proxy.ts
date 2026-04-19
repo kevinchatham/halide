@@ -53,6 +53,56 @@ function normalizeHeaders(headers: Record<string, unknown>): {
   return { headers: normalized, multiValueKeys };
 }
 
+function applyIdentityHeaders<TClaims>(
+  headers: Record<string, string | undefined>,
+  route: ProxyRoute<TClaims>,
+  claims: TClaims | undefined,
+  c: Context,
+  parsedBody: unknown,
+): void {
+  if (!route.identity || !claims) return;
+  const ctx = buildRequestContextFromHono(c, parsedBody);
+  const identityHeaders = route.identity(ctx, claims);
+  if (!identityHeaders) return;
+  for (const [key, value] of Object.entries(identityHeaders)) {
+    if (value !== undefined) {
+      headers[key] = value;
+    }
+  }
+}
+
+function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
+  const lowerKey = key.toLowerCase();
+  return (
+    !READONLY_HEADERS.has(lowerKey) && !ARRAY_HEADERS.has(lowerKey) && !multiValueKeys.has(lowerKey)
+  );
+}
+
+function applyTransform<TClaims>(
+  route: ProxyRoute<TClaims>,
+  parsedBody: unknown,
+  c: Context,
+  headers: Record<string, string | undefined>,
+  logger?: Logger,
+): BodyInit | null {
+  if (!route.transform) return c.req.raw.body;
+  try {
+    const jsonBody = parsedBody ?? {};
+    const { headers: normalizedHeaders, multiValueKeys } = normalizeHeaders(c.req.header());
+    const transformed = route.transform({ body: jsonBody, headers: normalizedHeaders });
+    const body = JSON.stringify(transformed.body);
+    for (const [key, value] of Object.entries(transformed.headers)) {
+      if (isWritableHeader(key, multiValueKeys)) {
+        headers[key.toLowerCase()] = value;
+      }
+    }
+    return body;
+  } catch (err) {
+    logger?.error('[halide] Transform error:', err);
+    throw err;
+  }
+}
+
 export function createProxyService<TClaims = unknown>(
   route: ProxyRoute<TClaims>,
   claims: TClaims | undefined,
@@ -70,42 +120,14 @@ export function createProxyService<TClaims = unknown>(
 
     const headers: Record<string, string | undefined> = { ...c.req.header() };
 
-    if (route.identity && claims) {
-      const ctx = buildRequestContextFromHono(c, parsedBody);
-      const identityHeaders = route.identity(ctx, claims);
-      if (identityHeaders) {
-        for (const [key, value] of Object.entries(identityHeaders)) {
-          if (value !== undefined) {
-            headers[key] = value;
-          }
-        }
-      }
-    }
+    applyIdentityHeaders(headers, route, claims, c, parsedBody);
 
-    let body: BodyInit | null = c.req.raw.body;
-    if (route.transform) {
-      try {
-        const jsonBody = parsedBody ?? {};
-        const { headers: normalizedHeaders, multiValueKeys } = normalizeHeaders(c.req.header());
-        const transformed = route.transform({ body: jsonBody, headers: normalizedHeaders });
-        body = JSON.stringify(transformed.body);
-        for (const [key, value] of Object.entries(transformed.headers)) {
-          const lowerKey = key.toLowerCase();
-          if (READONLY_HEADERS.has(lowerKey)) continue;
-          if (ARRAY_HEADERS.has(lowerKey)) continue;
-          if (multiValueKeys.has(lowerKey)) continue;
-          headers[lowerKey] = value;
-        }
-      } catch (err) {
-        logger?.error('[halide] Transform error:', err);
-        throw err;
-      }
-    }
+    const body = applyTransform(route, parsedBody, c, headers, logger);
 
     const signal = AbortSignal.timeout(timeoutMs);
 
     const proxyRequest = new Request(targetUrl, {
-      body: route.transform ? body : c.req.raw.body,
+      body,
       // @ts-expect-error - duplex is needed for streaming request bodies
       duplex: 'half',
       headers: headers as Record<string, string>,

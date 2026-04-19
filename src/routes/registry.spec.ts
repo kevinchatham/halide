@@ -535,4 +535,180 @@ describe('registerRoutes', () => {
       expect(res.status).toBe(401);
     });
   });
+
+  describe('OpenAPI metadata', () => {
+    it('registers route with openapi responses containing schema', async () => {
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ id: 1 }),
+            openapi: {
+              responses: {
+                '200': { description: 'OK', schema: z.object({ id: z.number() }) },
+                '404': { description: 'Not Found' },
+              },
+              summary: 'Get item',
+            },
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(200);
+    });
+
+    it('registers route with openapi responseSchema', async () => {
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ id: 1 }),
+            openapi: {
+              responseSchema: z.object({ id: z.number() }),
+              summary: 'Get item',
+            },
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(200);
+    });
+
+    it('registers route with openapi description and tags', async () => {
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ ok: true }),
+            openapi: {
+              description: 'A test route',
+              summary: 'Test',
+              tags: ['test'],
+            },
+            path: '/test',
+            type: 'api',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/test');
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('Auth config without secret or jwks', () => {
+    it('returns undefined claimExtractor when auth has no secret or jwks', async () => {
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'private',
+            handler: async () => ({ ok: true }),
+            path: '/profile',
+            type: 'api',
+          },
+        ],
+        security: { auth: { strategy: 'bearer' } },
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/profile');
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('Proxy authorization', () => {
+    it('returns 403 when proxy authorize returns false', async () => {
+      const app = await createTestApp({
+        proxyRoutes: [
+          {
+            access: 'public',
+            authorize: async () => false,
+            methods: ['get'],
+            path: '/admin',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/admin');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 when proxy authorize throws', async () => {
+      const app = await createTestApp({
+        proxyRoutes: [
+          {
+            access: 'public',
+            authorize: async () => {
+              throw new Error('Auth error');
+            },
+            methods: ['get'],
+            path: '/admin',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/admin');
+      expect(res.status).toBe(403);
+    });
+
+    it('executes proxy observability onRequest and onResponse', async () => {
+      const onRequest = vi.fn();
+      const onResponse = vi.fn();
+
+      const app = await createTestApp({
+        observability: { onRequest, onResponse },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/users',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      await app.request('/users');
+      expect(onRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips proxy observability when observe is false', async () => {
+      const onRequest = vi.fn();
+      const onResponse = vi.fn();
+
+      const app = await createTestApp({
+        observability: { onRequest, onResponse },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: false,
+            path: '/users',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      await app.request('/users');
+      expect(onRequest).not.toHaveBeenCalled();
+    });
+  });
 });

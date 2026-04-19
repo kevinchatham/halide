@@ -13,6 +13,20 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
   return sign(claims, secret, 'HS256');
 }
 
+describe('matchesAudience', () => {
+  it('returns null when aud is a non-string non-array type', async () => {
+    const app = new Hono();
+    const token = await createValidToken({ aud: 42, sub: 'user-123' });
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret, '42');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toBeNull();
+  });
+});
+
 describe('extractBearerClaims', () => {
   it('returns null when authorization header is missing', async () => {
     const app = new Hono();
@@ -152,6 +166,21 @@ describe('extractJwksClaims', () => {
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer invalid-token' } });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when JWKS verification fails with audience parameter', async () => {
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(
+        c,
+        'https://auth.example.com/jwks.json',
+        'my-api',
+      );
       return c.json({});
     });
     await app.request('/test', { headers: { authorization: 'Bearer invalid-token' } });

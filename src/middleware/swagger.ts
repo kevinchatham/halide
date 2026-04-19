@@ -12,7 +12,7 @@ export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app:
 
   app.get(
     `${swaggerPath}/openapi.json`,
-    openAPIRouteHandler(app as Hono, {
+    openAPIRouteHandler(app, {
       documentation: {
         info: {
           title: options?.title ?? 'Halide API',

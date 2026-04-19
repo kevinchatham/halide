@@ -52,34 +52,147 @@ function buildDescribeRouteOptions<TClaims>(
 
   if (route.observe === false) options.hide = true;
 
+  options.responses = buildResponses(meta);
+
+  return options;
+}
+
+function buildResponses(meta: ApiRoute['openapi']): ResponsesWithResolver {
   const responses: ResponsesWithResolver = {};
 
   if (meta?.responses) {
     for (const [status, resp] of Object.entries(meta.responses)) {
-      const response: Record<string, unknown> = {
-        description: resp.description,
-      };
+      const response: Record<string, unknown> = { description: resp.description };
       if (resp.schema) {
-        response.content = {
-          'application/json': { schema: resolver(resp.schema) },
-        };
+        response.content = { 'application/json': { schema: resolver(resp.schema) } };
       }
       responses[status] = response as ResponsesWithResolver[string];
     }
   } else if (meta?.responseSchema) {
     responses['200'] = {
-      content: {
-        'application/json': { schema: resolver(meta.responseSchema) },
-      },
+      content: { 'application/json': { schema: resolver(meta.responseSchema) } },
       description: 'Successful response',
     } as ResponsesWithResolver[string];
   } else {
     responses['200'] = { description: 'Successful response' } as ResponsesWithResolver[string];
   }
 
-  options.responses = responses;
+  return responses;
+}
 
-  return options;
+async function extractClaims<TClaims>(
+  c: Context,
+  route: { access: string },
+  claimExtractor: ClaimExtractor<TClaims> | undefined,
+): Promise<{ claims: TClaims | undefined; response: Response | null }> {
+  if (route.access === 'public' || !claimExtractor) {
+    return { claims: undefined, response: null };
+  }
+  const extracted = await claimExtractor(c);
+  if (extracted === null) {
+    return {
+      claims: undefined,
+      response: new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 401,
+      }),
+    };
+  }
+  return { claims: extracted, response: null };
+}
+
+async function checkAuthorization<TClaims>(
+  c: Context,
+  route: { authorize?: ApiRoute<TClaims>['authorize'] },
+  claims: TClaims | undefined,
+  body: unknown,
+  logger: Logger,
+): Promise<Response | null> {
+  if (!route.authorize) return null;
+  try {
+    const ctx = buildRequestContextFromHono(c, body);
+    const allowed = await route.authorize(ctx, claims, logger);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+    return null;
+  } catch {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 403,
+    });
+  }
+}
+
+function emitOnRequest<TClaims>(
+  c: Context,
+  body: unknown,
+  claims: TClaims | undefined,
+  observability: ObservabilityConfig<TClaims> | undefined,
+  observe: boolean | undefined,
+  logger: Logger,
+): void {
+  if (observability?.onRequest && observe !== false) {
+    const ctx = buildRequestContextFromHono(c, body);
+    observability.onRequest(ctx, claims, logger);
+  }
+}
+
+interface ResponseEmitContext {
+  handlerError: Error | undefined;
+  start: number;
+  statusCode: number;
+}
+
+function emitOnResponse<TClaims>(
+  c: Context,
+  body: unknown,
+  claims: TClaims | undefined,
+  observability: ObservabilityConfig<TClaims> | undefined,
+  observe: boolean | undefined,
+  ctx: ResponseEmitContext,
+  logger: Logger,
+): void {
+  if (observability?.onResponse && observe !== false) {
+    const reqCtx = buildRequestContextFromHono(c, body);
+    observability.onResponse(
+      reqCtx,
+      claims,
+      { durationMs: Date.now() - ctx.start, error: ctx.handlerError, statusCode: ctx.statusCode },
+      logger,
+    );
+  }
+}
+
+function getValidJson(c: Context): unknown {
+  return (c.req as unknown as { valid: (t: string) => unknown }).valid('json');
+}
+
+function resolveBody<TClaims>(c: Context, route: ApiRoute<TClaims>): unknown {
+  if (route.validationSchema) return getValidJson(c);
+  const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
+  return methodsWithBody.has(c.req.method.toUpperCase())
+    ? c.req.json().catch(() => undefined)
+    : undefined;
+}
+
+function registerRouteOnApp(
+  app: Hono<{ Variables: HalideVariables }>,
+  method: string,
+  path: string,
+  ...handlers: MiddlewareHandler[]
+): void {
+  const appRecord = app as unknown as Record<
+    string,
+    (path: string, ...handlers: MiddlewareHandler[]) => void
+  >;
+  const appMethod = appRecord[method];
+  if (appMethod) {
+    appMethod(path, ...handlers);
+  }
 }
 
 function registerApiRoute<TClaims = unknown>(
@@ -90,7 +203,6 @@ function registerApiRoute<TClaims = unknown>(
   logger: Logger,
 ): void {
   const method = route.method ?? DEFAULTS.route.method;
-
   const middlewares: MiddlewareHandler[] = [];
 
   middlewares.push(describeRoute(buildDescribeRouteOptions(route)));
@@ -99,54 +211,21 @@ function registerApiRoute<TClaims = unknown>(
     middlewares.push(validator('json', route.validationSchema));
   }
 
-  const getValidJson = (c: Context): unknown =>
-    (c.req as unknown as { valid: (t: string) => unknown }).valid('json');
-
   middlewares.push(async (c: Context) => {
     const start = Date.now();
-    let claims: TClaims | undefined;
     let handlerError: Error | undefined;
     let statusCode = 200;
 
-    if (route.access !== 'public' && claimExtractor) {
-      const extracted = await claimExtractor(c);
-      if (extracted === null) {
-        statusCode = 401;
-        return c.json({ error: 'Unauthorized' }, 401);
-      }
-      claims = extracted;
-    }
+    const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
+    if (authResponse) return authResponse;
 
-    if (route.authorize) {
-      try {
-        const body = route.validationSchema ? getValidJson(c) : undefined;
-        const ctx = buildRequestContextFromHono(c, body);
-        const allowed = await route.authorize(ctx, claims, logger);
-        if (!allowed) {
-          statusCode = 403;
-          return c.json({ error: 'Forbidden' }, 403);
-        }
-      } catch {
-        statusCode = 403;
-        return c.json({ error: 'Forbidden' }, 403);
-      }
-    }
+    const authBody = route.validationSchema ? getValidJson(c) : undefined;
+    const forbidResponse = await checkAuthorization(c, route, claims, authBody, logger);
+    if (forbidResponse) return forbidResponse;
 
-    if (observability?.onRequest && route.observe !== false) {
-      const body = route.validationSchema ? getValidJson(c) : undefined;
-      const ctx = buildRequestContextFromHono(c, body);
-      observability.onRequest(ctx, claims, logger);
-    }
+    emitOnRequest(c, authBody, claims, observability, route.observe, logger);
 
-    let body: unknown;
-    if (route.validationSchema) {
-      body = getValidJson(c);
-    } else {
-      const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
-      body = methodsWithBody.has(c.req.method.toUpperCase())
-        ? await c.req.json().catch(() => undefined)
-        : undefined;
-    }
+    const body = await resolveBody(c, route);
 
     let result: unknown;
     try {
@@ -158,32 +237,21 @@ function registerApiRoute<TClaims = unknown>(
       statusCode = 500;
       throw err;
     } finally {
-      if (observability?.onResponse && route.observe !== false) {
-        const ctx = buildRequestContextFromHono(c, body);
-        observability.onResponse(
-          ctx,
-          claims,
-          {
-            durationMs: Date.now() - start,
-            error: handlerError,
-            statusCode,
-          },
-          logger,
-        );
-      }
+      emitOnResponse(
+        c,
+        body,
+        claims,
+        observability,
+        route.observe,
+        { handlerError, start, statusCode },
+        logger,
+      );
     }
 
     return c.json(result);
   });
 
-  const appRecord = app as unknown as Record<
-    string,
-    (path: string, ...handlers: MiddlewareHandler[]) => void
-  >;
-  const appMethod = appRecord[method];
-  if (appMethod) {
-    appMethod(route.path, ...middlewares);
-  }
+  registerRouteOnApp(app, method, route.path, ...middlewares);
 }
 
 function registerProxyRoute<TClaims = unknown>(
@@ -196,7 +264,6 @@ function registerProxyRoute<TClaims = unknown>(
   for (const method of route.methods) {
     app[method](route.path, describeRoute(buildDescribeRouteOptions(route)), async (c: Context) => {
       const start = Date.now();
-      let claims: TClaims | undefined;
       let handlerError: Error | undefined;
       let statusCode = 200;
 
@@ -206,33 +273,23 @@ function registerProxyRoute<TClaims = unknown>(
         c.set('rawBody', parsedBody);
       }
 
-      if (route.access !== 'public' && claimExtractor) {
-        const extracted = await claimExtractor(c);
-        if (extracted === null) {
-          statusCode = 401;
-          return c.json({ error: 'Unauthorized' }, 401);
-        }
-        claims = extracted;
+      const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
+      if (authResponse) {
+        return new Response(authResponse.body, {
+          headers: authResponse.headers,
+          status: authResponse.status,
+        });
       }
 
-      if (route.authorize) {
-        try {
-          const ctx = buildRequestContextFromHono(c, parsedBody);
-          const allowed = await route.authorize(ctx, claims, logger);
-          if (!allowed) {
-            statusCode = 403;
-            return c.json({ error: 'Forbidden' }, 403);
-          }
-        } catch {
-          statusCode = 403;
-          return c.json({ error: 'Forbidden' }, 403);
-        }
+      const forbidResponse = await checkAuthorization(c, route, claims, parsedBody, logger);
+      if (forbidResponse) {
+        return new Response(forbidResponse.body, {
+          headers: forbidResponse.headers,
+          status: forbidResponse.status,
+        });
       }
 
-      if (observability?.onRequest && route.observe !== false) {
-        const ctx = buildRequestContextFromHono(c, parsedBody);
-        observability.onRequest(ctx, claims, logger);
-      }
+      emitOnRequest(c, parsedBody, claims, observability, route.observe, logger);
 
       try {
         const proxyHandler = createProxyService(route, claims, logger, parsedBody);
@@ -242,19 +299,15 @@ function registerProxyRoute<TClaims = unknown>(
         statusCode = 500;
         throw err;
       } finally {
-        if (observability?.onResponse && route.observe !== false) {
-          const ctx = buildRequestContextFromHono(c, parsedBody);
-          observability.onResponse(
-            ctx,
-            claims,
-            {
-              durationMs: Date.now() - start,
-              error: handlerError,
-              statusCode,
-            },
-            logger,
-          );
-        }
+        emitOnResponse(
+          c,
+          parsedBody,
+          claims,
+          observability,
+          route.observe,
+          { handlerError, start, statusCode },
+          logger,
+        );
       }
     });
   }
@@ -280,4 +333,4 @@ export async function registerRoutes<TClaims = unknown>(
   }
 }
 
-export { buildRequestContextFromHono };
+export { buildRequestContextFromHono } from '../services/proxy';

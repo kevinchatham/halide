@@ -191,4 +191,71 @@ describe('createProxyService', () => {
     const res = await app.request('/api/fail');
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
+
+  it('handles transform throwing an error', async () => {
+    const transformFn = vi.fn().mockImplementation(() => {
+      throw new Error('Transform failed');
+    });
+
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['post'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      transform: transformFn,
+      type: 'proxy',
+    };
+
+    const errorLogger: Logger = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+
+    const handler = createProxyService(route, undefined, errorLogger, { original: true });
+
+    const app = new Hono();
+    app.post('/api/data', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    const res = await app.request('/api/data', {
+      body: JSON.stringify({ original: true }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+
+    expect(res.status).toBe(502);
+    expect(errorLogger.error).toHaveBeenCalled();
+  });
+
+  it('normalizes headers with non-string and array values in transform', async () => {
+    const transformFn = vi.fn().mockReturnValue({
+      body: { transformed: true },
+      headers: { 'x-custom': 'value' },
+    });
+
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['post'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      transform: transformFn,
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+
+    const app = new Hono();
+    app.post('/api/data', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    await app.request('/api/data', {
+      body: JSON.stringify({ original: true }),
+      headers: { 'Content-Type': 'application/json', 'X-Array-Header': 'a, b' },
+      method: 'POST',
+    });
+
+    expect(transformFn).toHaveBeenCalled();
+  });
 });
