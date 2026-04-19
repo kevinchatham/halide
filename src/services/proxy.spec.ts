@@ -317,3 +317,360 @@ describe('createProxyService', () => {
     );
   });
 });
+
+it('handles array query params in identity context', () => {
+  const mockHandler = vi.fn();
+  const mockProxyReq = vi.fn();
+  mockedCreateProxyMiddleware.mockImplementation((options) => {
+    const proxyReqHandler = (options as { on: { proxyReq: typeof mockProxyReq } }).on.proxyReq;
+    mockProxyReq.mockImplementation(proxyReqHandler);
+    return mockHandler as unknown as ReturnType<typeof createProxyMiddleware>;
+  });
+
+  const identityFn = vi.fn().mockReturnValue({ 'x-test': 'ok' });
+  createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    identityFn,
+    undefined,
+    undefined,
+    noopLogger,
+  );
+
+  const mockReq = {
+    body: { foo: 'bar' },
+    claims: { sub: 'user1' },
+    headers: { cookie: 'session=abc' },
+    method: 'POST',
+    params: { id: '123' },
+    path: '/api/test',
+    query: { filter: ['a', 'b', 'c'] },
+  } as unknown as import('node:http').IncomingMessage & { claims: unknown };
+  const mockProxyRequest = { setHeader: vi.fn() } as unknown as import('node:http').ClientRequest;
+  mockProxyReq(mockProxyRequest, mockReq);
+
+  expect(identityFn).toHaveBeenCalled();
+  const ctx = identityFn.mock.calls[0]![0];
+  expect(ctx.query.filter).toEqual(['a', 'b', 'c']);
+});
+
+it('skips identity when claims are not present', () => {
+  const mockHandler = vi.fn();
+  const mockProxyReq = vi.fn();
+  mockedCreateProxyMiddleware.mockImplementation((options) => {
+    const proxyReqHandler = (options as { on: { proxyReq: typeof mockProxyReq } }).on.proxyReq;
+    mockProxyReq.mockImplementation(proxyReqHandler);
+    return mockHandler as unknown as ReturnType<typeof createProxyMiddleware>;
+  });
+
+  const identityFn = vi.fn().mockReturnValue({ 'x-test': 'ok' });
+  createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    identityFn,
+    undefined,
+    undefined,
+    noopLogger,
+  );
+
+  const mockReq = {
+    body: {},
+    headers: {},
+    method: 'GET',
+    params: {},
+    path: '/api/test',
+    query: {},
+  } as unknown as import('node:http').IncomingMessage & { claims: unknown };
+  const mockProxyRequest = { setHeader: vi.fn() } as unknown as import('node:http').ClientRequest;
+  mockProxyReq(mockProxyRequest, mockReq);
+
+  expect(identityFn).not.toHaveBeenCalled();
+});
+
+it('skips identity when it returns undefined', () => {
+  const mockHandler = vi.fn();
+  const mockProxyReq = vi.fn();
+  mockedCreateProxyMiddleware.mockImplementation((options) => {
+    const proxyReqHandler = (options as { on: { proxyReq: typeof mockProxyReq } }).on.proxyReq;
+    mockProxyReq.mockImplementation(proxyReqHandler);
+    return mockHandler as unknown as ReturnType<typeof createProxyMiddleware>;
+  });
+
+  const identityFn = vi.fn().mockReturnValue(undefined);
+  createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    identityFn,
+    undefined,
+    undefined,
+    noopLogger,
+  );
+
+  const mockReq = {
+    claims: { sub: 'user1' },
+    headers: {},
+    method: 'GET',
+    params: {},
+    path: '/api/test',
+    query: {},
+  } as unknown as import('node:http').IncomingMessage & { claims: unknown };
+  const mockProxyRequest = { setHeader: vi.fn() } as unknown as import('node:http').ClientRequest;
+  mockProxyReq(mockProxyRequest, mockReq);
+
+  expect(identityFn).toHaveBeenCalled();
+  expect(mockProxyRequest.setHeader).not.toHaveBeenCalled();
+});
+
+it('skips undefined header values from identity', () => {
+  const mockHandler = vi.fn();
+  const mockProxyReq = vi.fn();
+  mockedCreateProxyMiddleware.mockImplementation((options) => {
+    const proxyReqHandler = (options as { on: { proxyReq: typeof mockProxyReq } }).on.proxyReq;
+    mockProxyReq.mockImplementation(proxyReqHandler);
+    return mockHandler as unknown as ReturnType<typeof createProxyMiddleware>;
+  });
+
+  const identityFn = vi.fn().mockReturnValue({ 'x-defined': 'value', 'x-undefined': undefined });
+  createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    identityFn,
+    undefined,
+    undefined,
+    noopLogger,
+  );
+
+  const mockReq = {
+    claims: { sub: 'user1' },
+    headers: {},
+    method: 'GET',
+    params: {},
+    path: '/api/test',
+    query: {},
+  } as unknown as import('node:http').IncomingMessage & { claims: unknown };
+  const mockProxyRequest = { setHeader: vi.fn() } as unknown as import('node:http').ClientRequest;
+  mockProxyReq(mockProxyRequest, mockReq);
+
+  expect(mockProxyRequest.setHeader).toHaveBeenCalledWith('x-defined', 'value');
+  expect(mockProxyRequest.setHeader).not.toHaveBeenCalledWith('x-undefined', undefined);
+});
+
+it('handles transform with null body', () => {
+  const mockHandler = vi.fn();
+  mockedCreateProxyMiddleware.mockReturnValue(
+    mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+  );
+
+  const transform = (): { body: unknown; headers: Record<string, string> } => ({
+    body: {},
+    headers: {},
+  });
+  const result = createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transform,
+    undefined,
+    noopLogger,
+  );
+
+  const req = { body: null, headers: {} } as unknown as Request;
+  const res = {} as unknown as Response;
+  const next = vi.fn();
+  result(req, res, next);
+
+  expect(mockHandler).toHaveBeenCalled();
+});
+
+it('handles transform with string body', () => {
+  const mockHandler = vi.fn();
+  mockedCreateProxyMiddleware.mockReturnValue(
+    mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+  );
+
+  const transform = (): { body: unknown; headers: Record<string, string> } => ({
+    body: {},
+    headers: {},
+  });
+  const result = createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transform,
+    undefined,
+    noopLogger,
+  );
+
+  const req = { body: 'raw-string', headers: {} } as unknown as Request;
+  const res = {} as unknown as Response;
+  const next = vi.fn();
+  result(req, res, next);
+
+  expect(mockHandler).toHaveBeenCalled();
+});
+
+it('does not overwrite connection header from transform', () => {
+  const mockHandler = vi.fn();
+  mockedCreateProxyMiddleware.mockReturnValue(
+    mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+  );
+
+  const transform = (): { body: unknown; headers: Record<string, string> } => ({
+    body: {},
+    headers: { connection: 'keep-alive', 'x-new': 'value' },
+  });
+  const result = createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transform,
+    undefined,
+    noopLogger,
+  );
+
+  const req = { body: {}, headers: { connection: 'close' } } as unknown as Request;
+  const res = {} as unknown as Response;
+  const next = vi.fn();
+  result(req, res, next);
+
+  expect(req.headers['connection']).toBe('close');
+  expect(req.headers['x-new']).toBe('value');
+});
+
+it('does not overwrite content-length header from transform', () => {
+  const mockHandler = vi.fn();
+  mockedCreateProxyMiddleware.mockReturnValue(
+    mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+  );
+
+  const transform = (): { body: unknown; headers: Record<string, string> } => ({
+    body: {},
+    headers: { 'content-length': '999', 'x-new': 'value' },
+  });
+  const result = createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transform,
+    undefined,
+    noopLogger,
+  );
+
+  const req = { body: {}, headers: { 'content-length': '100' } } as unknown as Request;
+  const res = {} as unknown as Response;
+  const next = vi.fn();
+  result(req, res, next);
+
+  expect(req.headers['content-length']).toBe('100');
+  expect(req.headers['x-new']).toBe('value');
+});
+
+it('does not overwrite transfer-encoding header from transform', () => {
+  const mockHandler = vi.fn();
+  mockedCreateProxyMiddleware.mockReturnValue(
+    mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+  );
+
+  const transform = (): { body: unknown; headers: Record<string, string> } => ({
+    body: {},
+    headers: { 'transfer-encoding': 'chunked', 'x-new': 'value' },
+  });
+  const result = createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transform,
+    undefined,
+    noopLogger,
+  );
+
+  const req = { body: {}, headers: { 'transfer-encoding': 'identity' } } as unknown as Request;
+  const res = {} as unknown as Response;
+  const next = vi.fn();
+  result(req, res, next);
+
+  expect(req.headers['transfer-encoding']).toBe('identity');
+});
+
+it('does not overwrite host header from transform', () => {
+  const mockHandler = vi.fn();
+  mockedCreateProxyMiddleware.mockReturnValue(
+    mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+  );
+
+  const transform = (): { body: unknown; headers: Record<string, string> } => ({
+    body: {},
+    headers: { host: 'evil.com', 'x-new': 'value' },
+  });
+  const result = createProxyService(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transform,
+    undefined,
+    noopLogger,
+  );
+
+  const req = { body: {}, headers: { host: 'original.com' } } as unknown as Request;
+  const res = {} as unknown as Response;
+  const next = vi.fn();
+  result(req, res, next);
+
+  expect(req.headers['host']).toBe('original.com');
+});
+
+it('uses routePath as default when proxyPath is not provided', () => {
+  createProxyService(
+    'https://api.example.com',
+    '/api/users',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    noopLogger,
+  );
+
+  expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
+    expect.objectContaining({
+      pathRewrite: {
+        '^/api/users': '/api/users',
+      },
+    }),
+  );
+});
+
+describe('serializeQueryParam', () => {
+  let serializeQueryParam: (v: unknown) => string | string[];
+
+  beforeAll(async () => {
+    const mod = await import('./proxy');
+    serializeQueryParam = mod.serializeQueryParam;
+  });
+
+  it('serializes string values', () => {
+    expect(serializeQueryParam('hello')).toBe('hello');
+  });
+
+  it('serializes non-string non-array values', () => {
+    expect(serializeQueryParam(42)).toBe('42');
+    expect(serializeQueryParam(true)).toBe('true');
+  });
+
+  it('serializes arrays of strings', () => {
+    expect(serializeQueryParam(['a', 'b'])).toEqual(['a', 'b']);
+  });
+
+  it('serializes arrays with non-string items', () => {
+    expect(serializeQueryParam([1, 'b'])).toEqual(['1', 'b']);
+  });
+});

@@ -11,7 +11,7 @@ import type {
 } from '../config/types';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
 import { createBodyValidationMiddleware } from '../middleware/validate';
-import { createProxyService } from '../services/proxy';
+import { buildRequestContextFromExpress, createProxyService } from '../services/proxy';
 
 async function resolveSecret(
   secret: string | (() => string) | (() => Promise<string>),
@@ -52,19 +52,7 @@ async function createAuthMiddlewareFromConfig<TClaims = unknown>(
 }
 
 function buildRequestContext(req: Request): RequestContext {
-  return {
-    body: req.body,
-    headers: req.headers as Record<string, string | string[]>,
-    method: req.method.toLowerCase() as RequestContext['method'],
-    params: Object.fromEntries(Object.entries(req.params || {}).map(([k, v]) => [k, String(v)])),
-    path: req.path,
-    query: Object.fromEntries(
-      Object.entries(req.query || {}).map(([k, v]) => [
-        k,
-        Array.isArray(v) ? v.map(String) : String(v),
-      ]),
-    ),
-  };
+  return buildRequestContextFromExpress(req);
 }
 
 function createAuthorizeMiddleware<TClaims = unknown>(
@@ -121,6 +109,114 @@ function createObservationMiddleware<TClaims = unknown>(
   };
 }
 
+function buildApiRouteMiddlewares<TClaims = unknown>(
+  route: ApiRoute<TClaims>,
+  authMiddleware: RequestHandler | undefined,
+  observability: ObservabilityConfig<TClaims> | undefined,
+  logger: Logger,
+): RequestHandler[] {
+  const middlewares: RequestHandler[] = [];
+  if (route.access !== 'public' && authMiddleware) {
+    middlewares.push(authMiddleware);
+  }
+  if (route.authorize) {
+    middlewares.push(createAuthorizeMiddleware(route.authorize, logger));
+  }
+  if (observability) {
+    const routeObs = createObservationMiddleware(observability, route.observe, logger);
+    if (routeObs) middlewares.push(routeObs);
+  }
+  if (route.validationSchema) {
+    middlewares.push(createBodyValidationMiddleware(route.validationSchema));
+  }
+  return middlewares;
+}
+
+function createApiHandlerMiddleware<TClaims = unknown>(
+  route: ApiRoute<TClaims>,
+  logger: Logger,
+): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const ctx = buildRequestContext(req) as RequestContext & {
+      body: unknown;
+    };
+    const claims = req.claims as TClaims | undefined;
+    try {
+      const result = await route.handler(ctx, claims, logger);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+function registerApiRoute<TClaims = unknown>(
+  router: Router,
+  route: ApiRoute<TClaims>,
+  authMiddleware: RequestHandler | undefined,
+  observability: ObservabilityConfig<TClaims> | undefined,
+  logger: Logger,
+): void {
+  const fullPath = route.path;
+  const method = route.method ?? DEFAULTS.route.method;
+  const middlewares = buildApiRouteMiddlewares(route, authMiddleware, observability, logger);
+  middlewares.push(createApiHandlerMiddleware(route, logger));
+  router[method](fullPath, ...middlewares);
+}
+
+function buildProxyRouteMiddlewares<TClaims = unknown>(
+  route: ProxyRoute<TClaims>,
+  authMiddleware: RequestHandler | undefined,
+  observability: ObservabilityConfig<TClaims> | undefined,
+  logger: Logger,
+  proxyHandler: RequestHandler,
+): RequestHandler[] {
+  const middlewares: RequestHandler[] = [];
+  if (route.access !== 'public' && authMiddleware) {
+    middlewares.push(authMiddleware);
+  }
+  if (route.authorize) {
+    middlewares.push(createAuthorizeMiddleware(route.authorize, logger));
+  }
+  if (observability) {
+    const routeObs = createObservationMiddleware(observability, route.observe, logger);
+    if (routeObs) middlewares.push(routeObs);
+  }
+  middlewares.push(proxyHandler);
+  return middlewares;
+}
+
+function registerProxyRoute<TClaims = unknown>(
+  router: Router,
+  route: ProxyRoute<TClaims>,
+  authMiddleware: RequestHandler | undefined,
+  observability: ObservabilityConfig<TClaims> | undefined,
+  logger: Logger,
+): void {
+  const fullPath = route.path;
+  const proxyHandler = createProxyService<TClaims>(
+    route.target,
+    route.path,
+    route.proxyPath,
+    route.identity,
+    route.transform,
+    route.timeout,
+    logger,
+  );
+  type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+  const methods = route.methods as HttpMethod[];
+  for (const method of methods) {
+    const middlewares = buildProxyRouteMiddlewares(
+      route,
+      authMiddleware,
+      observability,
+      logger,
+      proxyHandler,
+    );
+    router[method](fullPath, ...middlewares);
+  }
+}
+
 export async function registerRoutes<TClaims = unknown>(
   app: Express | Router,
   config: ServerConfig<TClaims>,
@@ -132,72 +228,13 @@ export async function registerRoutes<TClaims = unknown>(
 
   if (apiRoutes) {
     for (const route of apiRoutes) {
-      const fullPath = route.path;
-      const method = route.method ?? DEFAULTS.route.method;
-      const middlewares: RequestHandler[] = [];
-      if (route.access !== 'public' && authMiddleware) {
-        middlewares.push(authMiddleware);
-      }
-      if (route.authorize) {
-        middlewares.push(createAuthorizeMiddleware(route.authorize, logger));
-      }
-      if (observability) {
-        const routeObs = createObservationMiddleware(observability, route.observe, logger);
-        if (routeObs) middlewares.push(routeObs);
-      }
-      if (route.validationSchema) {
-        middlewares.push(createBodyValidationMiddleware(route.validationSchema));
-      }
-      const handlerMiddleware: RequestHandler = async (
-        req: Request,
-        res: Response,
-        next: NextFunction,
-      ) => {
-        const ctx = buildRequestContext(req) as RequestContext & {
-          body: unknown;
-        };
-        const claims = req.claims as TClaims | undefined;
-        try {
-          const result = await route.handler(ctx, claims, logger);
-          res.json(result);
-        } catch (err) {
-          next(err);
-        }
-      };
-      middlewares.push(handlerMiddleware);
-      router[method](fullPath, ...middlewares);
+      registerApiRoute(router, route, authMiddleware, observability, logger);
     }
   }
 
   if (proxyRoutes) {
     for (const route of proxyRoutes) {
-      const fullPath = route.path;
-      const proxyHandler = createProxyService<TClaims>(
-        route.target,
-        route.path,
-        route.proxyPath,
-        route.identity,
-        route.transform,
-        route.timeout,
-        logger,
-      );
-      type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
-      const methods = route.methods as HttpMethod[];
-      for (const method of methods) {
-        const middlewares: RequestHandler[] = [];
-        if (route.access !== 'public' && authMiddleware) {
-          middlewares.push(authMiddleware);
-        }
-        if (route.authorize) {
-          middlewares.push(createAuthorizeMiddleware(route.authorize, logger));
-        }
-        if (observability) {
-          const routeObs = createObservationMiddleware(observability, route.observe, logger);
-          if (routeObs) middlewares.push(routeObs);
-        }
-        middlewares.push(proxyHandler);
-        router[method](fullPath, ...middlewares);
-      }
+      registerProxyRoute(router, route, authMiddleware, observability, logger);
     }
   }
 }

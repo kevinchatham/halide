@@ -45,7 +45,7 @@ router.patch('/:id', (req, res) => {
     res.status(400).json(parsed.error.issues);
     return;
   }
-  const existing = users[index] as (typeof users)[number];
+  const existing = users[index];
   users[index] = { ...existing, ...parsed.data };
   res.json(users[index]);
 });

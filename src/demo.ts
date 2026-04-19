@@ -26,7 +26,7 @@ import {
   type ServerConfig,
   type SpaConfig,
 } from './config/types'; // from 'halide'
-import { createServer } from './runtime'; // from 'halide';
+import { createServer, type Server } from './runtime'; // from 'halide';
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {
@@ -249,4 +249,6 @@ const exampleConfig: ServerConfig<UserClaims> = {
   spa,
 };
 
-createServer(exampleConfig).then((server) => server.start());
+const server: Server = await createServer(exampleConfig);
+
+await server.start();

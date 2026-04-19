@@ -29,7 +29,7 @@ function generateSchemaName(prefix: string, counter: { value: number }): string 
 
 function extractPathParams(path: string): OpenAPIV3.ParameterObject[] {
   const params: OpenAPIV3.ParameterObject[] = [];
-  const regex = /:([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const regex = /:(\w+)/g;
   let match: RegExpExecArray | null = regex.exec(path);
   while (match !== null) {
     const paramName = match[1];
@@ -47,7 +47,7 @@ function extractPathParams(path: string): OpenAPIV3.ParameterObject[] {
 }
 
 function toOpenApiPath(path: string): string {
-  return path.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, '{$1}');
+  return path.replaceAll(/:(\w+)/g, '{$1}');
 }
 
 function convertZodSchema(
@@ -111,123 +111,154 @@ function buildResponses(
   return responses;
 }
 
-export function generateOpenApiSpec<TClaims>(
+function buildSecuritySchemes<TClaims>(
   config: ServerConfig<TClaims>,
-  options?: OpenApiOptions,
-): OpenAPIV3.Document {
-  const ctx: SchemaContext = {
-    counter: { value: 0 },
-    dedup: new WeakMap(),
+): Record<string, OpenAPIV3.SecuritySchemeObject> | undefined {
+  const auth = config.security?.auth;
+  if (!auth) return undefined;
+
+  return {
+    BearerAuth: {
+      bearerFormat: 'JWT',
+      scheme: 'bearer',
+      type: 'http',
+      ...(auth.strategy === 'jwks' && {
+        description: 'JWT authentication via JWKS',
+      }),
+    },
+  };
+}
+
+function buildOperationSecurity(
+  routeAccess: 'public' | 'private' | undefined,
+  hasSecurity: boolean,
+): Array<Record<string, string[]>> | undefined {
+  return routeAccess === 'private' && hasSecurity ? [{ BearerAuth: [] }] : undefined;
+}
+
+function addOperationMetadata(
+  operation: OpenAPIV3.OperationObject,
+  routeOpenapi: import('../config/types').OpenApiRouteMeta | undefined,
+): void {
+  if (routeOpenapi?.summary) {
+    operation.summary = routeOpenapi.summary;
+  }
+  if (routeOpenapi?.description) {
+    operation.description = routeOpenapi.description;
+  }
+  if (routeOpenapi?.tags?.length) {
+    operation.tags = routeOpenapi.tags;
+  }
+}
+
+function buildApiRouteOperation<TClaims>(
+  route: import('../config/types').ApiRoute<TClaims>,
+  components: Record<string, OpenAPIV3.SchemaObject>,
+  ctx: SchemaContext,
+  hasSecurity: boolean,
+): OpenAPIV3.OperationObject {
+  const parameters = extractPathParams(route.path);
+  const operation: OpenAPIV3.OperationObject = {
+    responses: buildResponses(route.openapi, components, ctx),
   };
 
+  if (parameters.length > 0) {
+    operation.parameters = parameters;
+  }
+
+  addOperationMetadata(operation, route.openapi);
+
+  if (route.validationSchema) {
+    const schemaName =
+      route.openapi?.requestSchemaName ?? generateSchemaName('RequestBody', ctx.counter);
+    const schemaRef = convertZodSchema(route.validationSchema, schemaName, components, ctx);
+    operation.requestBody = {
+      content: {
+        'application/json': { schema: schemaRef },
+      },
+      required: true,
+    };
+  }
+
+  const security = buildOperationSecurity(route.access, hasSecurity);
+  if (security) {
+    operation.security = security;
+  }
+
+  return operation;
+}
+
+function buildProxyRouteOperation<TClaims>(
+  route: import('../config/types').ProxyRoute<TClaims>,
+  components: Record<string, OpenAPIV3.SchemaObject>,
+  ctx: SchemaContext,
+  hasSecurity: boolean,
+): OpenAPIV3.OperationObject {
+  const parameters = extractPathParams(route.path);
+  const operation: OpenAPIV3.OperationObject = {
+    responses: buildResponses(route.openapi, components, ctx),
+    summary: route.openapi?.summary ?? `Proxy to ${route.target}`,
+  };
+
+  if (parameters.length > 0) {
+    operation.parameters = parameters;
+  }
+
+  addOperationMetadata(operation, route.openapi);
+
+  const security = buildOperationSecurity(route.access, hasSecurity);
+  if (security) {
+    operation.security = security;
+  }
+
+  return operation;
+}
+
+function processApiRoutes<TClaims>(
+  routes: import('../config/types').ApiRoute<TClaims>[],
+  paths: MutablePaths,
+  components: Record<string, OpenAPIV3.SchemaObject>,
+  ctx: SchemaContext,
+  hasSecurity: boolean,
+): void {
+  for (const route of routes) {
+    const openApiPath = toOpenApiPath(route.path);
+    paths[openApiPath] ??= {};
+    const pathItem = paths[openApiPath];
+    const method = (route.method ?? DEFAULTS.route.method) as keyof MutablePathItem;
+
+    pathItem[method] = buildApiRouteOperation(route, components, ctx, hasSecurity);
+  }
+}
+
+function processProxyRoutes<TClaims>(
+  routes: import('../config/types').ProxyRoute<TClaims>[],
+  paths: MutablePaths,
+  components: Record<string, OpenAPIV3.SchemaObject>,
+  ctx: SchemaContext,
+  hasSecurity: boolean,
+): void {
+  for (const route of routes) {
+    const openApiPath = toOpenApiPath(route.path);
+    paths[openApiPath] ??= {};
+    const pathItem = paths[openApiPath];
+
+    for (const method of route.methods) {
+      const methodKey = method as keyof MutablePathItem;
+      pathItem[methodKey] = buildProxyRouteOperation(route, components, ctx, hasSecurity);
+    }
+  }
+}
+
+function buildOpenApiDocument<TClaims>(
+  config: ServerConfig<TClaims>,
+  options: OpenApiOptions | undefined,
+  paths: MutablePaths,
+  components: Record<string, OpenAPIV3.SchemaObject>,
+): OpenAPIV3.Document {
   const title = options?.title ?? DEFAULTS.openapi.title;
   const version = options?.version ?? DEFAULTS.openapi.version;
-  const includeProxyRoutes = options?.includeProxyRoutes ?? DEFAULTS.openapi.includeProxyRoutes;
 
-  const paths: MutablePaths = {};
-  const components: Record<string, OpenAPIV3.SchemaObject> = {};
-  const hasSecurity = !!config.security?.auth;
-
-  const securitySchemes: Record<string, OpenAPIV3.SecuritySchemeObject> | undefined =
-    hasSecurity && config.security?.auth
-      ? {
-          BearerAuth: {
-            bearerFormat: 'JWT',
-            scheme: 'bearer',
-            type: 'http',
-            ...(config.security.auth.strategy === 'jwks' && {
-              description: 'JWT authentication via JWKS',
-            }),
-          },
-        }
-      : undefined;
-
-  if (config.apiRoutes) {
-    for (const route of config.apiRoutes) {
-      const openApiPath = toOpenApiPath(route.path);
-      if (!paths[openApiPath]) {
-        paths[openApiPath] = {};
-      }
-      const pathItem = paths[openApiPath] as MutablePathItem;
-      const method = (route.method ?? DEFAULTS.route.method) as keyof MutablePathItem;
-
-      const parameters = extractPathParams(route.path);
-      const operation: OpenAPIV3.OperationObject = {
-        responses: buildResponses(route.openapi, components, ctx),
-      };
-
-      if (parameters.length > 0) {
-        operation.parameters = parameters;
-      }
-
-      if (route.openapi?.summary) {
-        operation.summary = route.openapi.summary;
-      }
-      if (route.openapi?.description) {
-        operation.description = route.openapi.description;
-      }
-      if (route.openapi?.tags?.length) {
-        operation.tags = route.openapi.tags;
-      }
-
-      if (route.validationSchema) {
-        const schemaName =
-          route.openapi?.requestSchemaName ?? generateSchemaName('RequestBody', ctx.counter);
-        const schemaRef = convertZodSchema(route.validationSchema, schemaName, components, ctx);
-        operation.requestBody = {
-          content: {
-            'application/json': { schema: schemaRef },
-          },
-          required: true,
-        };
-      }
-
-      if (route.access === 'private' && hasSecurity) {
-        operation.security = [{ BearerAuth: [] }];
-      }
-
-      pathItem[method] = operation;
-    }
-  }
-
-  if (config.proxyRoutes && includeProxyRoutes) {
-    for (const route of config.proxyRoutes) {
-      const openApiPath = toOpenApiPath(route.path);
-      if (!paths[openApiPath]) {
-        paths[openApiPath] = {};
-      }
-      const pathItem = paths[openApiPath] as MutablePathItem;
-
-      for (const method of route.methods) {
-        const methodKey = method as keyof MutablePathItem;
-        const parameters = extractPathParams(route.path);
-        const operation: OpenAPIV3.OperationObject = {
-          responses: buildResponses(route.openapi, components, ctx),
-          summary: route.openapi?.summary ?? `Proxy to ${route.target}`,
-        };
-
-        if (parameters.length > 0) {
-          operation.parameters = parameters;
-        }
-
-        if (route.openapi?.description) {
-          operation.description = route.openapi.description;
-        }
-        if (route.openapi?.tags?.length) {
-          operation.tags = route.openapi.tags;
-        }
-
-        if (route.access === 'private' && hasSecurity) {
-          operation.security = [{ BearerAuth: [] }];
-        }
-
-        pathItem[methodKey] = operation;
-      }
-    }
-  }
-
-  // MutablePathItem intentionally omits complex intersection constraints of
-  // PathItemObject for internal mutation; the output is structurally compatible at runtime.
   const doc: OpenAPIV3.Document = {
     info: { title, version },
     openapi: '3.0.3',
@@ -242,16 +273,41 @@ export function generateOpenApiSpec<TClaims>(
     doc.servers = options.servers;
   }
 
+  const securitySchemes = buildSecuritySchemes(config);
   if (securitySchemes) {
     doc.components = { securitySchemes };
   }
 
   if (Object.keys(components).length > 0) {
-    if (!doc.components) {
-      doc.components = {};
-    }
-    doc.components.schemas = components as OpenAPIV3.ComponentsObject['schemas'];
+    doc.components ??= {};
+    doc.components.schemas = components;
   }
 
   return doc;
+}
+
+export function generateOpenApiSpec<TClaims>(
+  config: ServerConfig<TClaims>,
+  options?: OpenApiOptions,
+): OpenAPIV3.Document {
+  const ctx: SchemaContext = {
+    counter: { value: 0 },
+    dedup: new WeakMap(),
+  };
+
+  const includeProxyRoutes = options?.includeProxyRoutes ?? DEFAULTS.openapi.includeProxyRoutes;
+
+  const paths: MutablePaths = {};
+  const components: Record<string, OpenAPIV3.SchemaObject> = {};
+  const hasSecurity = !!config.security?.auth;
+
+  if (config.apiRoutes) {
+    processApiRoutes(config.apiRoutes, paths, components, ctx, hasSecurity);
+  }
+
+  if (config.proxyRoutes && includeProxyRoutes) {
+    processProxyRoutes(config.proxyRoutes, paths, components, ctx, hasSecurity);
+  }
+
+  return buildOpenApiDocument(config, options, paths, components);
 }

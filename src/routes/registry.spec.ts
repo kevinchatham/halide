@@ -10,9 +10,14 @@ vi.mock('../middleware/auth', () => ({
   createJwksAuthMiddleware: vi.fn(),
 }));
 
-vi.mock('../services/proxy', () => ({
-  createProxyService: vi.fn(),
-}));
+vi.mock('../services/proxy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/proxy')>();
+  return {
+    buildRequestContextFromExpress: actual.buildRequestContextFromExpress,
+    createProxyService: vi.fn(),
+    serializeQueryParam: actual.serializeQueryParam,
+  };
+});
 
 const noopLogger: Logger = createNoopLogger();
 
@@ -469,4 +474,848 @@ describe('registerRoutes', () => {
       noopLogger,
     );
   });
+
+  it('executes api handler and returns result', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ id: 1, name: 'test' });
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const handler = getCall[1] as RequestHandler;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: {},
+      path: '/items',
+      query: {},
+    } as unknown as import('express').Request;
+    const res = { json: vi.fn() } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    await handler(req, res, next);
+
+    expect(mockHandler).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ id: 1, name: 'test' });
+  });
+
+  it('calls next with error when api handler throws', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const testError = new Error('Handler failed');
+    const mockHandler = vi.fn().mockRejectedValue(testError);
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const handler = getCall[1] as RequestHandler;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: {},
+      path: '/items',
+      query: {},
+    } as unknown as import('express').Request;
+    const res = { json: vi.fn() } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    await handler(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(testError);
+  });
+
+  it('skips observability when route observe is false', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const onRequest = vi.fn();
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          observe: false,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      observability: { onRequest },
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    expect(middlewares.length).toBe(1);
+  });
+
+  it('registers routes with validation schema', async () => {
+    const app = { post: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ created: true });
+    const { z } = await import('zod');
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          method: 'post',
+          path: '/items',
+          type: 'api',
+          validationSchema: z.object({ name: z.string() }),
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(app.post).toHaveBeenCalledTimes(1);
+    const postCall = (app.post as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(postCall.length).toBeGreaterThan(2);
+  });
+
+  it('registers proxy routes with transform function', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockProxyHandler = vi.fn();
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+    const transformFn = vi.fn().mockReturnValue({ body: {}, headers: {} });
+
+    const config = {
+      proxyRoutes: [
+        {
+          access: 'public',
+          methods: ['get'],
+          path: '/api',
+          proxyPath: '/api',
+          target: 'https://api.example.com',
+          transform: transformFn,
+          type: 'proxy',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createProxyService).toHaveBeenCalledWith(
+      'https://api.example.com',
+      '/api',
+      '/api',
+      undefined,
+      transformFn,
+      undefined,
+      noopLogger,
+    );
+  });
+
+  it('registers proxy routes with timeout', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockProxyHandler = vi.fn();
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+    const config = {
+      proxyRoutes: [
+        {
+          access: 'public',
+          methods: ['get'],
+          path: '/api',
+          proxyPath: '/api',
+          target: 'https://api.example.com',
+          timeout: 5000,
+          type: 'proxy',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createProxyService).toHaveBeenCalledWith(
+      'https://api.example.com',
+      '/api',
+      '/api',
+      undefined,
+      undefined,
+      5000,
+      noopLogger,
+    );
+  });
+
+  it('executes authorize middleware and denies forbidden request', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const authorizeFn = vi.fn().mockResolvedValue(false);
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          authorize: authorizeFn,
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    const authorizeMiddleware = middlewares[0]!;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: {},
+      path: '/items',
+      query: {},
+    } as unknown as import('express').Request;
+    const res = {
+      json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    await authorizeMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('executes authorize middleware and allows authorized request', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const authorizeFn = vi.fn().mockResolvedValue(true);
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          authorize: authorizeFn,
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    const authorizeMiddleware = middlewares[0]!;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: {},
+      path: '/items',
+      query: {},
+    } as unknown as import('express').Request;
+    const res = {
+      json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    await authorizeMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('returns 403 when authorize middleware throws', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const authorizeFn = vi.fn().mockRejectedValue(new Error('Auth error'));
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          authorize: authorizeFn,
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    const authorizeMiddleware = middlewares[0]!;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: {},
+      path: '/items',
+      query: {},
+    } as unknown as import('express').Request;
+    const res = {
+      json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    await authorizeMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden' });
+  });
+
+  it('executes observability onRequest and onResponse hooks', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const onRequest = vi.fn();
+    const onResponse = vi.fn();
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      observability: { onRequest, onResponse },
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    const obsMiddleware = middlewares[0]!;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: {},
+      path: '/items',
+      query: {},
+    } as unknown as import('express').Request;
+    const res = {
+      json: vi.fn(),
+      on: vi.fn((_event: string, cb: () => void) => {
+        cb();
+      }),
+      statusCode: 200,
+    } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    obsMiddleware(req, res, next);
+
+    expect(onRequest).toHaveBeenCalled();
+    expect(res.on).toHaveBeenCalledWith('finish', expect.any(Function));
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('skips observability when no onRequest or onResponse', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      observability: {},
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    expect(middlewares.length).toBe(1);
+  });
+
+  it('resolves async secret function', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const mockAuthMiddleware = vi.fn();
+    vi.mocked(createAuthMiddleware).mockReturnValue(
+      mockAuthMiddleware as unknown as RequestHandler,
+    );
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'private',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      security: { auth: { secret: async () => 'async-secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createAuthMiddleware).toHaveBeenCalledWith(expect.any(Uint8Array), undefined);
+  });
+
+  it('returns undefined auth middleware when no security auth configured', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createAuthMiddleware).not.toHaveBeenCalled();
+    expect(createJwksAuthMiddleware).not.toHaveBeenCalled();
+  });
+
+  it('returns undefined auth middleware when auth has no secret or jwksUri', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      security: { auth: { strategy: 'bearer' } },
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createAuthMiddleware).not.toHaveBeenCalled();
+    expect(createJwksAuthMiddleware).not.toHaveBeenCalled();
+  });
+
+  it('registers proxy route with authorize middleware', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockProxyHandler = vi.fn();
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+    const authorizeFn = vi.fn().mockResolvedValue(true);
+
+    const config = {
+      proxyRoutes: [
+        {
+          access: 'public',
+          authorize: authorizeFn,
+          methods: ['get'],
+          path: '/api',
+          proxyPath: '/api',
+          target: 'https://api.example.com',
+          type: 'proxy',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    expect(middlewares.length).toBe(2);
+    expect(middlewares[1]).toBe(mockProxyHandler);
+  });
+
+  it('registers proxy route with observability', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockProxyHandler = vi.fn();
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+    const onRequest = vi.fn();
+
+    const config = {
+      observability: { onRequest },
+      proxyRoutes: [
+        {
+          access: 'public',
+          methods: ['get'],
+          path: '/api',
+          proxyPath: '/api',
+          target: 'https://api.example.com',
+          type: 'proxy',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    expect(middlewares.length).toBe(2);
+    expect(middlewares[1]).toBe(mockProxyHandler);
+  });
+
+  it('uses JWKS with audience when both are configured', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const mockJwksMiddleware = vi.fn();
+    vi.mocked(createJwksAuthMiddleware).mockReturnValue(
+      mockJwksMiddleware as unknown as RequestHandler,
+    );
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'private',
+          handler: mockHandler,
+          path: '/profile',
+          type: 'api',
+        },
+      ],
+      security: {
+        auth: {
+          audience: 'my-api',
+          jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+          strategy: 'jwks',
+        },
+      },
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
+      'https://auth.example.com/.well-known/jwks.json',
+      'my-api',
+    );
+  });
+
+  it('uses default proxyPath when proxyPath is not provided', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockProxyHandler = vi.fn();
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+    const config = {
+      proxyRoutes: [
+        {
+          access: 'public',
+          methods: ['get'],
+          path: '/users',
+          target: 'https://api.example.com',
+          type: 'proxy',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    expect(createProxyService).toHaveBeenCalledWith(
+      'https://api.example.com',
+      '/users',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+    );
+  });
+
+  it('builds request context with params and query serialization', async () => {
+    const app = { get: vi.fn() } as unknown as Express | Router;
+    const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+    const authorizeFn = vi.fn().mockResolvedValue(true);
+
+    const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          authorize: authorizeFn,
+          handler: mockHandler,
+          path: '/items',
+          type: 'api',
+        },
+      ],
+      spa: { root: '/var/www' },
+    } as unknown as ServerConfig;
+
+    await registerRoutes(app, config, noopLogger);
+
+    const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const middlewares = getCall.slice(1) as RequestHandler[];
+    const authorizeMiddleware = middlewares[0]!;
+
+    const req = {
+      body: {},
+      headers: {},
+      method: 'GET',
+      params: { id: '123', num: 456 },
+      path: '/items',
+      query: { filter: 'active', tags: ['a', 'b'] },
+    } as unknown as import('express').Request;
+    const res = {
+      json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as import('express').Response;
+    const next = vi.fn();
+
+    await authorizeMiddleware(req, res, next);
+
+    expect(authorizeFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: { id: '123', num: '456' },
+        query: { filter: 'active', tags: ['a', 'b'] },
+      }),
+      undefined,
+      noopLogger,
+    );
+  });
+});
+
+it('executes api handler and returns result', async () => {
+  const app = { get: vi.fn() } as unknown as Express | Router;
+  const mockHandler = vi.fn().mockResolvedValue({ id: 1, name: 'test' });
+
+  const config = {
+    apiRoutes: [
+      {
+        access: 'public',
+        handler: mockHandler,
+        path: '/items',
+        type: 'api',
+      },
+    ],
+    spa: { root: '/var/www' },
+  } as unknown as ServerConfig;
+
+  await registerRoutes(app, config, noopLogger);
+
+  const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+  const handler = getCall[1] as RequestHandler;
+
+  const req = {
+    body: {},
+    headers: {},
+    method: 'GET',
+    params: {},
+    path: '/items',
+    query: {},
+  } as unknown as import('express').Request;
+  const res = { json: vi.fn() } as unknown as import('express').Response;
+  const next = vi.fn();
+
+  await handler(req, res, next);
+
+  expect(mockHandler).toHaveBeenCalled();
+  expect(res.json).toHaveBeenCalledWith({ id: 1, name: 'test' });
+});
+
+it('calls next with error when api handler throws', async () => {
+  const app = { get: vi.fn() } as unknown as Express | Router;
+  const testError = new Error('Handler failed');
+  const mockHandler = vi.fn().mockRejectedValue(testError);
+
+  const config = {
+    apiRoutes: [
+      {
+        access: 'public',
+        handler: mockHandler,
+        path: '/items',
+        type: 'api',
+      },
+    ],
+    spa: { root: '/var/www' },
+  } as unknown as ServerConfig;
+
+  await registerRoutes(app, config, noopLogger);
+
+  const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+  const handler = getCall[1] as RequestHandler;
+
+  const req = {
+    body: {},
+    headers: {},
+    method: 'GET',
+    params: {},
+    path: '/items',
+    query: {},
+  } as unknown as import('express').Request;
+  const res = { json: vi.fn() } as unknown as import('express').Response;
+  const next = vi.fn();
+
+  await handler(req, res, next);
+
+  expect(next).toHaveBeenCalledWith(testError);
+});
+
+it('skips observability when route observe is false', async () => {
+  const app = { get: vi.fn() } as unknown as Express | Router;
+  const mockHandler = vi.fn().mockResolvedValue({ ok: true });
+  const onRequest = vi.fn();
+
+  const config = {
+    apiRoutes: [
+      {
+        access: 'public',
+        handler: mockHandler,
+        observe: false,
+        path: '/items',
+        type: 'api',
+      },
+    ],
+    observability: { onRequest },
+    spa: { root: '/var/www' },
+  } as unknown as ServerConfig;
+
+  await registerRoutes(app, config, noopLogger);
+
+  const getCall = (app.get as ReturnType<typeof vi.fn>).mock.calls[0]!;
+  const middlewares = getCall.slice(1) as RequestHandler[];
+  expect(middlewares.length).toBe(1);
+});
+
+it('registers routes with validation schema', async () => {
+  const app = { post: vi.fn() } as unknown as Express | Router;
+  const mockHandler = vi.fn().mockResolvedValue({ created: true });
+  const { z } = await import('zod');
+
+  const config = {
+    apiRoutes: [
+      {
+        access: 'public',
+        handler: mockHandler,
+        method: 'post',
+        path: '/items',
+        type: 'api',
+        validationSchema: z.object({ name: z.string() }),
+      },
+    ],
+    spa: { root: '/var/www' },
+  } as unknown as ServerConfig;
+
+  await registerRoutes(app, config, noopLogger);
+
+  expect(app.post).toHaveBeenCalledTimes(1);
+  const postCall = (app.post as ReturnType<typeof vi.fn>).mock.calls[0]!;
+  expect(postCall.length).toBeGreaterThan(2);
+});
+
+it('registers proxy routes with transform function', async () => {
+  const app = { get: vi.fn() } as unknown as Express | Router;
+  const mockProxyHandler = vi.fn();
+  vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+  const transformFn = vi.fn().mockReturnValue({ body: {}, headers: {} });
+
+  const config = {
+    proxyRoutes: [
+      {
+        access: 'public',
+        methods: ['get'],
+        path: '/api',
+        proxyPath: '/api',
+        target: 'https://api.example.com',
+        transform: transformFn,
+        type: 'proxy',
+      },
+    ],
+    spa: { root: '/var/www' },
+  } as unknown as ServerConfig;
+
+  await registerRoutes(app, config, noopLogger);
+
+  expect(createProxyService).toHaveBeenCalledWith(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    transformFn,
+    undefined,
+    noopLogger,
+  );
+});
+
+it('registers proxy routes with timeout', async () => {
+  const app = { get: vi.fn() } as unknown as Express | Router;
+  const mockProxyHandler = vi.fn();
+  vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+
+  const config = {
+    proxyRoutes: [
+      {
+        access: 'public',
+        methods: ['get'],
+        path: '/api',
+        proxyPath: '/api',
+        target: 'https://api.example.com',
+        timeout: 5000,
+        type: 'proxy',
+      },
+    ],
+    spa: { root: '/var/www' },
+  } as unknown as ServerConfig;
+
+  await registerRoutes(app, config, noopLogger);
+
+  expect(createProxyService).toHaveBeenCalledWith(
+    'https://api.example.com',
+    '/api',
+    '/api',
+    undefined,
+    undefined,
+    5000,
+    noopLogger,
+  );
 });

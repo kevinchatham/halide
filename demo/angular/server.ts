@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Request, Response } from 'express';
 import type { Server } from 'halide';
 import { createServer } from 'halide';
-import type { Request, Response } from 'express';
 
 interface JwtClaims {
   admin: boolean;

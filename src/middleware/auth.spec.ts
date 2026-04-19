@@ -153,6 +153,25 @@ describe('createAuthMiddleware', () => {
       expect(verifyJwt).toHaveBeenCalledWith('my-token-here', secret, undefined);
     });
   });
+
+  it('passes audience to verifyJwt when provided', async () => {
+    vi.mocked(verifyJwt).mockResolvedValue({ sub: 'test' });
+
+    const handler = createAuthMiddleware<TestClaims>(secret, 'my-audience');
+
+    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
+    const res = {
+      json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    const next = vi.fn();
+
+    handler(req, res, next);
+
+    await vi.waitFor(() => {
+      expect(verifyJwt).toHaveBeenCalledWith('valid-token', secret, { audience: 'my-audience' });
+    });
+  });
 });
 
 describe('createJwksAuthMiddleware', () => {
@@ -232,5 +251,31 @@ describe('createJwksAuthMiddleware', () => {
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('passes audience to jwtVerify when provided', async () => {
+    const { jwtVerify: mockedJwtVerify } = await import('jose');
+    mockJwksVerify.mockResolvedValueOnce({
+      payload: { role: 'admin', sub: 'user-123' },
+      protectedHeader: { alg: 'RS256' },
+    });
+
+    const handler = createJwksAuthMiddleware<TestClaims>(
+      'https://auth.example.com/jwks.json',
+      'my-api',
+    );
+
+    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
+    const res = {
+      json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    const next = vi.fn();
+
+    await handler(req, res, next);
+
+    expect(mockedJwtVerify).toHaveBeenCalledWith('valid-token', expect.anything(), {
+      audience: 'my-api',
+    });
   });
 });

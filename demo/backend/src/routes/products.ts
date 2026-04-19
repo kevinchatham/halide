@@ -44,7 +44,7 @@ router.patch('/:id', (req, res) => {
     res.status(400).json(parsed.error.issues);
     return;
   }
-  const existing = products[index] as (typeof products)[number];
+  const existing = products[index];
   products[index] = { ...existing, ...parsed.data };
   res.json(products[index]);
 });

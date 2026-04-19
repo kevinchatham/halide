@@ -2,9 +2,9 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "module": "ESNext",
+    "module": "ES2022",
     "moduleDetection": "force",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "bundler",
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,

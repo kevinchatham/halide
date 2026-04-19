@@ -20,7 +20,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!coverage", "!demo", "!dist", "**/*.{ts,css,json}"]
+    "includes": ["**", "!coverage", "!dist", "**/*.{ts,css,json}"]
   },
   "formatter": {
     "enabled": true,
@@ -50,6 +50,7 @@
     "enabled": true,
     "rules": {
       "a11y": {
+        "noSvgWithoutTitle": "off",
         "useButtonType": "error",
         "useGenericFontNames": "error"
       },

@@ -17,6 +17,66 @@ const READONLY_HEADERS: Set<string> = new Set([
 
 const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
 
+export function serializeQueryParam(v: unknown): string | string[] {
+  if (Array.isArray(v)) {
+    return v.map((item) => (typeof item === 'string' ? item : JSON.stringify(item)));
+  }
+  return typeof v === 'string' ? v : JSON.stringify(v);
+}
+
+export function buildRequestContextFromExpress(req: Request): RequestContext {
+  return {
+    body: req.body,
+    headers: req.headers as Record<string, string | string[]>,
+    method: req.method.toLowerCase() as RequestContext['method'],
+    params: Object.fromEntries(
+      Object.entries(req.params || {}).map(([k, v]) => [
+        k,
+        typeof v === 'string' ? v : JSON.stringify(v),
+      ]),
+    ),
+    path: req.path,
+    query: Object.fromEntries(
+      Object.entries(req.query || {}).map(([k, v]) => [k, serializeQueryParam(v)]),
+    ),
+  };
+}
+
+function normalizeHeaders(headers: Record<string, unknown>): {
+  headers: Record<string, string>;
+  multiValueKeys: Set<string>;
+} {
+  const normalized: Record<string, string> = {};
+  const multiValueKeys = new Set<string>();
+  for (const [key, value] of Object.entries(headers)) {
+    if (value !== undefined) {
+      if (Array.isArray(value)) {
+        multiValueKeys.add(key.toLowerCase());
+        normalized[key] = value
+          .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)))
+          .join(', ');
+      } else {
+        normalized[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      }
+    }
+  }
+  return { headers: normalized, multiValueKeys };
+}
+
+function applyTransformedHeaders(
+  req: Request,
+  transformedHeaders: Record<string, string>,
+  multiValueKeys: Set<string>,
+): void {
+  for (const [key, value] of Object.entries(transformedHeaders)) {
+    const lowerKey = key.toLowerCase();
+    if (READONLY_HEADERS.has(lowerKey)) continue;
+    if (ARRAY_HEADERS.has(lowerKey)) continue;
+    if (multiValueKeys.has(lowerKey)) continue;
+    req.headers[lowerKey] = value;
+  }
+}
+
 export function createProxyService<TClaims = unknown>(
   target: string,
   routePath: string,
@@ -35,29 +95,15 @@ export function createProxyService<TClaims = unknown>(
         req: import('node:http').IncomingMessage,
       ) => {
         const expressReq = req as Request;
-        if (identity && expressReq.claims) {
-          const ctx: RequestContext = {
-            body: expressReq.body,
-            headers: expressReq.headers as Record<string, string | string[]>,
-            method: expressReq.method.toLowerCase() as RequestContext['method'],
-            params: Object.fromEntries(
-              Object.entries(expressReq.params || {}).map(([k, v]) => [k, String(v)]),
-            ),
-            path: expressReq.path,
-            query: Object.fromEntries(
-              Object.entries(expressReq.query || {}).map(([k, v]) => [
-                k,
-                Array.isArray(v) ? v.map(String) : String(v),
-              ]),
-            ),
-          };
-          const headers = identity(ctx, expressReq.claims as TClaims);
-          if (headers) {
-            for (const [key, value] of Object.entries(headers)) {
-              if (value !== undefined) {
-                proxyReq.setHeader(key, value);
-              }
-            }
+        if (!identity || !expressReq.claims) return;
+
+        const ctx = buildRequestContextFromExpress(expressReq);
+        const headers = identity(ctx, expressReq.claims as TClaims);
+        if (!headers) return;
+
+        for (const [key, value] of Object.entries(headers)) {
+          if (value !== undefined) {
+            proxyReq.setHeader(key, value);
           }
         }
       },
@@ -76,28 +122,11 @@ export function createProxyService<TClaims = unknown>(
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = typeof req.body === 'object' && req.body ? req.body : {};
-      const multiValueKeys = new Set<string>();
-      const headers: Record<string, string> = {};
-      for (const [key, value] of Object.entries(req.headers)) {
-        if (value !== undefined) {
-          if (Array.isArray(value)) {
-            multiValueKeys.add(key.toLowerCase());
-            headers[key] = value.join(', ');
-          } else {
-            headers[key] = String(value);
-          }
-        }
-      }
+      const { headers, multiValueKeys } = normalizeHeaders(req.headers);
       const transformed = transform({ body, headers });
 
       req.body = transformed.body;
-      for (const [key, value] of Object.entries(transformed.headers)) {
-        const lowerKey = key.toLowerCase();
-        if (READONLY_HEADERS.has(lowerKey)) continue;
-        if (ARRAY_HEADERS.has(lowerKey)) continue;
-        if (multiValueKeys.has(lowerKey)) continue;
-        req.headers[lowerKey] = value;
-      }
+      applyTransformedHeaders(req, transformed.headers, multiValueKeys);
     } catch (err) {
       logger?.error('[halide] Transform error:', err);
       next(err);
