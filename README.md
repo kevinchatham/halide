@@ -6,7 +6,7 @@
   <a href="./LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
-  <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node.js"/>
+  <img style="margin-left:4px;margin-right:4px;" src="https://img.shields.io/badge/node-%3E%3D24-green" alt="Node.js"/>
   <img src="https://img.shields.io/npm/v/halide" alt="npm"/>
 </p>
 
@@ -469,7 +469,3 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function.
 - A service mesh
 - A full backend framework
 - A distributed systems abstraction layer
-
-## License
-
-[MIT](./LICENSE)
