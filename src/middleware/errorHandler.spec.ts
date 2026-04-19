@@ -1,9 +1,16 @@
+import type { Logger } from '../config/types';
 import { createErrorHandler } from './errorHandler';
+
+const logger: Logger = {
+  debug: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+};
 
 describe('createErrorHandler', () => {
   it('logs the error with method and path', () => {
-    const handler = createErrorHandler();
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handler = createErrorHandler(logger);
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
@@ -16,13 +23,11 @@ describe('createErrorHandler', () => {
 
     handler(error, req, res, next);
 
-    expect(consoleSpy).toHaveBeenCalledWith('[error] GET /test:', error);
-
-    consoleSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith('[error] GET /test:', error);
   });
 
   it('returns 500 with error message', () => {
-    const handler = createErrorHandler();
+    const handler = createErrorHandler(logger);
 
     const req = { method: 'POST', path: '/api/data' } as any;
     const res = {
@@ -33,18 +38,14 @@ describe('createErrorHandler', () => {
     const next = vi.fn();
     const error = new Error('Something broke');
 
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
     handler(error, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' });
-
-    vi.restoreAllMocks();
   });
 
   it('handles errors without a message', () => {
-    const handler = createErrorHandler();
+    const handler = createErrorHandler(logger);
 
     const req = { method: 'DELETE', path: '/resource' } as any;
     const res = {
@@ -54,18 +55,14 @@ describe('createErrorHandler', () => {
     } as any;
     const next = vi.fn();
 
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
     handler(new Error(), req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' });
-
-    vi.restoreAllMocks();
   });
 
   it('stores Error instances in res.locals.error', () => {
-    const handler = createErrorHandler();
+    const handler = createErrorHandler(logger);
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
@@ -76,17 +73,13 @@ describe('createErrorHandler', () => {
     const next = vi.fn();
     const error = new Error('boom');
 
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
     handler(error, req, res, next);
 
     expect(res.locals.error).toBe(error);
-
-    vi.restoreAllMocks();
   });
 
   it('wraps non-Error values in res.locals.error', () => {
-    const handler = createErrorHandler();
+    const handler = createErrorHandler(logger);
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
@@ -96,13 +89,9 @@ describe('createErrorHandler', () => {
     } as any;
     const next = vi.fn();
 
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
     handler('string error', req, res, next);
 
     expect(res.locals.error).toBeInstanceOf(Error);
     expect(res.locals.error.message).toBe('string error');
-
-    vi.restoreAllMocks();
   });
 });

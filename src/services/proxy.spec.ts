@@ -1,5 +1,6 @@
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { DEFAULTS } from '../config/defaults';
+import { createNoopLogger, DEFAULTS } from '../config/defaults';
+import type { Logger } from '../config/types';
 import { createProxyService } from './proxy';
 
 vi.mock('http-proxy-middleware', () => ({
@@ -7,6 +8,7 @@ vi.mock('http-proxy-middleware', () => ({
 }));
 
 const mockedCreateProxyMiddleware = vi.mocked(createProxyMiddleware);
+const noopLogger = createNoopLogger();
 
 describe('createProxyService', () => {
   beforeEach(() => {
@@ -14,7 +16,15 @@ describe('createProxyService', () => {
   });
 
   it('creates proxy middleware with correct configuration', () => {
-    createProxyService('https://api.example.com', '/api/users', '/users');
+    createProxyService(
+      'https://api.example.com',
+      '/api/users',
+      '/users',
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+    );
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -29,7 +39,15 @@ describe('createProxyService', () => {
   });
 
   it('creates middleware for different routes', () => {
-    createProxyService('https://backend.example.com', '/v1/data', '/data');
+    createProxyService(
+      'https://backend.example.com',
+      '/v1/data',
+      '/data',
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+    );
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -47,7 +65,15 @@ describe('createProxyService', () => {
     const mockHandler = vi.fn();
     mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
 
-    const result = createProxyService('https://api.example.com', '/api', '/api');
+    const result = createProxyService(
+      'https://api.example.com',
+      '/api',
+      '/api',
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+    );
 
     expect(typeof result).toBe('function');
   });
@@ -69,6 +95,8 @@ describe('createProxyService', () => {
       '/api',
       undefined,
       transform,
+      undefined,
+      noopLogger,
     );
 
     const req = { body: { key: 'val' }, headers: { host: 'test' } } as any;
@@ -95,6 +123,8 @@ describe('createProxyService', () => {
       '/api',
       undefined,
       transform,
+      undefined,
+      noopLogger,
     );
 
     const req = {
@@ -122,6 +152,8 @@ describe('createProxyService', () => {
       '/api',
       undefined,
       transform,
+      undefined,
+      noopLogger,
     );
 
     const req = {
@@ -149,6 +181,8 @@ describe('createProxyService', () => {
       '/api',
       undefined,
       transform,
+      undefined,
+      noopLogger,
     );
 
     const req = { body: {}, headers: { host: 'test' } } as any;
@@ -176,6 +210,8 @@ describe('createProxyService', () => {
       '/api',
       undefined,
       transform,
+      undefined,
+      noopLogger,
     );
 
     const req = { body: {}, headers: { host: 'test' } } as any;
@@ -190,6 +226,12 @@ describe('createProxyService', () => {
     const mockHandler = vi.fn();
     mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
 
+    const spyLogger: Logger = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
     const transform = () => {
       throw new Error('transform failed');
     };
@@ -199,24 +241,33 @@ describe('createProxyService', () => {
       '/api',
       undefined,
       transform,
+      undefined,
+      spyLogger,
     );
 
     const req = { body: {}, headers: {} } as any;
     const res = {} as any;
     const next = vi.fn();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
     result(req, res, next);
-    vi.restoreAllMocks();
 
     expect(next).toHaveBeenCalledWith(expect.any(Error));
     expect(next).toHaveBeenCalledTimes(1);
     const err = (next.mock.calls as [[Error]])[0][0];
     expect(err.message).toBe('transform failed');
+    expect(spyLogger.error).toHaveBeenCalledWith('[bspa] Transform error:', expect.any(Error));
     expect(mockHandler).not.toHaveBeenCalled();
   });
 
   it('defaults timeout to 60 seconds when not provided', () => {
-    createProxyService('https://api.example.com', '/api/users', '/users');
+    createProxyService(
+      'https://api.example.com',
+      '/api/users',
+      '/users',
+      undefined,
+      undefined,
+      undefined,
+      noopLogger,
+    );
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -233,6 +284,7 @@ describe('createProxyService', () => {
       undefined,
       undefined,
       5000,
+      noopLogger,
     );
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(

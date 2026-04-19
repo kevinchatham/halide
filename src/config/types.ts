@@ -70,9 +70,17 @@ export type ResponseContext = {
  * @param claims - The JWT claims, or undefined if not authenticated.
  * @returns The response body.
  */
+export type Logger = {
+  debug: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+};
+
 export type ApiRouteHandler<TClaims, TBody = unknown> = (
   ctx: RequestContext & { body: TBody },
   claims: TClaims | undefined,
+  logger: Logger,
 ) => Promise<unknown>;
 
 /**
@@ -85,6 +93,7 @@ export type ApiRouteHandler<TClaims, TBody = unknown> = (
 export type AuthorizeFn<TClaims> = (
   ctx: RequestContext,
   claims: TClaims | undefined,
+  logger: Logger,
 ) => boolean | Promise<boolean>;
 
 /**
@@ -118,13 +127,20 @@ export type SpaConfig = {
 export type ObservabilityConfig<TClaims = unknown> = {
   /** Whether to generate/forward x-request-id headers. */
   requestId?: boolean;
+  /** Pluggable logger instance. Defaults to silent (no-op) if not provided. */
+  logger?: Logger;
   /** Hook called when a request is received. */
-  onRequest?: (ctx: RequestContext, claims: TClaims | undefined) => void | Promise<void>;
+  onRequest?: (
+    ctx: RequestContext,
+    claims: TClaims | undefined,
+    logger: Logger,
+  ) => void | Promise<void>;
   /** Hook called when a response is sent. */
   onResponse?: (
     ctx: RequestContext,
     claims: TClaims | undefined,
     response: ResponseContext,
+    logger: Logger,
   ) => void | Promise<void>;
 };
 

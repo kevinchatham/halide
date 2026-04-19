@@ -2,6 +2,7 @@ import type { Express, Request, RequestHandler, Router } from 'express';
 import { DEFAULTS } from '../config/defaults';
 import type {
   ApiRoute,
+  Logger,
   ObservabilityConfig,
   ProxyRoute,
   RequestContext,
@@ -65,12 +66,13 @@ function buildRequestContext(req: Request): RequestContext {
 
 function createAuthorizeMiddleware<TClaims = unknown>(
   authorizeFn: NonNullable<ApiRoute<TClaims>['authorize'] | ProxyRoute<TClaims>['authorize']>,
+  logger: Logger,
 ): RequestHandler {
   return async (req, res, next) => {
     const ctx = buildRequestContext(req);
     const claims = req.claims as TClaims | undefined;
     try {
-      const allowed = await authorizeFn(ctx, claims);
+      const allowed = await authorizeFn(ctx, claims, logger);
       if (!allowed) {
         res.status(403).json({ error: 'Forbidden' });
         return;
@@ -85,6 +87,7 @@ function createAuthorizeMiddleware<TClaims = unknown>(
 function createObservationMiddleware<TClaims = unknown>(
   observability: ObservabilityConfig<TClaims>,
   routeObserve: boolean | undefined,
+  logger: Logger,
 ): RequestHandler | undefined {
   if (!observability.onRequest && !observability.onResponse) return undefined;
   if (routeObserve === false) return undefined;
@@ -94,15 +97,20 @@ function createObservationMiddleware<TClaims = unknown>(
     const ctx = buildRequestContext(req);
     const claims = req.claims as TClaims | undefined;
 
-    observability.onRequest?.(ctx, claims);
+    observability.onRequest?.(ctx, claims, logger);
 
     if (observability.onResponse) {
       res.on('finish', () => {
-        observability.onResponse?.(ctx, claims, {
-          durationMs: Date.now() - start,
-          error: res.locals?.error,
-          statusCode: res.statusCode,
-        });
+        observability.onResponse?.(
+          ctx,
+          claims,
+          {
+            durationMs: Date.now() - start,
+            error: res.locals?.error,
+            statusCode: res.statusCode,
+          },
+          logger,
+        );
       });
     }
 
@@ -113,6 +121,7 @@ function createObservationMiddleware<TClaims = unknown>(
 export async function registerRoutes<TClaims = unknown>(
   app: Express | Router,
   config: ServerConfig<TClaims>,
+  logger: Logger,
 ): Promise<void> {
   const { apiRoutes, proxyRoutes, observability } = config;
   const router = app as Router;
@@ -127,10 +136,10 @@ export async function registerRoutes<TClaims = unknown>(
         middlewares.push(authMiddleware);
       }
       if (route.authorize) {
-        middlewares.push(createAuthorizeMiddleware(route.authorize));
+        middlewares.push(createAuthorizeMiddleware(route.authorize, logger));
       }
       if (observability) {
-        const routeObs = createObservationMiddleware(observability, route.observe);
+        const routeObs = createObservationMiddleware(observability, route.observe, logger);
         if (routeObs) middlewares.push(routeObs);
       }
       if (route.validationSchema) {
@@ -142,7 +151,7 @@ export async function registerRoutes<TClaims = unknown>(
         };
         const claims = req.claims as TClaims | undefined;
         try {
-          const result = await route.handler(ctx, claims);
+          const result = await route.handler(ctx, claims, logger);
           res.json(result);
         } catch (err) {
           next(err);
@@ -163,6 +172,7 @@ export async function registerRoutes<TClaims = unknown>(
         route.identity,
         route.transform,
         route.timeout,
+        logger,
       );
       type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
       const methods = route.methods as HttpMethod[];
@@ -172,10 +182,10 @@ export async function registerRoutes<TClaims = unknown>(
           middlewares.push(authMiddleware);
         }
         if (route.authorize) {
-          middlewares.push(createAuthorizeMiddleware(route.authorize));
+          middlewares.push(createAuthorizeMiddleware(route.authorize, logger));
         }
         if (observability) {
-          const routeObs = createObservationMiddleware(observability, route.observe);
+          const routeObs = createObservationMiddleware(observability, route.observe, logger);
           if (routeObs) middlewares.push(routeObs);
         }
         middlewares.push(proxyHandler);

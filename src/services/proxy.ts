@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { DEFAULTS } from '../config/defaults';
-import type { RequestContext, TransformFn } from '../config/types';
+import type { Logger, RequestContext, TransformFn } from '../config/types';
 
 // READONLY_HEADERS and ARRAY_HEADERS follow Node's http.IncomingMessage.headers convention
 // (also used by Express's req.headers): all keys are lowercase, multi-value headers like
@@ -19,6 +19,7 @@ export function createProxyService<TClaims = unknown>(
   identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined,
   transform?: TransformFn,
   timeout?: number,
+  logger?: Logger,
 ): RequestHandler {
   const rewritePath = proxyPath ?? routePath;
   const proxy = createProxyMiddleware({
@@ -90,7 +91,7 @@ export function createProxyService<TClaims = unknown>(
         req.headers[lowerKey] = value;
       }
     } catch (err) {
-      console.error('[bspa] Transform error:', err);
+      logger?.error('[bspa] Transform error:', err);
       next(err);
       return;
     }

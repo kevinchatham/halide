@@ -1,4 +1,5 @@
 import { contentSecurityPolicy } from 'helmet';
+import type { Logger } from './types';
 
 export const DEFAULTS = {
   cors: {
@@ -33,3 +34,12 @@ export const DEFAULTS = {
 } as const;
 
 export const defaultAuthorize = async () => true;
+
+export function createNoopLogger(): Logger {
+  return {
+    debug: (..._args) => {},
+    error: (..._args) => {},
+    info: (..._args) => {},
+    warn: (..._args) => {},
+  };
+}

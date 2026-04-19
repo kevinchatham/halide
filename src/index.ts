@@ -1,4 +1,4 @@
-export { DEFAULTS } from './config/defaults';
+export { createNoopLogger, DEFAULTS } from './config/defaults';
 export type {
   ApiRoute,
   ApiRouteHandler,
@@ -8,6 +8,7 @@ export type {
   CspDirectives,
   CspDirectiveValue,
   CspOptions,
+  Logger,
   ObservabilityConfig,
   OpenApiConfig,
   OpenApiRouteMeta,

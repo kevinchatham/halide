@@ -1,4 +1,5 @@
 import type { Express, Router } from 'express';
+import { createNoopLogger } from '../config/defaults';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
 import { createProxyService } from '../services/proxy';
 import { registerRoutes } from './registry';
@@ -12,6 +13,8 @@ vi.mock('../services/proxy', () => ({
   createProxyService: vi.fn(),
 }));
 
+const noopLogger = createNoopLogger();
+
 describe('registerRoutes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,7 +27,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).not.toHaveBeenCalled();
   });
@@ -55,7 +58,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledWith('/users', mockProxyHandler);
     expect(app.post).toHaveBeenCalledWith('/users', mockProxyHandler);
@@ -92,7 +95,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
     expect(app.post).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
@@ -135,7 +138,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledWith('/users', mockProxyHandler);
     expect(app.get).toHaveBeenCalledWith('/orders', mockProxyHandler);
@@ -179,135 +182,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
-
-    expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
-      'https://auth.example.com/.well-known/jwks.json',
-      undefined,
-    );
-    expect(app.get).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
-    expect(app.post).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
-    expect(app.put).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
-    expect(app.patch).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
-    expect(app.delete).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
-  });
-
-  it('registers private proxy routes with auth middleware', async () => {
-    const app = {
-      delete: vi.fn(),
-      get: vi.fn(),
-      patch: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-    } as unknown as Express | Router;
-    const mockProxyHandler = vi.fn();
-    const mockAuthMiddleware = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
-    vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
-
-    const config = {
-      proxyRoutes: [
-        {
-          access: 'private',
-          methods: ['get', 'post', 'put', 'patch', 'delete'],
-          path: '/admin',
-          proxyPath: '/api/admin',
-          target: 'https://api.example.com',
-          type: 'proxy',
-        },
-      ],
-      security: { auth: { secret: 'secret', strategy: 'bearer' } },
-      spa: { root: '/var/www' },
-    } as any;
-
-    await registerRoutes(app, config);
-
-    expect(app.get).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
-    expect(app.post).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
-    expect(app.put).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
-    expect(app.patch).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
-    expect(app.delete).toHaveBeenCalledWith('/admin', mockAuthMiddleware, mockProxyHandler);
-  });
-
-  it('registers multiple proxy routes', async () => {
-    const app = {
-      delete: vi.fn(),
-      get: vi.fn(),
-      patch: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-    } as unknown as Express | Router;
-    const mockProxyHandler = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
-
-    const config = {
-      proxyRoutes: [
-        {
-          access: 'public',
-          methods: ['get', 'post', 'put', 'patch', 'delete'],
-          path: '/users',
-          proxyPath: '/users',
-          target: 'https://api1.example.com',
-          type: 'proxy',
-        },
-        {
-          access: 'public',
-          methods: ['get', 'post', 'put', 'patch', 'delete'],
-          path: '/orders',
-          proxyPath: '/orders',
-          target: 'https://api2.example.com',
-          type: 'proxy',
-        },
-      ],
-      security: { auth: { secret: 'secret', strategy: 'bearer' } },
-      spa: { root: '/var/www' },
-    } as any;
-
-    await registerRoutes(app, config);
-
-    expect(app.get).toHaveBeenCalledWith('/users', mockProxyHandler);
-    expect(app.get).toHaveBeenCalledWith('/orders', mockProxyHandler);
-    expect(app.get).toHaveBeenCalledTimes(2);
-    expect(app.post).toHaveBeenCalledTimes(2);
-    expect(app.put).toHaveBeenCalledTimes(2);
-    expect(app.patch).toHaveBeenCalledTimes(2);
-    expect(app.delete).toHaveBeenCalledTimes(2);
-  });
-
-  it('uses JWKS middleware when strategy is jwks', async () => {
-    const app = {
-      delete: vi.fn(),
-      get: vi.fn(),
-      patch: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-    } as unknown as Express | Router;
-    const mockProxyHandler = vi.fn();
-    const mockJwksMiddleware = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
-    vi.mocked(createJwksAuthMiddleware).mockReturnValue(mockJwksMiddleware as any);
-
-    const config = {
-      proxyRoutes: [
-        {
-          access: 'private',
-          methods: ['get', 'post', 'put', 'patch', 'delete'],
-          path: '/admin',
-          proxyPath: '/admin',
-          target: 'https://api.example.com',
-          type: 'proxy',
-        },
-      ],
-      security: {
-        auth: {
-          jwksUri: 'https://auth.example.com/.well-known/jwks.json',
-          strategy: 'jwks',
-        },
-      },
-      spa: { root: '/var/www' },
-    } as any;
-
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
       'https://auth.example.com/.well-known/jwks.json',
@@ -337,7 +212,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledTimes(1);
     expect(app.get).toHaveBeenCalledWith('/health', expect.any(Function));
@@ -362,7 +237,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledTimes(1);
     expect(app.get).toHaveBeenCalledWith('/profile', mockAuthMiddleware, expect.any(Function));
@@ -394,7 +269,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledTimes(2);
     expect(app.get).toHaveBeenCalledWith('/public', expect.any(Function));
@@ -428,7 +303,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.post).toHaveBeenCalledTimes(2);
     expect(app.post).toHaveBeenCalledWith('/create', expect.any(Function));
@@ -454,7 +329,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.put).toHaveBeenCalledWith('/update/:id', expect.any(Function));
   });
@@ -479,7 +354,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.delete).toHaveBeenCalledWith(
       '/delete/:id',
@@ -498,7 +373,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(app.get).toHaveBeenCalledWith('/data', expect.any(Function));
   });
@@ -527,7 +402,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
       'https://auth.example.com/.well-known/jwks.json',
@@ -536,7 +411,7 @@ describe('registerRoutes', () => {
     expect(app.get).toHaveBeenCalledWith('/profile', mockJwksMiddleware, expect.any(Function));
   });
 
-  it('passes identity function to createProxyService', async () => {
+  it('passes identity function and logger to createProxyService', async () => {
     const app = {
       delete: vi.fn(),
       get: vi.fn(),
@@ -567,7 +442,7 @@ describe('registerRoutes', () => {
       spa: { root: '/var/www' },
     } as any;
 
-    await registerRoutes(app, config);
+    await registerRoutes(app, config, noopLogger);
 
     expect(createProxyService).toHaveBeenCalledWith(
       'https://api.example.com',
@@ -576,6 +451,7 @@ describe('registerRoutes', () => {
       identityFn,
       undefined,
       undefined,
+      noopLogger,
     );
   });
 });

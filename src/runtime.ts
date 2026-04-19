@@ -1,7 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import './types/express';
-import { DEFAULTS } from './config/defaults';
+import { createNoopLogger, DEFAULTS } from './config/defaults';
 import type { ServerConfig } from './config/types';
 import { validateServerConfig } from './config/validate';
 import { createErrorHandler } from './middleware/errorHandler';
@@ -22,6 +22,7 @@ export async function createServer<TClaims = unknown>(
 ): Promise<Server> {
   validateServerConfig(configInput);
 
+  const logger = configInput.observability?.logger ?? createNoopLogger();
   const app = express();
 
   const security = configInput.security;
@@ -61,7 +62,7 @@ export async function createServer<TClaims = unknown>(
     app.use(createRequestIdMiddleware());
   }
 
-  await registerRoutes<TClaims>(app, configInput);
+  await registerRoutes<TClaims>(app, configInput, logger);
 
   if (configInput.openapi?.enabled) {
     const swaggerPath = configInput.openapi.path ?? DEFAULTS.openapi.path;
@@ -74,7 +75,7 @@ export async function createServer<TClaims = unknown>(
     app.use(mw);
   }
 
-  app.use(createErrorHandler());
+  app.use(createErrorHandler(logger));
 
   let httpServer: ReturnType<typeof app.listen> | undefined;
 
@@ -83,7 +84,7 @@ export async function createServer<TClaims = unknown>(
       const port = Number.parseInt(process.env['PORT'] || '3001', 10);
       await new Promise<void>((resolve) => {
         httpServer = app.listen(port, () => {
-          console.log(
+          logger.info(
             `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`,
           );
           resolve();

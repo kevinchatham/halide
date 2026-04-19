@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import {
   apiRoute,
+  type Logger,
   type ObservabilityConfig,
   type OpenApiConfig,
   proxyRoute,
@@ -47,8 +48,8 @@ type CreateUserSchema = z.infer<typeof CreateUserSchema>;
  */
 const profileRoute = apiRoute<UserClaims>({
   access: 'private',
-  authorize: (_ctx, claims) => !!claims?.role && claims.role === 'admin',
-  handler: async (ctx, claims) => ({
+  authorize: (_ctx, claims, _logger) => !!claims?.role && claims.role === 'admin',
+  handler: async (ctx, claims, _logger) => ({
     ctx: JSON.stringify(ctx),
     user: claims?.sub,
   }),
@@ -64,7 +65,7 @@ const profileRoute = apiRoute<UserClaims>({
  */
 const userRoute = apiRoute<UserClaims, CreateUserSchema>({
   access: 'public',
-  handler: async (ctx) => {
+  handler: async (ctx, _claims, _logger) => {
     return {
       createdAt: new Date().toISOString(),
       email: ctx.body.email,
@@ -122,7 +123,7 @@ const usersProxyRoute = proxyRoute<UserClaims>({
  */
 const ordersProxyRoute = proxyRoute<UserClaims>({
   access: 'private',
-  authorize: (ctx: RequestContext, claims: UserClaims | undefined) =>
+  authorize: (ctx: RequestContext, claims: UserClaims | undefined, _logger: Logger) =>
     !!claims?.role && (claims.role === 'admin' || claims.role === 'user'),
   methods: ['get'],
   path: '/api/orders',
@@ -135,11 +136,12 @@ const ordersProxyRoute = proxyRoute<UserClaims>({
  * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
  */
 const observability: ObservabilityConfig<UserClaims> = {
-  onRequest: (ctx, claims) => {
-    console.log(`[Request] ${ctx.method} ${ctx.path} (user: ${claims?.sub ?? 'anonymous'})`);
+  logger: { debug: console.debug, error: console.error, info: console.info, warn: console.warn },
+  onRequest: (ctx, claims, logger) => {
+    logger.info(`[Request] ${ctx.method} ${ctx.path} (user: ${claims?.sub ?? 'anonymous'})`);
   },
-  onResponse: (ctx, claims, { statusCode, durationMs }) => {
-    console.log(
+  onResponse: (ctx, claims, { statusCode, durationMs }, logger) => {
+    logger.info(
       `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${claims?.sub ?? 'anonymous'})`,
     );
   },
