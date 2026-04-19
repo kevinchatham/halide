@@ -1,147 +1,50 @@
-# Halide
+<p align="center">
+  <img src="https://github.com/kevinchatham/halide/blob/main/images/halide-logo.png?raw=true" alt="halide" width="150px" height="150px"/>
+  <br/>
+  <em>A backend-for-frontend runtime for single page applications.</em>
+  <br/><br/>
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
+  </a>
+  <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node.js"/>
+  <img src="https://img.shields.io/npm/v/halide" alt="npm"/>
+</p>
 
-A Node runtime for defining the backend surface of a Single Page Application. It standardizes how SPAs are served, how identity is extracted and transformed, and how frontend requests are composed or routed to internal services. Unlike API gateways, it is not infrastructure-focused or protocol-agnostic; it is designed specifically around SPA application boundaries and developer-defined backend composition logic.
+## What is Halide?
 
-Halide is intended for teams that want a consistent way to build SPA backends without re-implementing the same patterns in every project.
-
-In three words it's a “frontend ingress gateway”
-
-## What problem this tries to solve
-
-In many SPA setups, each application ends up with its own backend-for-frontend (BFF) implementation. Over time this leads to:
-
-- inconsistent auth handling
-- duplicated proxy logic
-- ad-hoc configuration endpoints
-- backend service URLs leaking into frontend code
-- CORS configuration repeated across services
-- unclear boundaries between frontend and backend responsibilities
-
-Halide provides a shared structure for these concerns.
-
-It is not a full framework, and it does not try to replace existing backend systems.
-
-## Core idea
-
-Halide sits between the browser and internal services:
+Halide is a Node.js runtime that sits between your SPA and your backend services, giving you a single place to define how your frontend talks to your backend.
 
 ```
 Browser (SPA)
-   ↓
+    ↓
 Halide (BFF runtime)
-   ↓
+    ↓
 Private backend services
 ```
 
-Its role is to:
+Every SPA project ends up reinventing the same backend-for-frontend patterns: serving static files, validating tokens, proxying to internal services, handling CORS, and composing API responses. Halide gives these concerns a shared structure so you don't have to rebuild them each time.
 
-- serve the SPA
-- validate and interpret authentication (if enabled)
-- expose a controlled API surface to the frontend
-- route or compose requests to backend services
-- keep backend topology out of the browser
+It is not an API gateway, a service mesh, or a full backend framework. It is specifically designed around SPA application boundaries.
 
-## Key concepts
+## Quick start
 
-### 1. SPA hosting
-
-Halide can serve built frontend assets directly.
-
-### 2. BFF routes
-
-You explicitly define what the frontend is allowed to call.
-
-Routes can either:
-
-- call backend services via a handler (recommended)
-- proxy requests to services (escape hatch)
-
-### 4. Identity handling
-
-Authentication happens at the BFF boundary.
-
-Halide can:
-
-- validate JWTs
-- extract claims
-- optionally propagate identity to backend services via headers
-
-It does not assume backend services share the same auth model.
-
-## Example
+```bash
+npm install halide
+```
 
 ```ts
 import { createServer } from 'halide';
 
-interface JwtClaims {
-  sub: string;
-  name: string;
-  admin: boolean;
-}
-
-const server = createServer<JwtClaims>({
+const server = await createServer({
   spa: {
-    name: 'angular',
     root: './dist/browser',
   },
-
-  security: {
-    cors: 'internal',
-    csp: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'"],
-    },
-  },
-  },
-
-  auth: {
-    strategy: 'jwt',
-    jwks: 'https://idp/.well-known/jwks.json',
-    identityPropagation: 'headers',
-  },
-
-  identity: {
-    claims: ['sub', 'name', 'admin'],
-    headers: {
-      'x-user-id': 'sub',
-      'x-user-name': 'name',
-      'x-user-admin': 'admin',
-    },
-  },
-
-  routes: [
+  apiRoutes: [
     {
-      path: '/bff/config',
+      type: 'api',
+      path: '/health',
       access: 'public',
-      handler: () => ({
-        environment: process.env.NODE_ENV,
-      }),
-    },
-
-    {
-      path: '/api/users',
-      access: 'private',
-      handler: async ({ claims }) => {
-        return fetch('http://users.internal/users', {
-          headers: {
-            'x-user-id': claims.sub,
-          },
-        });
-      },
-    },
-        });
-      },
-    },
-
-    {
-      path: '/bff/admin',
-      access: 'private',
-      authorize: ({ claims }) => claims.admin,
-      handler: ({ claims }) => ({
-        user: claims,
-        data: 'secret',
-      }),
+      handler: async () => ({ status: 'ok' }),
     },
   ],
 });
@@ -149,79 +52,424 @@ const server = createServer<JwtClaims>({
 await server.start();
 ```
 
-## Routes
+The server starts on port 3001 (overridable via the `PORT` environment variable).
 
-Routes define the API surface exposed to the SPA.
+## Why Halide?
 
-### Handler route (preferred)
+In most SPA setups, each application carries its own BFF implementation. Over time this leads to:
 
-Used when you want to compose or shape data:
+- Inconsistent auth handling across projects
+- Duplicated proxy logic
+- Backend service URLs leaking into frontend code
+- CORS configuration repeated across services
+- Unclear boundaries between frontend and backend responsibilities
+
+Halide provides a shared structure for all of these concerns.
+
+## Configuration
+
+The server is configured through a single `ServerConfig` object passed to `createServer`.
+
+### SPA hosting
 
 ```ts
-{
-  type: 'proxy',
-  path: '/api/products',
-  access: 'private',
-  target: 'http://products.internal',
-  proxyPath: '/products',
-  identity: 'inject',
-  observe: true,
+spa: {
+  name: 'my-app',          // used in log output
+  root: './dist/browser',  // directory of built static assets
+  fallback: 'index.html',  // served for unmatched routes (client-side routing)
+  apiPrefix: '/api',       // paths with this prefix get 404 instead of SPA fallback
 }
 ```
 
-### Proxy route (escape hatch)
+`spa.root` is the only required field. `apiPrefix` defaults to `'/api'` — set it to `''` to disable the 404 behavior.
 
-Used for simple passthrough cases:
+### API routes
+
+API routes are handler functions that compose and return data directly. They define the controlled API surface your frontend can call.
 
 ```ts
-{
-  type: 'proxy',
-  path: '/api/products',
+apiRoutes: [
+  {
+    type: 'api',
+    path: '/bff/config',
+    access: 'public',
+    method: 'get',
+    handler: async (ctx, claims, logger) => ({
+      environment: process.env.NODE_ENV,
+    }),
+  },
+  {
+    type: 'api',
+    path: '/users',
+    access: 'private',
+    method: 'post',
+    validationSchema: CreateUserSchema, // Zod schema — body is validated before handler runs
+    handler: async (ctx, claims, logger) => {
+      return { id: crypto.randomUUID(), ...ctx.body };
+    },
+  },
+];
+```
+
+The handler receives three arguments:
+
+| Parameter | Type                               | Description                                              |
+| --------- | ---------------------------------- | -------------------------------------------------------- |
+| `ctx`     | `RequestContext & { body: TBody }` | Method, path, headers, params, query, and validated body |
+| `claims`  | `TClaims \| undefined`             | Decoded JWT claims (undefined for public routes)         |
+| `logger`  | `Logger`                           | Structured logger instance                               |
+
+You can also use the `apiRoute()` factory, which fills in the `type` field and a default `authorize` function:
+
+```ts
+import { apiRoute } from 'halide';
+
+const healthRoute = apiRoute({
+  access: 'public',
+  path: '/health',
+  handler: async () => ({ status: 'ok' }),
+});
+```
+
+### Proxy routes
+
+Proxy routes forward requests to a backend service. Use them when you don't need to compose data — just pass through.
+
+```ts
+proxyRoutes: [
+  {
+    type: 'proxy',
+    path: '/api/products',
+    access: 'private',
+    methods: ['get', 'post'],
+    target: 'http://products.internal',
+    proxyPath: '/products', // rewrites /api/products → /products on the target
+    timeout: 5000, // ms before aborting
+    identity: (ctx, claims) => ({
+      'x-user-id': claims.sub, // headers injected into the proxied request
+    }),
+    transform: ({ body, headers }) => ({
+      body: { ...body, source: 'halide' },
+      headers,
+    }),
+  },
+];
+```
+
+Use the `proxyRoute()` factory for the same convenience as `apiRoute()`:
+
+```ts
+import { proxyRoute } from 'halide';
+
+const productsProxy = proxyRoute({
   access: 'private',
+  path: '/api/products',
+  methods: ['get'],
   target: 'http://products.internal',
   proxyPath: '/products',
-  identity: 'inject',
-  observe: true,
+});
+```
+
+### Authentication
+
+Auth is configured under `security.auth`. Halide supports two strategies:
+
+**Bearer (shared secret)**
+
+```ts
+security: {
+  auth: {
+    strategy: 'bearer',
+    secret: () => process.env.JWT_SECRET,
+    audience: 'my-app',           // optional — validates the aud claim
+  },
 }
 ```
 
-Routes reference backend endpoints directly rather than by service name.
+**JWKS (remote key set)**
 
-## Authentication model
+```ts
+security: {
+  auth: {
+    strategy: 'jwks',
+    jwksUri: 'https://idp.example.com/.well-known/jwks.json',
+    audience: 'my-app',
+  },
+}
+```
 
-Authentication is handled at the BFF boundary.
+Routes with `access: 'private'` require a valid JWT. If any private route exists, `security.auth` must be configured — the server will refuse to start otherwise.
 
-Halide supports extracting identity from JWTs and making it available to route handlers.
+### Authorization
 
-Identity can optionally be forwarded to backend services via headers.
+Every route accepts an optional `authorize` function for fine-grained access control:
 
-Halide does not enforce how backend services validate or trust this identity.
+```ts
+{
+  type: 'api',
+  path: '/admin/settings',
+  access: 'private',
+  authorize: (ctx, claims, logger) => claims.role === 'admin',
+  handler: async (ctx, claims, logger) => ({ settings: '...' }),
+}
+```
 
-## Security defaults
+The `authorize` function receives `(ctx, claims, logger)` and returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response.
 
-Halide applies conservative defaults for SPA hosting environments:
+### Security
 
-- internal CORS policy by default
-- strict CSP mode available
-- no direct exposure of backend service URLs to the browser
+```ts
+security: {
+  cors: {
+    origin: ['https://myapp.com'],
+    credentials: true,
+    methods: ['get', 'post', 'put', 'delete', 'patch'],
+    allowedHeaders: ['content-type', 'authorization'],
+    maxAge: 3600,
+  },
+  csp: {
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'"],
+      'connect-src': ["'self'", 'https://api.example.com'],
+    },
+  },
+  rateLimit: {
+    maxRequests: 100,
+    windowMs: 900000,  // 15 minutes
+  },
+}
+```
 
-## What this is (and isn’t)
+- **CORS**: Wildcard origin (`*`) cannot be combined with `credentials: true` — the validator will catch this.
+- **CSP**: Defaults to Helmet's `contentSecurityPolicy.getDefaultDirectives()` if not specified.
+- **Rate limiting**: IP-based sliding window. Defaults to 100 requests per 15 minutes.
 
-### This is:
+### Observability
 
-- a runtime layer for SPA backends
-- a way to standardize BFF structure across applications
-- a controlled entry point to backend systems
+```ts
+observability: {
+  requestId: true,       // generates/forwards x-request-id headers
+  logger: myLogger,      // your Logger implementation (defaults to no-op if omitted)
+  onRequest: (ctx, claims, logger) => {
+    logger.info(`${ctx.method} ${ctx.path}`);
+  },
+  onResponse: (ctx, claims, response, logger) => {
+    logger.info(`${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`);
+  },
+}
+```
 
-### This is not:
+Per-route observability is controlled with the `observe` flag. Set `observe: false` on a route to skip hooks for that route.
 
-- an API gateway replacement
-- a service mesh
-- a full backend framework
-- a distributed systems abstraction layer
+### OpenAPI / Swagger UI
 
-## Status
+```ts
+openapi: {
+  enabled: true,
+  path: '/swagger',            // where Swagger UI is served (default: /swagger)
+  options: {
+    title: 'My App API',
+    description: 'Auto-generated API documentation',
+    version: '1.0.0',
+    includeProxyRoutes: true,  // include proxy routes in the spec (default: true)
+  },
+}
+```
 
-This project is early-stage (`0.0.0`).
+Attach metadata to individual routes for richer documentation:
 
-The API is expected to evolve as it is used in real applications.
+```ts
+{
+  type: 'api',
+  path: '/users',
+  access: 'public',
+  method: 'post',
+  validationSchema: CreateUserSchema,
+  openapi: {
+    summary: 'Create a user',
+    description: 'Creates a new user with the given name and email.',
+    tags: ['Users'],
+    responseSchema: UserResponseSchema,
+    requestSchemaName: 'CreateUserRequest',
+    schemaName: 'UserResponse',
+  },
+  handler: async (ctx) => createUser(ctx.body),
+}
+```
+
+Zod schemas (both `validationSchema` and `openapi.responseSchema`) are automatically converted to JSON Schema in the generated spec.
+
+## Full example
+
+```ts
+import { createServer, apiRoute, proxyRoute } from 'halide';
+import { z } from 'zod';
+
+interface UserClaims {
+  sub: string;
+  role: 'admin' | 'user';
+}
+
+const CreateUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+});
+
+const server = await createServer<UserClaims>({
+  spa: {
+    name: 'dashboard',
+    root: './dist/browser',
+  },
+
+  security: {
+    cors: {
+      origin: ['https://dashboard.example.com'],
+      credentials: true,
+    },
+    csp: {
+      directives: {
+        'default-src': ["'self'"],
+        'script-src': ["'self'"],
+        'connect-src': ["'self'"],
+      },
+    },
+    auth: {
+      strategy: 'jwks',
+      jwksUri: 'https://idp.example.com/.well-known/jwks.json',
+      audience: 'dashboard',
+    },
+    rateLimit: {
+      maxRequests: 100,
+      windowMs: 900000,
+    },
+  },
+
+  observability: {
+    requestId: true,
+    onRequest: (ctx, claims, logger) => {
+      logger.info(`[Request] ${ctx.method} ${ctx.path} user=${claims?.sub ?? 'anon'}`);
+    },
+    onResponse: (ctx, claims, { statusCode, durationMs }, logger) => {
+      logger.info(`[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`);
+    },
+  },
+
+  apiRoutes: [
+    apiRoute({
+      access: 'public',
+      path: '/health',
+      handler: async () => ({ status: 'ok' }),
+    }),
+    apiRoute({
+      access: 'public',
+      path: '/config',
+      handler: async () => ({ environment: process.env.NODE_ENV }),
+    }),
+    apiRoute({
+      access: 'private',
+      path: '/users',
+      method: 'post',
+      validationSchema: CreateUserSchema,
+      openapi: {
+        summary: 'Create a user',
+        tags: ['Users'],
+        responseSchema: z.object({ id: z.string(), email: z.string(), name: z.string() }),
+      },
+      handler: async (ctx, claims, logger) => ({
+        id: crypto.randomUUID(),
+        email: ctx.body.email,
+        name: ctx.body.name,
+      }),
+    }),
+    apiRoute({
+      access: 'private',
+      path: '/admin/settings',
+      authorize: (_ctx, claims) => claims.role === 'admin',
+      handler: async () => ({ maintenance: false }),
+    }),
+  ],
+
+  proxyRoutes: [
+    proxyRoute({
+      access: 'private',
+      path: '/api/orders',
+      methods: ['get'],
+      target: 'http://orders.internal:8080',
+      proxyPath: '/orders',
+      identity: (_ctx, claims) => ({ 'x-user-id': claims.sub }),
+    }),
+  ],
+
+  openapi: {
+    enabled: true,
+    options: {
+      title: 'Dashboard API',
+      description: 'API documentation for the dashboard BFF',
+    },
+  },
+});
+
+await server.start();
+```
+
+## API reference
+
+### `createServer<TClaims>(config): Promise<Server>`
+
+Creates and returns a Halide server. Validates the config before starting.
+
+### `Server`
+
+| Method    | Description                                                   |
+| --------- | ------------------------------------------------------------- |
+| `start()` | Starts listening on `PORT` (default 3001)                     |
+| `stop()`  | Gracefully shuts down the HTTP server and cleans up resources |
+
+### `apiRoute<TClaims, TBody>(input): ApiRoute`
+
+Factory that fills in `type: 'api'` and a default `authorize` function.
+
+### `proxyRoute<TClaims>(input): ProxyRoute`
+
+Factory that fills in `type: 'proxy'` and a default `authorize` function.
+
+### Exported types
+
+| Type                              | Description                                                             |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| `ServerConfig<TClaims>`           | Top-level configuration object                                          |
+| `ApiRoute<TClaims, TBody>`        | API route definition                                                    |
+| `ProxyRoute<TClaims>`             | Proxy route definition                                                  |
+| `Route<TClaims, TBody>`           | Union of `ApiRoute \| ProxyRoute`                                       |
+| `ApiRouteHandler<TClaims, TBody>` | `(ctx, claims, logger) => Promise<unknown>`                             |
+| `AuthorizeFn<TClaims>`            | `(ctx, claims, logger) => boolean \| Promise<boolean>`                  |
+| `TransformFn`                     | `({ body, headers }) => { body, headers }`                              |
+| `RequestContext`                  | Normalized request context (method, path, headers, params, query, body) |
+| `ResponseContext`                 | Response metadata (statusCode, durationMs, error?)                      |
+| `SecurityConfig`                  | CORS, CSP, auth, rate limit configuration                               |
+| `SecurityAuthConfig`              | Auth strategy, secret/JWKS, audience                                    |
+| `CorsConfig`                      | Origin, methods, credentials, headers                                   |
+| `SpaConfig`                       | Static file serving configuration                                       |
+| `ObservabilityConfig<TClaims>`    | Logger, request ID, lifecycle hooks                                     |
+| `OpenApiConfig`                   | Swagger UI toggle, path, and options                                    |
+| `Logger`                          | `{ debug, error, info, warn }` interface                                |
+
+## What this is (and isn't)
+
+**Halide is:**
+
+- A runtime layer for SPA backends
+- A way to standardize BFF structure across applications
+- A controlled entry point to backend systems
+
+**Halide is not:**
+
+- An API gateway replacement
+- A service mesh
+- A full backend framework
+- A distributed systems abstraction layer
+
+## License
+
+[MIT](./LICENSE)
