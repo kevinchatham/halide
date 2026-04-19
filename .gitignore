@@ -1,9 +1,12 @@
+.env
 .kilo/agent-manager.json
 .kilo/plans/
 .scannerwork/
+*.tsbuildinfo
 **/.angular/
 **/dist/
 **/node_modules/
+coverage/
 setup-script
+sonar-project.properties
 temp/
-*.tsbuildinfo

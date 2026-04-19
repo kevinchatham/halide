@@ -13,7 +13,7 @@ export const DEFAULTS = {
   openapi: {
     includeProxyRoutes: true,
     path: '/swagger',
-    title: 'bSPA API',
+    title: 'Halide API',
     version: '1.0.0',
   },
   proxy: {

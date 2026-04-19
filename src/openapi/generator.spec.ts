@@ -21,7 +21,7 @@ describe('generateOpenApiSpec', () => {
     const spec = generateOpenApiSpec(minimalConfig);
 
     expect(spec.openapi).toBe('3.0.3');
-    expect(spec.info.title).toBe('bSPA API');
+    expect(spec.info.title).toBe('Halide API');
     expect(spec.info.version).toBe('1.0.0');
     expect(spec.paths).toEqual({});
   });

@@ -20,7 +20,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!demo", "!dist", "**/*.{ts,css,json}"]
+    "includes": ["**", "!coverage", "!demo", "!dist", "**/*.{ts,css,json}"]
   },
   "formatter": {
     "enabled": true,
@@ -83,7 +83,6 @@
       }
     }
   },
-  "root": false,
   "vcs": {
     "clientKind": "git",
     "enabled": true,

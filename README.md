@@ -1,8 +1,8 @@
-# bSPA
+# Halide
 
 A Node runtime for defining the backend surface of a Single Page Application. It standardizes how SPAs are served, how identity is extracted and transformed, and how frontend requests are composed or routed to internal services. Unlike API gateways, it is not infrastructure-focused or protocol-agnostic; it is designed specifically around SPA application boundaries and developer-defined backend composition logic.
 
-bSPA is intended for teams that want a consistent way to build SPA backends without re-implementing the same patterns in every project.
+Halide is intended for teams that want a consistent way to build SPA backends without re-implementing the same patterns in every project.
 
 In three words it's a “frontend ingress gateway”
 
@@ -17,18 +17,18 @@ In many SPA setups, each application ends up with its own backend-for-frontend (
 - CORS configuration repeated across services
 - unclear boundaries between frontend and backend responsibilities
 
-bSPA provides a shared structure for these concerns.
+Halide provides a shared structure for these concerns.
 
 It is not a full framework, and it does not try to replace existing backend systems.
 
 ## Core idea
 
-bSPA sits between the browser and internal services:
+Halide sits between the browser and internal services:
 
 ```
 Browser (SPA)
    ↓
-bSPA (BFF runtime)
+Halide (BFF runtime)
    ↓
 Private backend services
 ```
@@ -45,7 +45,7 @@ Its role is to:
 
 ### 1. SPA hosting
 
-bSPA can serve built frontend assets directly.
+Halide can serve built frontend assets directly.
 
 ### 2. BFF routes
 
@@ -60,7 +60,7 @@ Routes can either:
 
 Authentication happens at the BFF boundary.
 
-bSPA can:
+Halide can:
 
 - validate JWTs
 - extract claims
@@ -71,7 +71,7 @@ It does not assume backend services share the same auth model.
 ## Example
 
 ```ts
-import { createServer } from 'bspa';
+import { createServer } from 'halide';
 
 interface JwtClaims {
   sub: string;
@@ -191,15 +191,15 @@ Routes reference backend endpoints directly rather than by service name.
 
 Authentication is handled at the BFF boundary.
 
-bSPA supports extracting identity from JWTs and making it available to route handlers.
+Halide supports extracting identity from JWTs and making it available to route handlers.
 
 Identity can optionally be forwarded to backend services via headers.
 
-bSPA does not enforce how backend services validate or trust this identity.
+Halide does not enforce how backend services validate or trust this identity.
 
 ## Security defaults
 
-bSPA applies conservative defaults for SPA hosting environments:
+Halide applies conservative defaults for SPA hosting environments:
 
 - internal CORS policy by default
 - strict CSP mode available

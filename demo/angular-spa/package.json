@@ -6,7 +6,7 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "bspa": "1.0.0",
+    "halide": "1.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -19,7 +19,7 @@
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"
   },
-  "name": "bspa-angular-spa-demo",
+  "name": "halide-angular-spa-demo",
   "packageManager": "npm@11.8.0",
   "private": true,
   "scripts": {

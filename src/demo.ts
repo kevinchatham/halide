@@ -1,7 +1,7 @@
 /**
- * Demo implementation showcasing bSPA's API design.
+ * Demo implementation showcasing halide's API design.
  *
- * This file demonstrates how to configure a bSPA server with:
+ * This file demonstrates how to configure a halide server with:
  * - API routes (public and private with authorization)
  * - Proxy routes with request transformation
  * - Observability hooks for request/response logging
@@ -25,8 +25,8 @@ import {
   type SecurityConfig,
   type ServerConfig,
   type SpaConfig,
-} from './config/types'; // from 'bspa'
-import { createServer } from './runtime'; // from 'bspa';
+} from './config/types'; // from 'halide'
+import { createServer } from './runtime'; // from 'halide';
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {
@@ -238,7 +238,7 @@ const openapi: OpenApiConfig = {
  * - `proxyRoutes`: reverse proxy routes with optional transformation
  * - `openapi`: Swagger UI and OpenAPI spec configuration
  *
- * Passed to `createServer()` to bootstrap the bSPA BFF server.
+ * Passed to `createServer()` to bootstrap the halide BFF server.
  */
 const exampleConfig: ServerConfig<UserClaims> = {
   apiRoutes: [profileRoute, userRoute as unknown as ApiRoute<UserClaims>, healthRoute],

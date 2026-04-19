@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Server } from 'bspa';
-import { createServer } from 'bspa';
+import type { Server } from 'halide';
+import { createServer } from 'halide';
 import type { Request, Response } from 'express';
 
 interface JwtClaims {

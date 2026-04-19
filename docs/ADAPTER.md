@@ -2,7 +2,7 @@
 
 **Core runtime + adapters**
 
-- bSPA owns logic
+- Halide owns logic
 - adapters translate to runtime (Express, Hono, Fastify)
 - slightly more work upfront
 - but:
@@ -12,10 +12,10 @@
 
 # 🧠 The correct mental model
 
-Think of bSPA like this:
+Think of Halide like this:
 
 ```text id="adapter_model"
-        bSPA Core (framework-agnostic)
+        Halide Core (framework-agnostic)
      ┌──────────────────────────────┐
      │ routing                     │
      │ identity                   │
@@ -88,7 +88,7 @@ type Context<TClaims, TIdentity> = {
 
 This is the rule that keeps you safe:
 
-> bSPA core should never import Express, Hono, Fastify, or any HTTP framework.
+> Halide core should never import Express, Hono, Fastify, or any HTTP framework.
 
 Only adapters do.
 

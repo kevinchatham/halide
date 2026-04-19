@@ -12,7 +12,7 @@
     "typescript": "^5.9.0"
   },
   "main": "./dist/index.js",
-  "name": "bspa-backend-demo",
+  "name": "halide-backend-demo",
   "private": true,
   "scripts": {
     "build": "tsup",

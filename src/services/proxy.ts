@@ -99,7 +99,7 @@ export function createProxyService<TClaims = unknown>(
         req.headers[lowerKey] = value;
       }
     } catch (err) {
-      logger?.error('[bspa] Transform error:', err);
+      logger?.error('[halide] Transform error:', err);
       next(err);
       return;
     }

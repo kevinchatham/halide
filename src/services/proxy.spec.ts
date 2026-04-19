@@ -277,7 +277,7 @@ describe('createProxyService', () => {
     expect(next).toHaveBeenCalledTimes(1);
     const err = (next.mock.calls as [[Error]])[0][0];
     expect(err.message).toBe('transform failed');
-    expect(spyLogger.error).toHaveBeenCalledWith('[bspa] Transform error:', expect.any(Error));
+    expect(spyLogger.error).toHaveBeenCalledWith('[halide] Transform error:', expect.any(Error));
     expect(mockHandler).not.toHaveBeenCalled();
   });
 
