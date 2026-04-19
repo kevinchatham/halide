@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Logger, ProxyRoute } from '../config/types';
+import type { Logger, ProxyRoute } from '../types';
 import { buildRequestContextFromHono, createProxyService, serializeQueryParam } from './proxy';
 
 const noopLogger: Logger = {

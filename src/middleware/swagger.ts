@@ -1,7 +1,7 @@
 import { Scalar } from '@scalar/hono-api-reference';
 import type { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
-import type { ServerConfig } from '../config/types';
+import type { ServerConfig } from '../types';
 
 export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app: Hono): void {
   const openapiConfig = config.openapi;

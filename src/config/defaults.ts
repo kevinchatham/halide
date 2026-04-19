@@ -1,4 +1,4 @@
-import type { Logger } from './types';
+import type { Logger } from '../types';
 
 export const DEFAULTS = {
   cors: {

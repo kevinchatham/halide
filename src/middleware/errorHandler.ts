@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Logger } from '../config/types';
+import type { Logger } from '../types';
 
 export function createErrorHandler(logger: Logger): (err: unknown, c: Context) => Response {
   return (err: unknown, c: Context) => {

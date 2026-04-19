@@ -2,6 +2,8 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import type { DescribeRouteOptions, ResponsesWithResolver } from 'hono-openapi';
 import { describeRoute, resolver, validator } from 'hono-openapi';
 import { DEFAULTS } from '../config/defaults';
+import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
+import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
 import type {
   ApiRoute,
   ClaimExtractor,
@@ -10,9 +12,7 @@ import type {
   ProxyRoute,
   RequestContext,
   ServerConfig,
-} from '../config/types';
-import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
-import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
+} from '../types';
 
 type HalideVariables = { rawBody?: unknown };
 

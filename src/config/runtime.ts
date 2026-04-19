@@ -8,8 +8,8 @@ import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { registerRoutes } from '../routes/registry.js';
 import { createSpaHandler } from '../routes/spa.js';
+import type { ServerConfig } from '../types.js';
 import { createNoopLogger, DEFAULTS } from './defaults.js';
-import type { ServerConfig } from './types.js';
 import { validateServerConfig } from './validate.js';
 
 type HalideVariables = { rawBody?: unknown };
@@ -19,9 +19,14 @@ export interface Server {
   stop: () => Promise<void>;
 }
 
-export async function createServer<TClaims = unknown>(
+export interface CreateAppResult {
+  app: Hono<{ Variables: HalideVariables }>;
+  rateLimitDispose: (() => void) | undefined;
+}
+
+export async function createApp<TClaims = unknown>(
   configInput: ServerConfig<TClaims>,
-): Promise<Server> {
+): Promise<CreateAppResult> {
   validateServerConfig(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
@@ -72,6 +77,16 @@ export async function createServer<TClaims = unknown>(
   app.all('/*', spaFallback);
 
   app.onError(createErrorHandler(logger));
+
+  return { app, rateLimitDispose };
+}
+
+export async function createServer<TClaims = unknown>(
+  configInput: ServerConfig<TClaims>,
+): Promise<Server> {
+  const { app, rateLimitDispose } = await createApp<TClaims>(configInput);
+
+  const logger = configInput.observability?.logger ?? createNoopLogger();
 
   let httpServer: ReturnType<typeof serve> | undefined;
 

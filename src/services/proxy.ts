@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
-import type { Logger, ProxyRoute, RequestContext } from '../config/types';
+import type { Logger, ProxyRoute, RequestContext } from '../types';
 
 const READONLY_HEADERS: Set<string> = new Set([
   'host',

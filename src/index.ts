@@ -1,4 +1,6 @@
-export { createServer, type Server } from './config/runtime';
+export { type CreateAppResult, createApp, createServer, type Server } from './config/runtime';
+export { apiRoute } from './routes/apiRoute';
+export { proxyRoute } from './routes/proxyRoute';
 export type {
   ApiRoute,
   ApiRouteHandler,
@@ -18,5 +20,4 @@ export type {
   ServerConfig,
   SpaConfig,
   TransformFn,
-} from './config/types';
-export { apiRoute, proxyRoute } from './config/types';
+} from './types';

@@ -1,4 +1,4 @@
-import type { CorsConfig, CspOptions, Route, SecurityConfig, SpaConfig } from './types';
+import type { CorsConfig, CspOptions, Route, SecurityConfig, SpaConfig } from '../types';
 
 type RouteInput<TClaims = unknown> =
   | Partial<Extract<Route<TClaims>, { type: 'api' }>>

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
 import { z } from 'zod';
 import { createNoopLogger } from '../config/defaults';
-import type { Logger, ServerConfig } from '../config/types';
+import type { Logger, ServerConfig } from '../types';
 import { registerRoutes } from './registry';
 
 const noopLogger: Logger = createNoopLogger();

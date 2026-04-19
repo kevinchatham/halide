@@ -1,7 +1,6 @@
 import type { Context } from 'hono';
 import type { ContentSecurityPolicyOptionHandler } from 'hono/secure-headers';
 import type { ZodSchema } from 'zod';
-import { defaultAuthorize } from './defaults';
 
 export type ClaimExtractor<TClaims = unknown> = (c: Context) => Promise<TClaims | null>;
 
@@ -108,6 +107,13 @@ export type ObservabilityConfig<TClaims = unknown> = {
   ) => void | Promise<void>;
 };
 
+export type OpenApiOptions = {
+  title?: string;
+  version?: string;
+  description?: string;
+  servers?: Array<{ url: string; description?: string }>;
+};
+
 export type CorsConfig = {
   allowedHeaders?: string[];
   credentials?: boolean;
@@ -134,7 +140,7 @@ export type SecurityConfig = {
 export type OpenApiConfig = {
   enabled?: boolean;
   path?: string;
-  options?: import('../openapi/types').OpenApiOptions;
+  options?: OpenApiOptions;
 };
 
 export type ServerConfig<TClaims = unknown> = {
@@ -186,21 +192,3 @@ export type ApiRouteInput<TClaims, TBody = unknown> = Omit<
 };
 
 export type ProxyRouteInput<TClaims> = Omit<ProxyRoute<TClaims>, 'type'>;
-
-export function apiRoute<TClaims, TBody = unknown>(
-  route: ApiRouteInput<TClaims, TBody>,
-): ApiRoute<TClaims, TBody> {
-  return {
-    ...route,
-    authorize: route.authorize ?? defaultAuthorize,
-    type: 'api',
-  };
-}
-
-export function proxyRoute<TClaims>(route: ProxyRouteInput<TClaims>): ProxyRoute<TClaims> {
-  return {
-    ...route,
-    authorize: route.authorize ?? defaultAuthorize,
-    type: 'proxy',
-  };
-}

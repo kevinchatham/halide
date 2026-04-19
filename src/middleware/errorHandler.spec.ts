@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Logger } from '../config/types';
+import type { Logger } from '../types';
 import { createErrorHandler } from './errorHandler';
 
 const logger: Logger = {

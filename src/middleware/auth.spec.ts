@@ -2,6 +2,10 @@ import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
 import { extractBearerClaims, extractJwksClaims } from './auth';
 
+vi.mock('hono/jwk', () => ({
+  jwk: vi.fn(),
+}));
+
 const secret = 'test-secret';
 
 interface TestClaims {
@@ -183,7 +187,122 @@ describe('extractJwksClaims', () => {
       );
       return c.json({});
     });
-    await app.request('/test', { headers: { authorization: 'Bearer invalid-token' } });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
     expect(result).toBeNull();
+  });
+
+  it('returns claims when JWKS verification succeeds without audience', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { role: 'admin', sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+    expect(result).toMatchObject(payload);
+  });
+
+  it('returns claims when JWKS verification succeeds and audience matches string aud', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { aud: 'my-api', sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(
+        c,
+        'https://auth.example.com/jwks.json',
+        'my-api',
+      );
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+    expect(result).toMatchObject(payload);
+  });
+
+  it('returns null when JWKS verification succeeds but audience does not match', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { aud: 'wrong-audience', sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(
+        c,
+        'https://auth.example.com/jwks.json',
+        'my-api',
+      );
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when JWKS verification succeeds but jwtPayload is not set', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (_c: import('hono').Context, next: import('hono').Next) => {
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+    expect(result).toBeNull();
+  });
+
+  it('returns claims when JWKS verification succeeds and audience matches array aud', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { aud: ['my-api', 'other-api'], sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(
+        c,
+        'https://auth.example.com/jwks.json',
+        'my-api',
+      );
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+    expect(result).toMatchObject(payload);
   });
 });

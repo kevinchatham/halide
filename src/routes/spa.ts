@@ -3,7 +3,7 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { Context, MiddlewareHandler } from 'hono';
 import { DEFAULTS } from '../config/defaults';
-import type { SpaConfig } from '../config/types';
+import type { SpaConfig } from '../types';
 
 export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): {
   staticMiddleware: MiddlewareHandler;
