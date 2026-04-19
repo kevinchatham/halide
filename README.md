@@ -3,13 +3,15 @@
   <br/>
   <em>Stability by composition</em>
   <br/><br/>
-  <a style="color:inherit!important;text-decoration:none!important;" href="./LICENSE">
+  <a href="https://github.com/kevinchatham/halide/tree/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
-  <a style="margin-left:8px;color:inherit!important;text-decoration:none!important;" href="https://github.com/kevinchatham/halide/tree/main/docs">
+  <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
     <img src="https://img.shields.io/badge/docs-1.0.0-cyan" alt="Documentation"/>
   </a>
-  <img style="margin-left:8px;" src="https://img.shields.io/badge/node-%3E%3D24-1e293b" alt="Node.js"/>
+  <a style="margin-left:8px;" href="https://nodejs.org">
+    <img src="https://img.shields.io/badge/node-%3E%3D24-1e293b" alt="Node.js"/>
+  </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
 </p>
 
