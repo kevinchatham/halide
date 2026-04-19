@@ -2,6 +2,7 @@ import { contentSecurityPolicy } from 'helmet';
 
 export const DEFAULTS = {
   spa: {
+    apiPrefix: '/api',
     fallback: 'index.html',
     name: 'app',
   },

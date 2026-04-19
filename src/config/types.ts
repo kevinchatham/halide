@@ -88,24 +88,24 @@ export type AuthorizeFn<TClaims> = (
 ) => boolean | Promise<boolean>;
 
 /**
- * Function to transform proxy response data.
- * @param response - The response object containing body and headers.
- * @returns The transformed response or a promise of it.
+ * Function to transform proxy request data before forwarding.
+ * @param request - The request object containing body and headers.
+ * @returns The transformed request.
  */
-export type TransformFn = (response: {
+export type TransformFn = (request: {
   body: unknown;
   headers: Record<string, string>;
-}) =>
-  | { body: unknown; headers: Record<string, string> }
-  | Promise<{ body: unknown; headers: Record<string, string> }>;
+}) => { body: unknown; headers: Record<string, string> };
 
 /**
  * Configuration for single-page application serving.
  */
 export type SpaConfig = {
+  /** URL prefix for API routes; SPA fallback returns 404 for paths matching this prefix. Defaults to '/api'. Set to '' to disable. */
+  apiPrefix?: string;
   /** Path to the fallback index.html file for client-side routing. */
   fallback?: string;
-  /** Name of the SPA application. */
+  /** Name of the SPA application, used for logging. */
   name?: string;
   /** Root directory path from which to serve static files. */
   root: string;
@@ -116,6 +116,8 @@ export type SpaConfig = {
  * @template TClaims - The type of claims contained in the JWT.
  */
 export type ObservabilityConfig<TClaims = unknown> = {
+  /** Whether to generate/forward x-request-id headers. */
+  requestId?: boolean;
   /** Hook called when a request is received. */
   onRequest?: (ctx: RequestContext, claims: TClaims | undefined) => void | Promise<void>;
   /** Hook called when a response is sent. */
@@ -251,7 +253,7 @@ export type ProxyRoute<TClaims = unknown> = {
   authorize?: AuthorizeFn<TClaims>;
   /** Function to extract identity headers from request context. */
   identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined;
-  /** Function to transform proxy responses. */
+  /** Function to transform proxy request data before forwarding. */
   transform?: TransformFn;
   /** OpenAPI metadata for the route. */
   openapi?: OpenApiRouteMeta;

@@ -179,7 +179,7 @@ const security: SecurityConfig = {
 
 /**
  * SPA serving configuration.
- * - `name`: application identifier used for caching headers and logging
+ * - `name`: application identifier used for logging
  * - `root`: absolute path to the directory containing static assets
  * - `fallback`: file served for unmatched routes to support client-side routing
  */

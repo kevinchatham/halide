@@ -1,7 +1,16 @@
-import type { RequestHandler } from 'express';
-import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middleware';
+import type { Request, RequestHandler } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { DEFAULTS } from '../config/defaults';
 import type { RequestContext, TransformFn } from '../config/types';
+
+// READONLY_HEADERS and ARRAY_HEADERS follow Node's http.IncomingMessage.headers convention
+// (also used by Express's req.headers): all keys are lowercase, multi-value headers like
+// set-cookie are stored as arrays, and certain hop-by-hop/protocol headers must not be
+// overwritten. Transform output keys are normalized to lowercase before writing back to
+// req.headers to maintain consistency with this convention.
+const READONLY_HEADERS = new Set(['host', 'connection', 'content-length', 'transfer-encoding']);
+
+const ARRAY_HEADERS = new Set(['set-cookie']);
 
 export function createProxyService<TClaims = unknown>(
   target: string,
@@ -12,26 +21,33 @@ export function createProxyService<TClaims = unknown>(
   timeout?: number
 ): RequestHandler {
   const rewritePath = proxyPath ?? routePath;
-  return createProxyMiddleware({
+  const proxy = createProxyMiddleware({
     target,
     changeOrigin: true,
     timeout: timeout ?? DEFAULTS.proxy.timeoutMs,
     pathRewrite: {
       [`^${routePath}`]: rewritePath,
     },
-    selfHandleResponse: !!transform,
     on: {
       proxyReq: (proxyReq, req) => {
-        if (identity && (req as any).claims) {
+        const expressReq = req as Request;
+        if (identity && expressReq.claims) {
           const ctx: RequestContext = {
-            method: req.method.toLowerCase() as RequestContext['method'],
-            path: req.path,
-            headers: req.headers as Record<string, string>,
-            params: (req.params || {}) as Record<string, string>,
-            query: req.query as Record<string, string>,
-            body: req.body,
+            method: expressReq.method.toLowerCase() as RequestContext['method'],
+            path: expressReq.path,
+            headers: expressReq.headers as Record<string, string | string[]>,
+            params: Object.fromEntries(
+              Object.entries(expressReq.params || {}).map(([k, v]) => [k, String(v)])
+            ),
+            query: Object.fromEntries(
+              Object.entries(expressReq.query || {}).map(([k, v]) => [
+                k,
+                Array.isArray(v) ? v.map(String) : String(v),
+              ])
+            ),
+            body: expressReq.body,
           };
-          const headers = identity(ctx, (req as any).claims);
+          const headers = identity(ctx, expressReq.claims as TClaims);
           if (headers) {
             for (const [key, value] of Object.entries(headers)) {
               if (value !== undefined) {
@@ -41,44 +57,43 @@ export function createProxyService<TClaims = unknown>(
           }
         }
       },
-      proxyRes: transform
-        ? responseInterceptor(async (responseBuffer, proxyRes) => {
-            const body = responseBuffer.toString();
-            let parsed: unknown;
-            try {
-              parsed = JSON.parse(body);
-            } catch {
-              return responseBuffer;
-            }
-            const headers: Record<string, string> = {};
-            const setCookieValues: string[] = [];
-            for (const [key, value] of Object.entries(proxyRes.headers)) {
-              if (value === undefined) continue;
-              if (key.toLowerCase() === 'set-cookie') {
-                const values = Array.isArray(value) ? value : [value];
-                setCookieValues.push(...values);
-                delete proxyRes.headers[key];
-              } else {
-                headers[key] = Array.isArray(value) ? value.join(', ') : value;
-              }
-            }
-            if (setCookieValues.length > 0) {
-              proxyRes.headers['set-cookie'] = setCookieValues;
-            }
-            try {
-              const transformed = await transform({ body: parsed, headers });
-              for (const [key, value] of Object.entries(transformed.headers)) {
-                if (value !== undefined && value !== null) {
-                  proxyRes.headers[key] = value;
-                }
-              }
-              return JSON.stringify(transformed.body);
-            } catch (err) {
-              console.error('[bspa] Transform error:', err);
-              return responseBuffer;
-            }
-          })
-        : undefined,
     },
   });
+
+  if (!transform) {
+    return proxy;
+  }
+
+  return (req, res, next) => {
+    try {
+      const body = typeof req.body === 'object' && req.body ? req.body : {};
+      const multiValueKeys = new Set<string>();
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (value !== undefined) {
+          if (Array.isArray(value)) {
+            multiValueKeys.add(key.toLowerCase());
+            headers[key] = value.join(', ');
+          } else {
+            headers[key] = String(value);
+          }
+        }
+      }
+      const transformed = transform({ body, headers });
+
+      req.body = transformed.body;
+      for (const [key, value] of Object.entries(transformed.headers)) {
+        const lowerKey = key.toLowerCase();
+        if (READONLY_HEADERS.has(lowerKey)) continue;
+        if (ARRAY_HEADERS.has(lowerKey)) continue;
+        if (multiValueKeys.has(lowerKey)) continue;
+        req.headers[lowerKey] = value;
+      }
+    } catch (err) {
+      console.error('[bspa] Transform error:', err);
+      next(err);
+      return;
+    }
+    proxy(req, res, next);
+  };
 }

@@ -7,6 +7,7 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
+      locals: {},
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
     } as any;
@@ -25,6 +26,7 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'POST', path: '/api/data' } as any;
     const res = {
+      locals: {},
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
     } as any;
@@ -46,6 +48,7 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'DELETE', path: '/resource' } as any;
     const res = {
+      locals: {},
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
     } as any;
@@ -57,6 +60,48 @@ describe('createErrorHandler', () => {
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' });
+
+    vi.restoreAllMocks();
+  });
+
+  it('stores Error instances in res.locals.error', () => {
+    const handler = createErrorHandler();
+
+    const req = { method: 'GET', path: '/test' } as any;
+    const res = {
+      locals: {},
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    } as any;
+    const next = vi.fn();
+    const error = new Error('boom');
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    handler(error, req, res, next);
+
+    expect(res.locals.error).toBe(error);
+
+    vi.restoreAllMocks();
+  });
+
+  it('wraps non-Error values in res.locals.error', () => {
+    const handler = createErrorHandler();
+
+    const req = { method: 'GET', path: '/test' } as any;
+    const res = {
+      locals: {},
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    } as any;
+    const next = vi.fn();
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    handler('string error', req, res, next);
+
+    expect(res.locals.error).toBeInstanceOf(Error);
+    expect(res.locals.error.message).toBe('string error');
 
     vi.restoreAllMocks();
   });

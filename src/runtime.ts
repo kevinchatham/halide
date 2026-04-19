@@ -6,6 +6,7 @@ import type { ServerConfig } from './config/types';
 import { validateServerConfig } from './config/validate';
 import { createErrorHandler } from './middleware/errorHandler';
 import { createRateLimitMiddleware } from './middleware/rateLimit';
+import { createRequestIdMiddleware } from './middleware/requestId';
 import { createSecurityMiddleware } from './middleware/security';
 import { createSwaggerMiddleware } from './middleware/swagger';
 import { registerRoutes } from './routes/registry';
@@ -56,6 +57,10 @@ export async function createServer<TClaims = unknown>(
   app.use(express.json());
   app.use(createSecurityMiddleware(cspConfig));
 
+  if (configInput.observability?.requestId) {
+    app.use(createRequestIdMiddleware());
+  }
+
   await registerRoutes<TClaims>(app, configInput);
 
   if (configInput.openapi?.enabled) {
@@ -64,8 +69,10 @@ export async function createServer<TClaims = unknown>(
     app.use(swaggerPath, swaggerRouter);
   }
 
-  const spaHandler = createSpaHandler(configInput.spa);
-  app.get(/^\/(.*)/, spaHandler);
+  const spaMiddlewares = createSpaHandler(configInput.spa);
+  for (const mw of spaMiddlewares) {
+    app.use(mw);
+  }
 
   app.use(createErrorHandler());
 
