@@ -37,14 +37,14 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 - Validation is imperative (`validateServerConfig` in `src/config/validate.ts`), not Zod — Zod is only used for route body validation and OpenAPI schema generation
 - `src/middleware/validate.ts` — per-route body validation using Zod schemas (distinct from config validation)
 - SPA `apiPrefix` defaults to `'/api'` — paths starting with that prefix get 404 instead of SPA fallback (set `apiPrefix: ''` to disable)
+- `src/types/express.ts` — augments `Express.Request` with `claims?: unknown`
+- `src/demo.ts` exists but is **not exported** — used by demo apps only
 - **src/config/** — types, defaults, validation
 - **src/middleware/** — auth (bearer + JWKS), CORS, CSP, rate limit, request ID, error handler, Swagger UI, body validation
 - **src/routes/** — `registry.ts` (route registration), `spa.ts` (static file serving)
 - **src/services/** — proxy handler
 - **src/openapi/** — spec generator (uses `zod-to-json-schema`)
 - **src/utils/** — JWT helpers (uses `jose`)
-- **src/types/** — Express augmentation
-- `src/demo.ts` exists but is not exported — likely used by demo apps only
 
 ## Testing
 
@@ -56,7 +56,7 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 ## TypeScript
 
 - Strict mode + `noUncheckedIndexedAccess`
-- Module: `Node16` / `node16` resolution — use `.js` extensions in relative imports
+- Module: `es2022` / `bundler` resolution — use `.js` extensions in relative imports
 - Express 5 types (`@types/express@^5`)
 - Target: ES2022
 
@@ -82,3 +82,7 @@ npm run demo:angular:serve       # port 3001
 - Biome assist auto-runs on `lint:fix`: organizes imports, sorts interface members, object keys, and attributes
 - Default server port is 3001 (from `process.env.PORT` fallback in `runtime.ts`)
 - Private routes require `security.auth` to be configured — validation will throw otherwise
+- `package.json` declares `"type": "module"` — this is an ESM project
+- Node.js >=24.0.0 required (enforced in `engines`)
+- CORS wildcard origin (`*`) cannot be combined with `credentials: true` — config validator will throw
+- `apiRoute()` and `proxyRoute()` factory functions fill in `type` and default `authorize` — prefer them over raw route objects
