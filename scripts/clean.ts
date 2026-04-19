@@ -5,6 +5,7 @@ const patterns: string[] = [
   '**/.angular',
   '**/dist',
   '**/package-lock.json',
+  'coverage',
   'demo/**/node_modules',
   'node_modules',
 ];
