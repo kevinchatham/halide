@@ -27,7 +27,7 @@ Halide (auth, routing, composition)
 Private backend services
 ```
 
-It is not an API gateway, a service mesh, or a full backend framework. It is specifically designed around SPA application boundaries.
+Halide is not an API gateway, a service mesh, or a full backend framework. It is specifically designed around SPA application boundaries.
 
 > Halides are compounds that bond separate elements into a stable structure.
 
