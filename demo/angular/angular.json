@@ -5,7 +5,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "angular-spa": {
+    "angular": {
       "architect": {
         "build": {
           "builder": "@angular/build:application",
@@ -49,10 +49,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "development": {
-              "buildTarget": "angular-spa:build:development"
+              "buildTarget": "angular:build:development"
             },
             "production": {
-              "buildTarget": "angular-spa:build:production"
+              "buildTarget": "angular:build:production"
             }
           },
           "defaultConfiguration": "development"

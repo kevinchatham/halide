@@ -77,7 +77,7 @@ const server: Server = createServer<JwtClaims>({
   },
   spa: {
     fallback: 'index.html',
-    name: 'angular-spa',
+    name: 'angular',
     root: path.join(__dirname, './browser'),
   },
 });

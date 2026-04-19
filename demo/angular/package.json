@@ -19,7 +19,7 @@
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"
   },
-  "name": "halide-angular-spa-demo",
+  "name": "halide-angular-demo",
   "packageManager": "npm@11.8.0",
   "private": true,
   "scripts": {

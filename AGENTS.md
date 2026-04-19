@@ -68,7 +68,7 @@ npm run demo:backend:serve       # port 3000
 npm run demo:angular:serve       # port 3001
 ```
 
-`demo:link` builds the library and runs `npm link` so demos resolve `halide` locally. Demo apps are in `demo/backend/` and `demo/angular-spa/`.
+`demo:link` builds the library and runs `npm link` so demos resolve `halide` locally. Demo apps are in `demo/backend/` and `demo/angular/`.
 
 ## Gotchas
 

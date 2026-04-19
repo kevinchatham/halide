@@ -25,7 +25,7 @@
         "autoExecuteCommands": true,
         "color": "terminal.ansiMagenta",
         "commands": [
-          "npx concurrently --names \"angular-spa,backend\" --prefix-colors \"blue,magenta\" \"npm run demo:angular:serve:server\" \"npm run demo:backend:serve\""
+          "npx concurrently --names \"angular,backend\" --prefix-colors \"blue,magenta\" \"npm run demo:angular:serve:server\" \"npm run demo:backend:serve\""
         ],
         "icon": "browser",
         "name": "demos"

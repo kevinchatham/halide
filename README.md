@@ -81,7 +81,7 @@ interface JwtClaims {
 
 const server = createServer<JwtClaims>({
   spa: {
-    name: 'angular-spa',
+    name: 'angular',
     root: './dist/browser',
   },
 
