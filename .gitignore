@@ -8,5 +8,4 @@
 **/node_modules/
 coverage/
 setup-script
-sonar-project.properties
 temp/
