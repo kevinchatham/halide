@@ -81,7 +81,7 @@ export async function createServer<TClaims = unknown>(
 
   return {
     start: async () => {
-      const port = Number.parseInt(process.env['PORT'] || '3001', 10);
+      const port = Number.parseInt(process.env.PORT || '3001', 10);
       await new Promise<void>((resolve) => {
         httpServer = app.listen(port, () => {
           logger.info(

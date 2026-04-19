@@ -1,6 +1,6 @@
 import type { OpenAPIV3 } from 'openapi-types';
 import { z } from 'zod';
-import type { ServerConfig } from '../config/types';
+import type { ApiRoute, ServerConfig } from '../config/types';
 import { apiRoute, proxyRoute } from '../config/types';
 import { generateOpenApiSpec } from './generator';
 
@@ -102,7 +102,7 @@ describe('generateOpenApiSpec', () => {
           method: 'post',
           path: '/users',
           validationSchema: UserSchema,
-        }),
+        }) as unknown as ApiRoute<unknown>,
       ],
       spa: { root: '/var/www' },
     };
@@ -474,14 +474,14 @@ describe('generateOpenApiSpec', () => {
           method: 'post',
           path: '/users',
           validationSchema: SharedBody,
-        }),
+        }) as unknown as ApiRoute<unknown>,
         apiRoute({
           access: 'public',
           handler: async () => ({}),
           method: 'post',
           path: '/admin/users',
           validationSchema: SharedBody,
-        }),
+        }) as unknown as ApiRoute<unknown>,
       ],
       spa: { root: '/var/www' },
     };
@@ -530,7 +530,7 @@ describe('generateOpenApiSpec', () => {
           openapi: { requestSchemaName: 'CreateUser' },
           path: '/users',
           validationSchema: CreateUserSchema,
-        }),
+        }) as unknown as ApiRoute<unknown>,
       ],
       spa: { root: '/var/www' },
     };
@@ -666,7 +666,7 @@ describe('generateOpenApiSpec', () => {
           },
           path: '/users',
           validationSchema: CreateUserBody,
-        }),
+        }) as unknown as ApiRoute<unknown>,
       ],
       spa: { root: '/var/www' },
     };

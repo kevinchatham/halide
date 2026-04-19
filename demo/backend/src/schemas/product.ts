@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ProductSchema = z.object({
+export const ProductSchema: z.ZodObject<z.ZodRawShape> = z.object({
   description: z.string().optional(),
   id: z.string().uuid(),
   name: z.string().min(1),
@@ -9,8 +9,8 @@ export const ProductSchema = z.object({
 
 export type Product = z.infer<typeof ProductSchema>;
 
-export const CreateProductSchema = ProductSchema.omit({ id: true });
+export const CreateProductSchema: z.ZodObject<z.ZodRawShape> = ProductSchema.omit({ id: true });
 export type CreateProduct = z.infer<typeof CreateProductSchema>;
 
-export const UpdateProductSchema = CreateProductSchema.partial();
+export const UpdateProductSchema: z.ZodObject<z.ZodRawShape> = CreateProductSchema.partial();
 export type UpdateProduct = z.infer<typeof UpdateProductSchema>;

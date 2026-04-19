@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { users } from '../data/store';
 import { CreateUserSchema, UpdateUserSchema, UserSchema } from '../schemas/user';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/', (_req, res) => {
   res.json(users);

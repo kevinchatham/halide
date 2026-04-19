@@ -1,4 +1,4 @@
-import type { Request, RequestHandler } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { DEFAULTS } from '../config/defaults';
 import type { Logger, RequestContext, TransformFn } from '../config/types';
@@ -8,9 +8,14 @@ import type { Logger, RequestContext, TransformFn } from '../config/types';
 // set-cookie are stored as arrays, and certain hop-by-hop/protocol headers must not be
 // overwritten. Transform output keys are normalized to lowercase before writing back to
 // req.headers to maintain consistency with this convention.
-const READONLY_HEADERS = new Set(['host', 'connection', 'content-length', 'transfer-encoding']);
+const READONLY_HEADERS: Set<string> = new Set([
+  'host',
+  'connection',
+  'content-length',
+  'transfer-encoding',
+]);
 
-const ARRAY_HEADERS = new Set(['set-cookie']);
+const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
 
 export function createProxyService<TClaims = unknown>(
   target: string,
@@ -25,7 +30,10 @@ export function createProxyService<TClaims = unknown>(
   const proxy = createProxyMiddleware({
     changeOrigin: true,
     on: {
-      proxyReq: (proxyReq, req) => {
+      proxyReq: (
+        proxyReq: import('node:http').ClientRequest,
+        req: import('node:http').IncomingMessage,
+      ) => {
         const expressReq = req as Request;
         if (identity && expressReq.claims) {
           const ctx: RequestContext = {
@@ -65,7 +73,7 @@ export function createProxyService<TClaims = unknown>(
     return proxy;
   }
 
-  return (req, res, next) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = typeof req.body === 'object' && req.body ? req.body : {};
       const multiValueKeys = new Set<string>();

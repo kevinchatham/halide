@@ -12,14 +12,14 @@ Design a **type-safe SPA backend runtime** that standardizes routing, identity t
 
 Specifically, it should:
 
-* Serve SPA static assets
-* Provide a secure browser-facing API boundary (BFF layer)
-* Centralize authentication and identity extraction
-* Eliminate CORS concerns by design
-* Hide internal backend service topology from the browser
-* Provide controlled access to backend systems via composition or proxying
-* Ensure consistent SPA backend behavior across multiple applications/teams
-* Include built-in observability and resilient transport behavior
+- Serve SPA static assets
+- Provide a secure browser-facing API boundary (BFF layer)
+- Centralize authentication and identity extraction
+- Eliminate CORS concerns by design
+- Hide internal backend service topology from the browser
+- Provide controlled access to backend systems via composition or proxying
+- Ensure consistent SPA backend behavior across multiple applications/teams
+- Include built-in observability and resilient transport behavior
 
 ---
 
@@ -27,16 +27,16 @@ Specifically, it should:
 
 This system MUST NOT:
 
-* Not implement or manage service-to-service authentication
-* Not control backend service security policies
-* Not replace API gateways or cloud infrastructure tools
-* Not attempt to enforce trust relationships on downstream services
-* Not assume backend services behave consistently or are under control
-* Be a service mesh
-* Be a distributed systems framework
-* Be a backend-to-backend security system
-* Include dynamic runtime route registration complexity
-* Include infra-level API gateway features (rate limiting, WAF, etc.)
+- Not implement or manage service-to-service authentication
+- Not control backend service security policies
+- Not replace API gateways or cloud infrastructure tools
+- Not attempt to enforce trust relationships on downstream services
+- Not assume backend services behave consistently or are under control
+- Be a service mesh
+- Be a distributed systems framework
+- Be a backend-to-backend security system
+- Include dynamic runtime route registration complexity
+- Include infra-level API gateway features (rate limiting, WAF, etc.)
 
 This library only governs the **browser-facing boundary layer**.
 
@@ -48,9 +48,9 @@ The system is a 3-layer architecture:
 
 ## Layer 1 — Browser (Untrusted)
 
-* SPA runs here
-* Cannot access backend services directly
-* Only communicates with the BFF
+- SPA runs here
+- Cannot access backend services directly
+- Only communicates with the BFF
 
 ## Layer 2 — BFF Gateway (Trusted Edge Runtime)
 
@@ -58,22 +58,22 @@ This is the library's responsibility.
 
 Responsibilities:
 
-* Serve SPA assets
-* Validate JWT (optional but supported)
-* Extract identity claims
-* Enforce route-level authorization
-* Shape API responses for frontend consumption
-* Route requests to internal systems
-* Hide backend topology from browser
-* Eliminate CORS via same-origin design
-* Apply retries and load balancing for service communication
-* Provide observability hooks (tracing, logging)
+- Serve SPA assets
+- Validate JWT (optional but supported)
+- Extract identity claims
+- Enforce route-level authorization
+- Shape API responses for frontend consumption
+- Route requests to internal systems
+- Hide backend topology from browser
+- Eliminate CORS via same-origin design
+- Apply retries and load balancing for service communication
+- Provide observability hooks (tracing, logging)
 
 ## Layer 3 — Backend Systems (Private Mesh)
 
-* Not exposed to the internet
-* May or may not validate JWT
-* Receive requests via BFF (forwarded or composed)
+- Not exposed to the internet
+- May or may not validate JWT
+- Receive requests via BFF (forwarded or composed)
 
 ---
 
@@ -262,9 +262,9 @@ Two modes:
 
 Proxy is no longer dumb forwarding:
 
-* Retries enabled per route
-* Observability hooks enabled
-* Identity injection explicit
+- Retries enabled per route
+- Observability hooks enabled
+- Identity injection explicit
 
 ---
 
@@ -296,18 +296,18 @@ identity: {
 
 Meaning:
 
-* JWT is validated at the BFF
-* Claims are extracted via a typed `extract` function
-* Identity is injected into downstream requests via typed `inject` mappings
-* No magic strings or implicit forwarding
-* Fully typed transformation functions
-* Explicit control over identity shape
+- JWT is validated at the BFF
+- Claims are extracted via a typed `extract` function
+- Identity is injected into downstream requests via typed `inject` mappings
+- No magic strings or implicit forwarding
+- Fully typed transformation functions
+- Explicit control over identity shape
 
 JWT supports:
 
-* Secret OR JWKS
-* Audience validation included
-* Safe defaults enforced
+- Secret OR JWKS
+- Audience validation included
+- Safe defaults enforced
 
 ---
 
@@ -333,10 +333,10 @@ security: {
 
 Goal:
 
-* Eliminate browser CORS complexity
-* Enforce safe defaults for SPA hosting
-* CORS defaults to `"internal"` with escape hatch for explicit origins or wildcard
-* CSP based on helmet, but extendable with structured config
+- Eliminate browser CORS complexity
+- Enforce safe defaults for SPA hosting
+- CORS defaults to `"internal"` with escape hatch for explicit origins or wildcard
+- CSP based on helmet, but extendable with structured config
 
 ---
 
@@ -388,13 +388,13 @@ Or more precisely:
 
 Not:
 
-* A proxy library
-* A BFF helper
-* A framework
+- A proxy library
+- A BFF helper
+- A framework
 
 But:
 
-* A **runtime contract layer**
+- A **runtime contract layer**
 
 ---
 
@@ -402,11 +402,11 @@ But:
 
 It is NOT:
 
-* An API gateway replacement
-* A service mesh
-* A distributed systems framework
-* A backend-to-backend security system
-* A plugin ecosystem
+- An API gateway replacement
+- A service mesh
+- A distributed systems framework
+- A backend-to-backend security system
+- A plugin ecosystem
 
 ---
 
@@ -414,16 +414,16 @@ It is NOT:
 
 The library is successful if:
 
-* Multiple SPAs can adopt it with consistent backend patterns
-* Teams stop writing custom Express BFF servers
-* Authentication + routing behaves consistently across apps
-* Backend service URLs are never exposed to frontend code
-* Developers stop thinking about CORS and proxy wiring entirely
-* Same structure is used everywhere (consistency across SPAs)
-* Strong typing everywhere (no runtime guessing of service names or identity fields)
-* Secure-by-default boundary (JWT validated at edge)
-* Production-ready transport behavior (retries + LB included)
-* Clear identity model (no ambiguity about how claims become headers)
+- Multiple SPAs can adopt it with consistent backend patterns
+- Teams stop writing custom Express BFF servers
+- Authentication + routing behaves consistently across apps
+- Backend service URLs are never exposed to frontend code
+- Developers stop thinking about CORS and proxy wiring entirely
+- Same structure is used everywhere (consistency across SPAs)
+- Strong typing everywhere (no runtime guessing of service names or identity fields)
+- Secure-by-default boundary (JWT validated at edge)
+- Production-ready transport behavior (retries + LB included)
+- Clear identity model (no ambiguity about how claims become headers)
 
 ---
 

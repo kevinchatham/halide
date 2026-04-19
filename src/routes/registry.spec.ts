@@ -1,5 +1,6 @@
-import type { Express, Router } from 'express';
+import type { Express, RequestHandler, Router } from 'express';
 import { createNoopLogger } from '../config/defaults';
+import type { Logger, ServerConfig } from '../config/types';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
 import { createProxyService } from '../services/proxy';
 import { registerRoutes } from './registry';
@@ -13,7 +14,7 @@ vi.mock('../services/proxy', () => ({
   createProxyService: vi.fn(),
 }));
 
-const noopLogger = createNoopLogger();
+const noopLogger: Logger = createNoopLogger();
 
 describe('registerRoutes', () => {
   beforeEach(() => {
@@ -25,7 +26,7 @@ describe('registerRoutes', () => {
     const config = {
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -41,7 +42,7 @@ describe('registerRoutes', () => {
       put: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
 
     const config = {
       proxyRoutes: [
@@ -56,7 +57,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -77,8 +78,10 @@ describe('registerRoutes', () => {
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     const mockAuthMiddleware = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
-    vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+    vi.mocked(createAuthMiddleware).mockReturnValue(
+      mockAuthMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       proxyRoutes: [
@@ -93,7 +96,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -113,7 +116,7 @@ describe('registerRoutes', () => {
       put: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
 
     const config = {
       proxyRoutes: [
@@ -136,7 +139,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -159,8 +162,10 @@ describe('registerRoutes', () => {
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     const mockJwksMiddleware = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
-    vi.mocked(createJwksAuthMiddleware).mockReturnValue(mockJwksMiddleware as any);
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
+    vi.mocked(createJwksAuthMiddleware).mockReturnValue(
+      mockJwksMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       proxyRoutes: [
@@ -180,7 +185,7 @@ describe('registerRoutes', () => {
         },
       },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -210,7 +215,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -222,7 +227,9 @@ describe('registerRoutes', () => {
     const app = { get: vi.fn() } as unknown as Express | Router;
     const mockHandler = vi.fn();
     const mockAuthMiddleware = vi.fn();
-    vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
+    vi.mocked(createAuthMiddleware).mockReturnValue(
+      mockAuthMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       apiRoutes: [
@@ -235,7 +242,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -248,7 +255,9 @@ describe('registerRoutes', () => {
     const mockHandler1 = vi.fn();
     const mockHandler2 = vi.fn();
     const mockAuthMiddleware = vi.fn();
-    vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
+    vi.mocked(createAuthMiddleware).mockReturnValue(
+      mockAuthMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       apiRoutes: [
@@ -267,7 +276,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -280,7 +289,9 @@ describe('registerRoutes', () => {
     const app = { get: vi.fn(), post: vi.fn() } as unknown as Express | Router;
     const mockHandler = vi.fn();
     const mockAuthMiddleware = vi.fn();
-    vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
+    vi.mocked(createAuthMiddleware).mockReturnValue(
+      mockAuthMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       apiRoutes: [
@@ -301,7 +312,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -327,7 +338,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -338,7 +349,9 @@ describe('registerRoutes', () => {
     const app = { delete: vi.fn() } as unknown as Express | Router;
     const mockHandler = vi.fn();
     const mockAuthMiddleware = vi.fn();
-    vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
+    vi.mocked(createAuthMiddleware).mockReturnValue(
+      mockAuthMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       apiRoutes: [
@@ -352,7 +365,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -371,7 +384,7 @@ describe('registerRoutes', () => {
       apiRoutes: [{ access: 'public', handler: mockHandler, path: '/data', type: 'api' }],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -382,7 +395,9 @@ describe('registerRoutes', () => {
     const app = { get: vi.fn() } as unknown as Express | Router;
     const mockHandler = vi.fn();
     const mockJwksMiddleware = vi.fn();
-    vi.mocked(createJwksAuthMiddleware).mockReturnValue(mockJwksMiddleware as any);
+    vi.mocked(createJwksAuthMiddleware).mockReturnValue(
+      mockJwksMiddleware as unknown as RequestHandler,
+    );
 
     const config = {
       apiRoutes: [
@@ -400,7 +415,7 @@ describe('registerRoutes', () => {
         },
       },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 
@@ -420,10 +435,10 @@ describe('registerRoutes', () => {
       put: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
-    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
+    vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as unknown as RequestHandler);
 
-    const identityFn = (_ctx: any, claims: any) => ({
-      'x-user-id': claims.sub,
+    const identityFn = (_ctx: unknown, claims: unknown): Record<string, string> | undefined => ({
+      'x-user-id': (claims as { sub: string }).sub,
     });
 
     const config = {
@@ -440,7 +455,7 @@ describe('registerRoutes', () => {
       ],
       security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-    } as any;
+    } as unknown as ServerConfig;
 
     await registerRoutes(app, config, noopLogger);
 

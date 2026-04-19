@@ -2,14 +2,13 @@
 
 **Core runtime + adapters**
 
-* bSPA owns logic
-* adapters translate to runtime (Express, Hono, Fastify)
-* slightly more work upfront
-* but:
-
-  * future-proof
-  * cleaner mental model
-  * better open-source story
+- bSPA owns logic
+- adapters translate to runtime (Express, Hono, Fastify)
+- slightly more work upfront
+- but:
+  - future-proof
+  - cleaner mental model
+  - better open-source story
 
 # 🧠 The correct mental model
 
@@ -42,13 +41,13 @@ This is critical.
 Bad (locks you in):
 
 ```ts
-handler: (req: Request, res: Response) => {}
+handler: (req: Request, res: Response) => {};
 ```
 
 Good:
 
 ```ts
-handler: (ctx: Context) => {}
+handler: (ctx: Context) => {};
 ```
 
 Where `Context` is yours:
@@ -74,16 +73,16 @@ type Context<TClaims, TIdentity> = {
 
 ### Express adapter:
 
-* maps Express req → Context
-* maps response back
-* registers routes
+- maps Express req → Context
+- maps response back
+- registers routes
 
 ### Hono adapter:
 
-* maps Hono context → your Context
-* same core runtime
+- maps Hono context → your Context
+- same core runtime
 
-👉 adapters should be *boring*
+👉 adapters should be _boring_
 
 ## 3. Core runtime must not know Express exists
 
@@ -102,7 +101,7 @@ createRuntime({
   routes,
   identity,
   auth,
-})
+});
 ```
 
 ## Adapter (Express)

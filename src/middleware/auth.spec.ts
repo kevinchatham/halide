@@ -1,3 +1,4 @@
+import type { Request, Response } from 'express';
 import { SignJWT } from 'jose';
 import { verifyJwt } from '../utils/jwt';
 import { createAuthMiddleware, createJwksAuthMiddleware } from './auth';
@@ -6,7 +7,7 @@ vi.mock('../utils/jwt', () => ({
   verifyJwt: vi.fn(),
 }));
 
-const mockJwksVerify = vi.fn();
+const mockJwksVerify: ReturnType<typeof vi.fn> = vi.fn();
 vi.mock('jose', async (importOriginal) => {
   const actual = await importOriginal<typeof import('jose')>();
   return {
@@ -18,15 +19,17 @@ vi.mock('jose', async (importOriginal) => {
   };
 });
 
-const secret = new TextEncoder().encode('test-secret');
+const secret: Uint8Array = new TextEncoder().encode('test-secret');
 
 interface TestClaims {
   role: string;
   sub: string;
 }
 
-async function createValidToken(claims: Record<string, unknown>): Promise<string> {
-  return new SignJWT(claims).setProtectedHeader({ alg: 'HS256' }).sign(secret);
+async function _createValidToken(claims: Record<string, unknown>): Promise<string> {
+  return new SignJWT(claims as unknown as import('jose').JWTPayload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .sign(secret);
 }
 
 describe('createAuthMiddleware', () => {
@@ -37,11 +40,11 @@ describe('createAuthMiddleware', () => {
   it('returns 401 when authorization header is missing', () => {
     const handler = createAuthMiddleware<TestClaims>(secret);
 
-    const req = { headers: {} } as any;
+    const req = { headers: {} } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -54,11 +57,11 @@ describe('createAuthMiddleware', () => {
   it('returns 401 when authorization header does not start with Bearer', () => {
     const handler = createAuthMiddleware<TestClaims>(secret);
 
-    const req = { headers: { authorization: 'Basic abc123' } } as any;
+    const req = { headers: { authorization: 'Basic abc123' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -72,11 +75,11 @@ describe('createAuthMiddleware', () => {
 
     const handler = createAuthMiddleware<TestClaims>(secret);
 
-    const req = { headers: { authorization: 'Bearer invalid-token' } } as any;
+    const req = { headers: { authorization: 'Bearer invalid-token' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -94,11 +97,11 @@ describe('createAuthMiddleware', () => {
 
     const handler = createAuthMiddleware<TestClaims>(secret);
 
-    const req = { headers: { authorization: 'Bearer valid-token' } } as any;
+    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -116,11 +119,11 @@ describe('createAuthMiddleware', () => {
 
     const handler = createAuthMiddleware<TestClaims>(secret);
 
-    const req = { headers: { authorization: 'Bearer bad-token' } } as any;
+    const req = { headers: { authorization: 'Bearer bad-token' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -137,11 +140,11 @@ describe('createAuthMiddleware', () => {
 
     const handler = createAuthMiddleware(secret);
 
-    const req = { headers: { authorization: 'Bearer my-token-here' } } as any;
+    const req = { headers: { authorization: 'Bearer my-token-here' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -160,11 +163,11 @@ describe('createJwksAuthMiddleware', () => {
   it('returns 401 when authorization header is missing', () => {
     const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
 
-    const req = { headers: {} } as any;
+    const req = { headers: {} } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -177,11 +180,11 @@ describe('createJwksAuthMiddleware', () => {
   it('returns 401 when authorization header does not start with Bearer', () => {
     const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
 
-    const req = { headers: { authorization: 'Basic abc123' } } as any;
+    const req = { headers: { authorization: 'Basic abc123' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -198,11 +201,11 @@ describe('createJwksAuthMiddleware', () => {
 
     const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
 
-    const req = { headers: { authorization: 'Bearer valid-token' } } as any;
+    const req = { headers: { authorization: 'Bearer valid-token' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     await handler(req, res, next);
@@ -217,11 +220,11 @@ describe('createJwksAuthMiddleware', () => {
 
     const handler = createJwksAuthMiddleware<TestClaims>('https://auth.example.com/jwks.json');
 
-    const req = { headers: { authorization: 'Bearer invalid-token' } } as any;
+    const req = { headers: { authorization: 'Bearer invalid-token' } } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     await handler(req, res, next);

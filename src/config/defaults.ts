@@ -33,7 +33,7 @@ export const DEFAULTS = {
   },
 } as const;
 
-export const defaultAuthorize = async () => true;
+export const defaultAuthorize = async (): Promise<boolean> => true;
 
 export function createNoopLogger(): Logger {
   return {

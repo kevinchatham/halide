@@ -207,7 +207,7 @@ export type ServerConfig<TClaims = unknown> = {
   /** Observability hook configuration. */
   observability?: ObservabilityConfig<TClaims>;
   /** List of API route definitions. */
-  apiRoutes?: ApiRoute<TClaims, any>[];
+  apiRoutes?: ApiRoute<TClaims, unknown>[];
   /** List of proxy route definitions. */
   proxyRoutes?: ProxyRoute<TClaims>[];
   /** Security configuration. */

@@ -1,7 +1,7 @@
 import { SignJWT } from 'jose';
 import { verifyJwt } from './jwt';
 
-const secret = new TextEncoder().encode('test-secret');
+const secret: Uint8Array = new TextEncoder().encode('test-secret');
 
 async function createValidToken(claims: Record<string, unknown>): Promise<string> {
   return new SignJWT(claims).setProtectedHeader({ alg: 'HS256' }).sign(secret);

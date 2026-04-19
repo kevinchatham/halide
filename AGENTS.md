@@ -19,6 +19,7 @@ npx vitest run src/config/validate.spec.ts  # single test
 ## Linting
 
 `lint:fix` runs **both** Biome and Prettier. They target different file types:
+
 - **Biome**: `.ts`, `.css`, `.json` — single quotes, semicolons, trailing commas, 100 char width
 - **Prettier**: `.html`, `.yml`, `.yaml`, `.md` only (see `.prettierignore`)
 

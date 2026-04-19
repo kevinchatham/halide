@@ -1,10 +1,10 @@
 import path from 'node:path';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { createSpaHandler } from './spa';
 
 function getFallbackMiddleware(spaConfig: Parameters<typeof createSpaHandler>[0]): RequestHandler {
   const middlewares = createSpaHandler(spaConfig);
-  return middlewares[1] as RequestHandler;
+  return middlewares[1] as unknown as RequestHandler;
 }
 
 describe('createSpaHandler', () => {
@@ -27,11 +27,11 @@ describe('createSpaHandler', () => {
       root: '/var/www',
     });
 
-    const req = { path: '/api/users' } as any;
+    const req = { path: '/api/users' } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);
@@ -47,10 +47,10 @@ describe('createSpaHandler', () => {
       root: '/var/www',
     });
 
-    const req = { path: '/about' } as any;
+    const req = { path: '/about' } as unknown as Request;
     const res = {
       sendFile: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);
@@ -68,10 +68,10 @@ describe('createSpaHandler', () => {
       root: '/public',
     });
 
-    const req = { path: '/deep/nested/route' } as any;
+    const req = { path: '/deep/nested/route' } as unknown as Request;
     const res = {
       sendFile: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);
@@ -89,15 +89,16 @@ describe('createSpaHandler', () => {
       root: '/var/www',
     });
 
-    const req = { path: '/about' } as any;
+    const req = { path: '/about' } as unknown as Request;
     const res = {
       sendFile: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);
 
-    const sendFileCallback = res.sendFile.mock.calls[0][1];
+    const sendFileCallback = (res.sendFile as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0]![1];
     const fakeError = new Error('File not found');
 
     sendFileCallback(fakeError);
@@ -113,11 +114,11 @@ describe('createSpaHandler', () => {
       root: '/var/www',
     });
 
-    const req = { path: '/v1/users' } as any;
+    const req = { path: '/v1/users' } as unknown as Request;
     const res = {
       json: vi.fn().mockReturnThis(),
       status: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);
@@ -134,10 +135,10 @@ describe('createSpaHandler', () => {
       root: '/var/www',
     });
 
-    const req = { path: '/api/users' } as any;
+    const req = { path: '/api/users' } as unknown as Request;
     const res = {
       sendFile: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);
@@ -156,10 +157,10 @@ describe('createSpaHandler', () => {
       root: '/var/www',
     });
 
-    const req = { path: '/about' } as any;
+    const req = { path: '/about' } as unknown as Request;
     const res = {
       sendFile: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     fallback(req, res, next);

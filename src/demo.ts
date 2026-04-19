@@ -13,12 +13,15 @@
 
 import { z } from 'zod';
 import {
+  type ApiRoute,
   apiRoute,
   type Logger,
   type ObservabilityConfig,
   type OpenApiConfig,
+  type ProxyRoute,
   proxyRoute,
   type RequestContext,
+  type ResponseContext,
   type SecurityConfig,
   type ServerConfig,
   type SpaConfig,
@@ -32,7 +35,7 @@ interface UserClaims {
 }
 
 /** Zod schema validating the request body for creating a new user. */
-const CreateUserSchema = z.object({
+const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> = z.object({
   email: z.string().email(),
   name: z.string().min(1),
 });
@@ -46,10 +49,15 @@ type CreateUserSchema = z.infer<typeof CreateUserSchema>;
  * - `authorize`: restricts access to users with the 'admin' role
  * - `handler`: returns the request context and authenticated user subject
  */
-const profileRoute = apiRoute<UserClaims>({
+const profileRoute: ApiRoute<UserClaims> = apiRoute<UserClaims>({
   access: 'private',
-  authorize: (_ctx, claims, _logger) => !!claims?.role && claims.role === 'admin',
-  handler: async (ctx, claims, _logger) => ({
+  authorize: (_ctx: RequestContext, claims: UserClaims | undefined, _logger: Logger) =>
+    !!claims?.role && claims.role === 'admin',
+  handler: async (
+    ctx: RequestContext & { body: unknown },
+    claims: UserClaims | undefined,
+    _logger: Logger,
+  ) => ({
     ctx: JSON.stringify(ctx),
     user: claims?.sub,
   }),
@@ -63,9 +71,13 @@ const profileRoute = apiRoute<UserClaims>({
  * - `validationSchema`: Zod schema validating that body contains a valid email and non-empty name
  * - `handler`: creates a user with a generated UUID, timestamp, and the validated body fields
  */
-const userRoute = apiRoute<UserClaims, CreateUserSchema>({
+const userRoute: ApiRoute<UserClaims, CreateUserSchema> = apiRoute<UserClaims, CreateUserSchema>({
   access: 'public',
-  handler: async (ctx, _claims, _logger) => {
+  handler: async (
+    ctx: RequestContext & { body: CreateUserSchema },
+    _claims: UserClaims | undefined,
+    _logger: Logger,
+  ) => {
     return {
       createdAt: new Date().toISOString(),
       email: ctx.body.email,
@@ -83,7 +95,7 @@ const userRoute = apiRoute<UserClaims, CreateUserSchema>({
  * - `access: 'public'`: no authentication required
  * - `handler`: returns `{ status: 'ok' }`, useful for load balancer health checks
  */
-const healthRoute = apiRoute({
+const healthRoute: ApiRoute<unknown> = apiRoute({
   access: 'public',
   handler: async () => ({ status: 'ok' }),
   method: 'get',
@@ -98,14 +110,14 @@ const healthRoute = apiRoute({
  * - `timeout`: aborts the proxy request after 5000ms
  * - `transform`: merges a `transformed: true` flag into the request body before forwarding
  */
-const usersProxyRoute = proxyRoute<UserClaims>({
+const usersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
   access: 'private',
   methods: ['get', 'post'],
   path: '/api/users',
   proxyPath: '/users',
   target: 'https://api.example.com',
   timeout: 5000,
-  transform: ({ body, headers }) => ({
+  transform: ({ body, headers }: { body: unknown; headers: Record<string, string> }) => ({
     body: {
       ...(typeof body === 'object' && body ? body : {}),
       transformed: true,
@@ -121,9 +133,9 @@ const usersProxyRoute = proxyRoute<UserClaims>({
  * - `proxyPath`: omitted, so '/api/orders' is forwarded as-is to the target
  * - `authorize`: allows both 'admin' and 'user' roles
  */
-const ordersProxyRoute = proxyRoute<UserClaims>({
+const ordersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
   access: 'private',
-  authorize: (ctx: RequestContext, claims: UserClaims | undefined, _logger: Logger) =>
+  authorize: (_ctx: RequestContext, claims: UserClaims | undefined, _logger: Logger) =>
     !!claims?.role && (claims.role === 'admin' || claims.role === 'user'),
   methods: ['get'],
   path: '/api/orders',
@@ -136,11 +148,21 @@ const ordersProxyRoute = proxyRoute<UserClaims>({
  * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
  */
 const observability: ObservabilityConfig<UserClaims> = {
-  logger: { debug: console.debug, error: console.error, info: console.info, warn: console.warn },
-  onRequest: (ctx, claims, logger) => {
+  logger: {
+    debug: (..._args: unknown[]) => {},
+    error: (..._args: unknown[]) => {},
+    info: (..._args: unknown[]) => {},
+    warn: (..._args: unknown[]) => {},
+  },
+  onRequest: (ctx: RequestContext, claims: UserClaims | undefined, logger: Logger) => {
     logger.info(`[Request] ${ctx.method} ${ctx.path} (user: ${claims?.sub ?? 'anonymous'})`);
   },
-  onResponse: (ctx, claims, { statusCode, durationMs }, logger) => {
+  onResponse: (
+    ctx: RequestContext,
+    claims: UserClaims | undefined,
+    { statusCode, durationMs }: ResponseContext,
+    logger: Logger,
+  ) => {
     logger.info(
       `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${claims?.sub ?? 'anonymous'})`,
     );
@@ -219,7 +241,7 @@ const openapi: OpenApiConfig = {
  * Passed to `createServer()` to bootstrap the bSPA BFF server.
  */
 const exampleConfig: ServerConfig<UserClaims> = {
-  apiRoutes: [profileRoute, userRoute, healthRoute],
+  apiRoutes: [profileRoute, userRoute as unknown as ApiRoute<UserClaims>, healthRoute],
   observability,
   openapi,
   proxyRoutes: [usersProxyRoute, ordersProxyRoute],

@@ -1,3 +1,4 @@
+import type { Request, Response } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { createNoopLogger, DEFAULTS } from '../config/defaults';
 import type { Logger } from '../config/types';
@@ -7,8 +8,9 @@ vi.mock('http-proxy-middleware', () => ({
   createProxyMiddleware: vi.fn(),
 }));
 
-const mockedCreateProxyMiddleware = vi.mocked(createProxyMiddleware);
-const noopLogger = createNoopLogger();
+const mockedCreateProxyMiddleware: ReturnType<typeof vi.mocked<typeof createProxyMiddleware>> =
+  vi.mocked(createProxyMiddleware);
+const noopLogger: Logger = createNoopLogger();
 
 describe('createProxyService', () => {
   beforeEach(() => {
@@ -63,7 +65,9 @@ describe('createProxyService', () => {
 
   it('returns a RequestHandler', () => {
     const mockHandler = vi.fn();
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
     const result = createProxyService(
       'https://api.example.com',
@@ -79,10 +83,16 @@ describe('createProxyService', () => {
   });
 
   it('returns a wrapper RequestHandler when transform is provided', () => {
-    const mockHandler = vi.fn((_req: any, _res: any, next: any) => next());
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    const mockHandler = vi.fn();
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
-    const transform = ({ body }: { body: unknown }) => ({
+    const transform = ({
+      body,
+    }: {
+      body: unknown;
+    }): { body: unknown; headers: Record<string, string> } => ({
       body: {
         ...(typeof body === 'object' && body ? body : {}),
         transformed: true,
@@ -99,21 +109,26 @@ describe('createProxyService', () => {
       noopLogger,
     );
 
-    const req = { body: { key: 'val' }, headers: { host: 'test' } } as any;
-    const res = {} as any;
+    const req = {
+      body: { key: 'val' },
+      headers: { host: 'test' },
+    } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn();
     result(req, res, next);
 
     expect(req.body).toEqual({ key: 'val', transformed: true });
     expect(req.headers['x-custom']).toBe('value');
-    expect(req.headers['host']).toBe('test');
+    expect(req.headers.host).toBe('test');
   });
 
   it('does not overwrite set-cookie array headers from transform', () => {
-    const mockHandler = vi.fn((_req: any, _res: any, next: any) => next());
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    const mockHandler = vi.fn();
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
-    const transform = () => ({
+    const transform = (): { body: unknown; headers: Record<string, string> } => ({
       body: {},
       headers: { 'set-cookie': 'injected=value' },
     });
@@ -130,8 +145,8 @@ describe('createProxyService', () => {
     const req = {
       body: {},
       headers: { host: 'test', 'set-cookie': ['a=1', 'b=2'] },
-    } as any;
-    const res = {} as any;
+    } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn();
     result(req, res, next);
 
@@ -139,10 +154,12 @@ describe('createProxyService', () => {
   });
 
   it('does not overwrite runtime multi-value headers from transform', () => {
-    const mockHandler = vi.fn((_req: any, _res: any, next: any) => next());
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    const mockHandler = vi.fn();
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
-    const transform = () => ({
+    const transform = (): { body: unknown; headers: Record<string, string> } => ({
       body: {},
       headers: { 'x-dup': 'overwritten' },
     });
@@ -159,8 +176,8 @@ describe('createProxyService', () => {
     const req = {
       body: {},
       headers: { host: 'test', 'x-dup': ['val1', 'val2'] },
-    } as any;
-    const res = {} as any;
+    } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn();
     result(req, res, next);
 
@@ -168,10 +185,12 @@ describe('createProxyService', () => {
   });
 
   it('normalizes transform header keys to lowercase', () => {
-    const mockHandler = vi.fn((_req: any, _res: any, next: any) => next());
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    const mockHandler = vi.fn();
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
-    const transform = () => ({
+    const transform = (): { body: unknown; headers: Record<string, string> } => ({
       body: {},
       headers: { 'X-Another-Header': 'test', 'X-Custom': 'value' },
     });
@@ -185,8 +204,8 @@ describe('createProxyService', () => {
       noopLogger,
     );
 
-    const req = { body: {}, headers: { host: 'test' } } as any;
-    const res = {} as any;
+    const req = { body: {}, headers: { host: 'test' } } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn();
     result(req, res, next);
 
@@ -197,10 +216,12 @@ describe('createProxyService', () => {
   });
 
   it('allows transform to add a new header not originally present', () => {
-    const mockHandler = vi.fn((_req: any, _res: any, next: any) => next());
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    const mockHandler = vi.fn();
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
-    const transform = () => ({
+    const transform = (): { body: unknown; headers: Record<string, string> } => ({
       body: {},
       headers: { 'x-new': 'added' },
     });
@@ -214,8 +235,8 @@ describe('createProxyService', () => {
       noopLogger,
     );
 
-    const req = { body: {}, headers: { host: 'test' } } as any;
-    const res = {} as any;
+    const req = { body: {}, headers: { host: 'test' } } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn();
     result(req, res, next);
 
@@ -224,7 +245,9 @@ describe('createProxyService', () => {
 
   it('calls next with error when transform throws', () => {
     const mockHandler = vi.fn();
-    mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
+    mockedCreateProxyMiddleware.mockReturnValue(
+      mockHandler as unknown as ReturnType<typeof createProxyMiddleware>,
+    );
 
     const spyLogger: Logger = {
       debug: vi.fn(),
@@ -232,7 +255,7 @@ describe('createProxyService', () => {
       info: vi.fn(),
       warn: vi.fn(),
     };
-    const transform = () => {
+    const transform = (): never => {
       throw new Error('transform failed');
     };
     const result = createProxyService(
@@ -245,8 +268,8 @@ describe('createProxyService', () => {
       spyLogger,
     );
 
-    const req = { body: {}, headers: {} } as any;
-    const res = {} as any;
+    const req = { body: {}, headers: {} } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn();
     result(req, res, next);
 

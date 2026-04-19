@@ -10,12 +10,12 @@ In three words it's a “frontend ingress gateway”
 
 In many SPA setups, each application ends up with its own backend-for-frontend (BFF) implementation. Over time this leads to:
 
-* inconsistent auth handling
-* duplicated proxy logic
-* ad-hoc configuration endpoints
-* backend service URLs leaking into frontend code
-* CORS configuration repeated across services
-* unclear boundaries between frontend and backend responsibilities
+- inconsistent auth handling
+- duplicated proxy logic
+- ad-hoc configuration endpoints
+- backend service URLs leaking into frontend code
+- CORS configuration repeated across services
+- unclear boundaries between frontend and backend responsibilities
 
 bSPA provides a shared structure for these concerns.
 
@@ -35,11 +35,11 @@ Private backend services
 
 Its role is to:
 
-* serve the SPA
-* validate and interpret authentication (if enabled)
-* expose a controlled API surface to the frontend
-* route or compose requests to backend services
-* keep backend topology out of the browser
+- serve the SPA
+- validate and interpret authentication (if enabled)
+- expose a controlled API surface to the frontend
+- route or compose requests to backend services
+- keep backend topology out of the browser
 
 ## Key concepts
 
@@ -53,8 +53,8 @@ You explicitly define what the frontend is allowed to call.
 
 Routes can either:
 
-* call backend services via a handler (recommended)
-* proxy requests to services (escape hatch)
+- call backend services via a handler (recommended)
+- proxy requests to services (escape hatch)
 
 ### 4. Identity handling
 
@@ -62,9 +62,9 @@ Authentication happens at the BFF boundary.
 
 bSPA can:
 
-* validate JWTs
-* extract claims
-* optionally propagate identity to backend services via headers
+- validate JWTs
+- extract claims
+- optionally propagate identity to backend services via headers
 
 It does not assume backend services share the same auth model.
 
@@ -201,24 +201,24 @@ bSPA does not enforce how backend services validate or trust this identity.
 
 bSPA applies conservative defaults for SPA hosting environments:
 
-* internal CORS policy by default
-* strict CSP mode available
-* no direct exposure of backend service URLs to the browser
+- internal CORS policy by default
+- strict CSP mode available
+- no direct exposure of backend service URLs to the browser
 
 ## What this is (and isn’t)
 
 ### This is:
 
-* a runtime layer for SPA backends
-* a way to standardize BFF structure across applications
-* a controlled entry point to backend systems
+- a runtime layer for SPA backends
+- a way to standardize BFF structure across applications
+- a controlled entry point to backend systems
 
 ### This is not:
 
-* an API gateway replacement
-* a service mesh
-* a full backend framework
-* a distributed systems abstraction layer
+- an API gateway replacement
+- a service mesh
+- a full backend framework
+- a distributed systems abstraction layer
 
 ## Status
 

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { products } from '../data/store';
 import { CreateProductSchema, ProductSchema, UpdateProductSchema } from '../schemas/product';
 
-const router = Router();
+const router: Router = Router();
 
 router.get('/', (_req, res) => {
   res.json(products);

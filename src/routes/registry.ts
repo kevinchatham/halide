@@ -1,4 +1,4 @@
-import type { Express, Request, RequestHandler, Router } from 'express';
+import type { Express, NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import { DEFAULTS } from '../config/defaults';
 import type {
   ApiRoute,
@@ -6,6 +6,7 @@ import type {
   ObservabilityConfig,
   ProxyRoute,
   RequestContext,
+  SecurityAuthConfig,
   ServerConfig,
 } from '../config/types';
 import { createAuthMiddleware, createJwksAuthMiddleware } from '../middleware/auth';
@@ -21,7 +22,9 @@ async function resolveSecret(
   return secret;
 }
 
-function getAuthConfig<TClaims = unknown>(config: ServerConfig<TClaims>) {
+function getAuthConfig<TClaims = unknown>(
+  config: ServerConfig<TClaims>,
+): SecurityAuthConfig | undefined {
   return config.security?.auth;
 }
 
@@ -68,7 +71,7 @@ function createAuthorizeMiddleware<TClaims = unknown>(
   authorizeFn: NonNullable<ApiRoute<TClaims>['authorize'] | ProxyRoute<TClaims>['authorize']>,
   logger: Logger,
 ): RequestHandler {
-  return async (req, res, next) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const ctx = buildRequestContext(req);
     const claims = req.claims as TClaims | undefined;
     try {
@@ -92,7 +95,7 @@ function createObservationMiddleware<TClaims = unknown>(
   if (!observability.onRequest && !observability.onResponse) return undefined;
   if (routeObserve === false) return undefined;
 
-  return (req, res, next) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     const ctx = buildRequestContext(req);
     const claims = req.claims as TClaims | undefined;
@@ -145,7 +148,11 @@ export async function registerRoutes<TClaims = unknown>(
       if (route.validationSchema) {
         middlewares.push(createBodyValidationMiddleware(route.validationSchema));
       }
-      const handlerMiddleware: RequestHandler = async (req, res, next) => {
+      const handlerMiddleware: RequestHandler = async (
+        req: Request,
+        res: Response,
+        next: NextFunction,
+      ) => {
         const ctx = buildRequestContext(req) as RequestContext & {
           body: unknown;
         };

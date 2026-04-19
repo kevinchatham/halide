@@ -1,4 +1,4 @@
-import type { Request, RequestHandler } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -27,7 +27,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
 } {
   const store = new Map<string, WindowEntry>();
 
-  const sweep = () => {
+  const sweep = (): void => {
     const now = Date.now();
     for (const ip of store.keys()) {
       const entry = store.get(ip);
@@ -41,7 +41,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
   const timer = setInterval(sweep, sweepInterval);
   timer.unref();
 
-  const middleware: RequestHandler = (req, res, next) => {
+  const middleware: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
     const clientIp = getClientIp(req);
     const now = Date.now();
     const entry = store.get(clientIp);

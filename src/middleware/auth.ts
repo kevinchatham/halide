@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { verifyJwt } from '../utils/jwt';
 
@@ -8,7 +8,7 @@ export function createAuthMiddleware<TClaims = unknown>(
   secret: Uint8Array,
   audience?: string,
 ): RequestHandler {
-  return (req, res, next) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const authHeader: string | undefined = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json(unauthorized);
@@ -36,7 +36,7 @@ export function createJwksAuthMiddleware<TClaims = unknown>(
 ): RequestHandler {
   const JWKS = createRemoteJWKSet(new URL(jwksUri));
 
-  return async (req, res, next) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const authHeader: string | undefined = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json(unauthorized);

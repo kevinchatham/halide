@@ -72,10 +72,10 @@ This is the most important part of the model.
 
 bSPA owns:
 
-* “What can the SPA call?”
-* “What does identity look like in backend requests?”
-* “How are backend services shaped for frontend consumption?”
-* “How do we ensure consistent SPA backend structure?”
+- “What can the SPA call?”
+- “What does identity look like in backend requests?”
+- “How are backend services shaped for frontend consumption?”
+- “How do we ensure consistent SPA backend structure?”
 
 👉 It is **code-level application logic**
 
@@ -83,11 +83,11 @@ bSPA owns:
 
 Owned by infrastructure (not bSPA):
 
-* rate limiting
-* WAF rules
-* TLS
-* global routing
-* external exposure policies
+- rate limiting
+- WAF rules
+- TLS
+- global routing
+- external exposure policies
 
 👉 It is **network-level governance**
 
@@ -97,10 +97,10 @@ e.g. Istio
 
 Owns:
 
-* service-to-service retries
-* mTLS
-* circuit breaking
-* internal load balancing
+- service-to-service retries
+- mTLS
+- circuit breaking
+- internal load balancing
 
 👉 It is **distributed systems reliability**
 
@@ -108,10 +108,10 @@ Owns:
 
 Own:
 
-* business logic
-* data access
-* internal validation (optional)
-* domain rules
+- business logic
+- data access
+- internal validation (optional)
+- domain rules
 
 👉 It is **business behavior**
 
@@ -130,10 +130,10 @@ This diagram does 3 important things:
 
 It explicitly excludes:
 
-* rate limiting
-* caching policies
-* WAF behavior
-* service mesh concerns
+- rate limiting
+- caching policies
+- WAF behavior
+- service mesh concerns
 
 👉 no “just one more feature” expansion into infra land
 
@@ -178,4 +178,3 @@ Service Mesh
     ↓
 Backend Services
 ```
-

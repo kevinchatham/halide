@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Server } from 'bspa';
 import { createServer } from 'bspa';
 import type { Request, Response } from 'express';
 
@@ -17,9 +18,9 @@ function generateMockJwt(): string {
   return DEMO_JWT;
 }
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname: string = path.dirname(fileURLToPath(import.meta.url));
 
-const server = createServer<JwtClaims>({
+const server: Server = createServer<JwtClaims>({
   api: {
     basePath: '/bff',
     routes: [

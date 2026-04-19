@@ -1,3 +1,4 @@
+import type { Request, Response } from 'express';
 import { createSecurityMiddleware } from './security';
 
 describe('createSecurityMiddleware', () => {
@@ -10,12 +11,12 @@ describe('createSecurityMiddleware', () => {
   it('applies helmet with default directives', () => {
     const handler = createSecurityMiddleware({ directives: undefined });
 
-    const req = { headers: {}, method: 'GET', path: '/' } as any;
+    const req = { headers: {}, method: 'GET', path: '/' } as unknown as Request;
     const res = {
       getHeader: vi.fn(),
       removeHeader: vi.fn(),
       setHeader: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -34,12 +35,12 @@ describe('createSecurityMiddleware', () => {
       },
     });
 
-    const req = { headers: {}, method: 'GET', path: '/' } as any;
+    const req = { headers: {}, method: 'GET', path: '/' } as unknown as Request;
     const res = {
       getHeader: vi.fn(),
       removeHeader: vi.fn(),
       setHeader: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);
@@ -53,12 +54,12 @@ describe('createSecurityMiddleware', () => {
   it('calls next after applying helmet', () => {
     const handler = createSecurityMiddleware({ directives: undefined });
 
-    const req = { headers: {}, method: 'GET', path: '/' } as any;
+    const req = { headers: {}, method: 'GET', path: '/' } as unknown as Request;
     const res = {
       getHeader: vi.fn(),
       removeHeader: vi.fn(),
       setHeader: vi.fn(),
-    } as any;
+    } as unknown as Response;
     const next = vi.fn();
 
     handler(req, res, next);

@@ -1,7 +1,7 @@
 import { rmSync } from 'node:fs';
 import { glob } from 'glob';
 
-const patterns = [
+const patterns: string[] = [
   '**/.angular',
   '**/dist',
   '**/package-lock.json',
@@ -16,6 +16,7 @@ Promise.all(
       try {
         rmSync(f, { force: true, recursive: true });
       } catch (err) {
+        // biome-ignore lint/suspicious/noConsole: script error reporting
         console.error(`Failed to remove ${f}:`, err);
       }
     }

@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { createRateLimitMiddleware } from './rateLimit';
 
 describe('createRateLimitMiddleware', () => {
@@ -35,7 +35,7 @@ describe('createRateLimitMiddleware', () => {
     }
   });
 
-  function create(config: { windowMs: number; maxRequests: number }) {
+  function create(config: { windowMs: number; maxRequests: number }): RequestHandler {
     const { middleware, dispose } = createRateLimitMiddleware(config);
     disposeFns.push(dispose);
     return middleware;

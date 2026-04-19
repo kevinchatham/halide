@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 declare global {
   namespace Express {
@@ -9,7 +9,7 @@ declare global {
 }
 
 export function createRequestIdMiddleware(): RequestHandler {
-  return (req, res, next) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const requestId = (req.headers['x-request-id'] as string | undefined) ?? generateRequestId();
     req.requestId = requestId;
     res.setHeader('x-request-id', requestId);

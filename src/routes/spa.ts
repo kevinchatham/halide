@@ -1,5 +1,10 @@
 import path from 'node:path';
-import express, { type RequestHandler } from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from 'express';
 import { DEFAULTS } from '../config/defaults';
 import type { SpaConfig } from '../config/types';
 
@@ -9,7 +14,7 @@ export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): RequestHand
 
   const staticMiddleware = express.static(root);
 
-  const spaFallback: RequestHandler = (req, res, next) => {
+  const spaFallback: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
     if (apiPrefix && req.path.startsWith(apiPrefix)) {
       res.status(404).json({ error: 'Not Found' });
       return;

@@ -20,7 +20,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**/*.{ts,css,json}"]
+    "includes": ["**", "!demo", "!dist", "**/*.{ts,css,json}"]
   },
   "formatter": {
     "enabled": true,
