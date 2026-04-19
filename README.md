@@ -61,6 +61,18 @@ npm install halide
 ```ts
 import { createServer, apiRoute, proxyRoute } from 'halide';
 
+const spa = {
+  root: './browser',
+};
+
+const security = {
+  auth: {
+    strategy: 'jwks',
+    jwksUri: 'https://my-tenant.us.auth0.com/.well-known/jwks.json',
+    audience: 'https://api.example.com',
+  },
+};
+
 const healthRoute = apiRoute({
   access: 'public',
   method: 'get',
@@ -76,9 +88,8 @@ const userRoute = proxyRoute({
 });
 
 const server = await createServer({
-  spa: {
-    root: './browser',
-  },
+  spa,
+  security,
   apiRoutes: [healthRoute],
   proxyRoutes: [userRoute],
 });
