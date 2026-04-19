@@ -1,5 +1,9 @@
 {
-  "cSpell.words": ["APIV", "halide"],
+  "cSpell.words": ["APIV", "halide", "SONARQUBE"],
+  "sonarlint.connectedMode.project": {
+    "connectionId": "http-desktop-9000",
+    "projectKey": "halide"
+  },
   "terminal.integrated.env.linux": {
     "NODE_ENV": "development"
   }

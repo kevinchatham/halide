@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "context7": {
+      "alwaysAllow": ["resolve-library-id", "get-library-docs", "query-docs"],
+      "args": ["-y", "@upstash/context7-mcp"],
+      "command": "npx",
+      "disabled": false,
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": "6000",
+        "PATH": "/home/kevin/.nvm/versions/node/v24.13.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      }
+    },
+    "sonarqube": {
+      "args": [
+        "dotenv",
+        "--",
+        "docker",
+        "run",
+        "--init",
+        "--pull=always",
+        "-i",
+        "--rm",
+        "-e",
+        "SONARQUBE_TOKEN",
+        "-e",
+        "SONARQUBE_URL",
+        "mcp/sonarqube"
+      ],
+      "command": "npx",
+      "env": {
+        "SONARQUBE_URL": "http://desktop:9000"
+      }
+    }
+  }
+}
