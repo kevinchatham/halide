@@ -18,7 +18,7 @@ export interface Server {
 }
 
 export async function createServer<TClaims = unknown>(
-  configInput: ServerConfig<TClaims>
+  configInput: ServerConfig<TClaims>,
 ): Promise<Server> {
   validateServerConfig(configInput);
 
@@ -33,13 +33,13 @@ export async function createServer<TClaims = unknown>(
 
   app.use(
     cors({
-      origin: corsOrigin,
-      methods: corsMethods.map((m) => m.toUpperCase()),
       allowedHeaders: corsConfig?.allowedHeaders,
-      exposedHeaders: corsConfig?.exposedHeaders,
       credentials: corsCredentials,
+      exposedHeaders: corsConfig?.exposedHeaders,
       maxAge: corsConfig?.maxAge,
-    })
+      methods: corsMethods.map((m) => m.toUpperCase()),
+      origin: corsOrigin,
+    }),
   );
 
   let rateLimitDispose: (() => void) | undefined;
@@ -47,8 +47,8 @@ export async function createServer<TClaims = unknown>(
   if (security?.rateLimit) {
     const rateLimitConfig = security.rateLimit;
     const { middleware, dispose } = createRateLimitMiddleware({
-      windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
       maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+      windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
     });
     app.use(middleware);
     rateLimitDispose = dispose;
@@ -84,7 +84,7 @@ export async function createServer<TClaims = unknown>(
       await new Promise<void>((resolve) => {
         httpServer = app.listen(port, () => {
           console.log(
-            `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`
+            `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`,
           );
           resolve();
         });

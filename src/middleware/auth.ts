@@ -6,7 +6,7 @@ const unauthorized = { error: 'Unauthorized' };
 
 export function createAuthMiddleware<TClaims = unknown>(
   secret: Uint8Array,
-  audience?: string
+  audience?: string,
 ): RequestHandler {
   return (req, res, next) => {
     const authHeader: string | undefined = req.headers.authorization;
@@ -32,7 +32,7 @@ export function createAuthMiddleware<TClaims = unknown>(
 
 export function createJwksAuthMiddleware<TClaims = unknown>(
   jwksUri: string,
-  audience?: string
+  audience?: string,
 ): RequestHandler {
   const JWKS = createRemoteJWKSet(new URL(jwksUri));
 

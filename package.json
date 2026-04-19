@@ -1,35 +1,4 @@
 {
-  "name": "bspa",
-  "version": "1.0.0",
-  "license": "MIT",
-  "main": "./dist/index.js",
-  "exports": {
-    ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    },
-    "./*": "./dist/*"
-  },
-  "scripts": {
-    "build": "tsup",
-    "clean": "npx tsx scripts/clean.ts",
-    "demo:angular:build": "cd demo/angular-spa && npm run build",
-    "demo:angular:install": "cd demo/angular-spa && npm install",
-    "demo:angular:serve:server": "cd demo/angular-spa && npm run serve:server",
-    "demo:angular:serve": "cd demo/angular-spa && npm run serve",
-    "demo:backend:build": "cd demo/backend && npm run build",
-    "demo:backend:install": "cd demo/backend && npm install",
-    "demo:backend:serve": "cd demo/backend && npm run serve",
-    "demo:install": "npm run demo:link && npm run demo:angular:install && npm run demo:backend:install",
-    "demo:link": "npm run build && npm link && cd demo/angular-spa && npm link bspa",
-    "lint:fix": "biome check --write .",
-    "lint:watch": "nodemon --exec 'biome check --fix .' --watch '**/*.ts' --watch '**/*.json' --ext '.ts,.json'",
-    "lint": "biome check .",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:ui": "vitest --ui",
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.0.0",
@@ -44,16 +13,49 @@
   "devDependencies": {
     "@angular/cli": "^21.0.0",
     "@angular/core": "^21.0.0",
-    "@biomejs/biome": "^1.9.0",
+    "@biomejs/biome": "2.4.7",
     "@types/cors": "^2.8.0",
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
     "@types/swagger-ui-express": "^4.1.8",
     "concurrently": "^9.2.1",
     "openapi-types": "^12.1.3",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.7.1",
     "rimraf": "^6.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.0",
     "vitest": "^4.1.4"
-  }
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./*": "./dist/*"
+  },
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "name": "bspa",
+  "scripts": {
+    "build": "tsup",
+    "clean": "npx tsx scripts/clean.ts",
+    "demo:angular:build": "cd demo/angular-spa && npm run build",
+    "demo:angular:install": "cd demo/angular-spa && npm install",
+    "demo:angular:serve": "cd demo/angular-spa && npm run serve",
+    "demo:angular:serve:server": "cd demo/angular-spa && npm run serve:server",
+    "demo:backend:build": "cd demo/backend && npm run build",
+    "demo:backend:install": "cd demo/backend && npm install",
+    "demo:backend:serve": "cd demo/backend && npm run serve",
+    "demo:install": "npm run demo:link && npm run demo:angular:install && npm run demo:backend:install",
+    "demo:link": "npm run build && npm link && cd demo/angular-spa && npm link bspa",
+    "lint": "biome check .",
+    "lint:fix": "biome check --config-path biome.json  --write . && prettier --write . --config .prettierrc --ignore-path .prettierignore",
+    "lint:watch": "nodemon --exec 'npm run lint:fix' --watch '**/*.ts' --watch '**/*.json' --ext '.ts,.json'",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit"
+  },
+  "version": "1.0.0"
 }

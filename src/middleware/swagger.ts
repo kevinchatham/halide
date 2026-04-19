@@ -7,7 +7,7 @@ import type { OpenApiOptions } from '../openapi/types';
 
 export function createSwaggerMiddleware<TClaims>(
   config: ServerConfig<TClaims>,
-  options?: OpenApiOptions
+  options?: OpenApiOptions,
 ): Router {
   const spec = generateOpenApiSpec(config, options);
   const router = createRouter();

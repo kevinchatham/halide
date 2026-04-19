@@ -72,7 +72,7 @@ export type ResponseContext = {
  */
 export type ApiRouteHandler<TClaims, TBody = unknown> = (
   ctx: RequestContext & { body: TBody },
-  claims: TClaims | undefined
+  claims: TClaims | undefined,
 ) => Promise<unknown>;
 
 /**
@@ -84,7 +84,7 @@ export type ApiRouteHandler<TClaims, TBody = unknown> = (
  */
 export type AuthorizeFn<TClaims> = (
   ctx: RequestContext,
-  claims: TClaims | undefined
+  claims: TClaims | undefined,
 ) => boolean | Promise<boolean>;
 
 /**
@@ -92,10 +92,10 @@ export type AuthorizeFn<TClaims> = (
  * @param request - The request object containing body and headers.
  * @returns The transformed request.
  */
-export type TransformFn = (request: {
+export type TransformFn = (request: { body: unknown; headers: Record<string, string> }) => {
   body: unknown;
   headers: Record<string, string>;
-}) => { body: unknown; headers: Record<string, string> };
+};
 
 /**
  * Configuration for single-page application serving.
@@ -124,7 +124,7 @@ export type ObservabilityConfig<TClaims = unknown> = {
   onResponse?: (
     ctx: RequestContext,
     claims: TClaims | undefined,
-    response: ResponseContext
+    response: ResponseContext,
   ) => void | Promise<void>;
 };
 
@@ -296,19 +296,19 @@ export type ProxyRouteInput<TClaims> = Omit<ProxyRoute<TClaims>, 'type'>;
  * @returns A fully configured API route.
  */
 export function apiRoute<TClaims, TBody = unknown>(
-  route: ApiRouteInput<TClaims, TBody>
+  route: ApiRouteInput<TClaims, TBody>,
 ): ApiRoute<TClaims, TBody> {
   return {
     ...route,
-    type: 'api',
     authorize: route.authorize ?? defaultAuthorize,
+    type: 'api',
   };
 }
 
 export function proxyRoute<TClaims>(route: ProxyRouteInput<TClaims>): ProxyRoute<TClaims> {
   return {
     ...route,
-    type: 'proxy',
     authorize: route.authorize ?? defaultAuthorize,
+    type: 'proxy',
   };
 }

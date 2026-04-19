@@ -7,9 +7,9 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
+      json: vi.fn().mockReturnThis(),
       locals: {},
       status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
     const error = new Error('Test error');
@@ -26,9 +26,9 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'POST', path: '/api/data' } as any;
     const res = {
+      json: vi.fn().mockReturnThis(),
       locals: {},
       status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
     const error = new Error('Something broke');
@@ -48,9 +48,9 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'DELETE', path: '/resource' } as any;
     const res = {
+      json: vi.fn().mockReturnThis(),
       locals: {},
       status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -69,9 +69,9 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
+      json: vi.fn().mockReturnThis(),
       locals: {},
       status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
     const error = new Error('boom');
@@ -90,9 +90,9 @@ describe('createErrorHandler', () => {
 
     const req = { method: 'GET', path: '/test' } as any;
     const res = {
+      json: vi.fn().mockReturnThis(),
       locals: {},
       status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 

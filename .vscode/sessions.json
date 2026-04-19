@@ -17,9 +17,7 @@
       {
         "autoExecuteCommands": true,
         "color": "terminal.ansiGreen",
-        "commands": [
-          "npx nodemon"
-        ],
+        "commands": ["npx nodemon"],
         "icon": "sync",
         "name": "build:watch"
       },
@@ -35,9 +33,7 @@
       {
         "autoExecuteCommands": true,
         "color": "terminal.ansiYellow",
-        "commands": [
-          "npm run lint:watch"
-        ],
+        "commands": ["npm run lint:watch"],
         "icon": "check",
         "name": "lint"
       },

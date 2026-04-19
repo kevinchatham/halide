@@ -14,8 +14,8 @@ describe('verifyJwt', () => {
   });
 
   it('returns claims for valid token', async () => {
-    const token = await createValidToken({ sub: 'user-123', role: 'admin' });
+    const token = await createValidToken({ role: 'admin', sub: 'user-123' });
     const result = await verifyJwt<{ sub: string; role: string }>(token, secret);
-    expect(result).toMatchObject({ sub: 'user-123', role: 'admin' });
+    expect(result).toMatchObject({ role: 'admin', sub: 'user-123' });
   });
 });

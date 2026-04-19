@@ -56,7 +56,7 @@ function validateRoutes<TClaims = unknown>(routes?: RouteInput<TClaims>[]): void
 
 function validateSecurityForRoutes<TClaims = unknown>(
   routes?: RouteInput<TClaims>[],
-  security?: SecurityInput
+  security?: SecurityInput,
 ): void {
   const hasPrivateRoute = routes?.some((r) => r.access === 'private');
   if (hasPrivateRoute && !security?.auth) {
@@ -86,7 +86,7 @@ export function validateServerConfig<TClaims = unknown>(config: ServerConfigInpu
   validateRoutes(config.proxyRoutes);
   validateSecurityForRoutes(
     [...(config.apiRoutes ?? []), ...(config.proxyRoutes ?? [])],
-    config.security
+    config.security,
   );
   validateCors(config.security?.cors);
   validateAuth(config.security?.auth);

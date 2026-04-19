@@ -28,9 +28,9 @@ describe('generateOpenApiSpec', () => {
 
   it('uses custom title and version from options', () => {
     const spec = generateOpenApiSpec(minimalConfig, {
+      description: 'A custom API',
       title: 'My API',
       version: '2.0.0',
-      description: 'A custom API',
     });
 
     expect(spec.info.title).toBe('My API');
@@ -40,19 +40,29 @@ describe('generateOpenApiSpec', () => {
 
   it('includes servers from options', () => {
     const spec = generateOpenApiSpec(minimalConfig, {
-      servers: [{ url: 'https://api.example.com', description: 'Production' }],
+      servers: [{ description: 'Production', url: 'https://api.example.com' }],
     });
 
-    expect(spec.servers).toEqual([{ url: 'https://api.example.com', description: 'Production' }]);
+    expect(spec.servers).toEqual([{ description: 'Production', url: 'https://api.example.com' }]);
   });
 
   it('includes paths from apiRoutes with correct methods', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
-        apiRoute({ access: 'public', method: 'get', path: '/users', handler: async () => ({}) }),
-        apiRoute({ access: 'public', method: 'post', path: '/users', handler: async () => ({}) }),
+        apiRoute({
+          access: 'public',
+          handler: async () => ({}),
+          method: 'get',
+          path: '/users',
+        }),
+        apiRoute({
+          access: 'public',
+          handler: async () => ({}),
+          method: 'post',
+          path: '/users',
+        }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -65,8 +75,14 @@ describe('generateOpenApiSpec', () => {
 
   it('defaults method to get when not specified', () => {
     const config: ServerConfig = {
+      apiRoutes: [
+        apiRoute({
+          access: 'public',
+          handler: async () => ({}),
+          path: '/health',
+        }),
+      ],
       spa: { root: '/var/www' },
-      apiRoutes: [apiRoute({ access: 'public', path: '/health', handler: async () => ({}) })],
     };
 
     const spec = generateOpenApiSpec(config);
@@ -74,18 +90,21 @@ describe('generateOpenApiSpec', () => {
   });
 
   it('converts Zod validationSchema to requestBody schema', () => {
-    const UserSchema = z.object({ name: z.string(), email: z.string().email() });
+    const UserSchema = z.object({
+      email: z.string().email(),
+      name: z.string(),
+    });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
+          handler: async () => ({}),
           method: 'post',
           path: '/users',
           validationSchema: UserSchema,
-          handler: async () => ({}),
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -102,11 +121,16 @@ describe('generateOpenApiSpec', () => {
 
   it('adds security requirements for private routes', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: () => 'secret' } },
       apiRoutes: [
-        apiRoute({ access: 'private', method: 'get', path: '/profile', handler: async () => ({}) }),
+        apiRoute({
+          access: 'private',
+          handler: async () => ({}),
+          method: 'get',
+          path: '/profile',
+        }),
       ],
+      security: { auth: { secret: () => 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -117,29 +141,39 @@ describe('generateOpenApiSpec', () => {
 
   it('adds BearerAuth security scheme when auth is configured', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: () => 'secret' } },
       apiRoutes: [
-        apiRoute({ access: 'private', method: 'get', path: '/profile', handler: async () => ({}) }),
+        apiRoute({
+          access: 'private',
+          handler: async () => ({}),
+          method: 'get',
+          path: '/profile',
+        }),
       ],
+      security: { auth: { secret: () => 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
 
     expect(spec.components?.securitySchemes?.BearerAuth).toEqual({
-      type: 'http',
-      scheme: 'bearer',
       bearerFormat: 'JWT',
+      scheme: 'bearer',
+      type: 'http',
     });
   });
 
   it('excludes security for public routes', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: () => 'secret' } },
       apiRoutes: [
-        apiRoute({ access: 'public', method: 'get', path: '/health', handler: async () => ({}) }),
+        apiRoute({
+          access: 'public',
+          handler: async () => ({}),
+          method: 'get',
+          path: '/health',
+        }),
       ],
+      security: { auth: { secret: () => 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -150,7 +184,6 @@ describe('generateOpenApiSpec', () => {
 
   it('includes proxy routes when includeProxyRoutes is true (default)', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       proxyRoutes: [
         proxyRoute({
           access: 'public',
@@ -159,6 +192,7 @@ describe('generateOpenApiSpec', () => {
           target: 'https://api.example.com',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -171,7 +205,6 @@ describe('generateOpenApiSpec', () => {
 
   it('excludes proxy routes when includeProxyRoutes is false', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       proxyRoutes: [
         proxyRoute({
           access: 'public',
@@ -180,6 +213,7 @@ describe('generateOpenApiSpec', () => {
           target: 'https://api.example.com',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config, { includeProxyRoutes: false });
@@ -189,15 +223,15 @@ describe('generateOpenApiSpec', () => {
 
   it('extracts path parameters from route patterns', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
+          handler: async () => ({}),
           method: 'get',
           path: '/users/:id',
-          handler: async () => ({}),
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -205,48 +239,53 @@ describe('generateOpenApiSpec', () => {
 
     expect(spec.paths['/users/{id}']).toBeDefined();
     expect(op?.parameters).toEqual([
-      { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+      { in: 'path', name: 'id', required: true, schema: { type: 'string' } },
     ]);
   });
 
   it('extracts multiple path parameters', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
+          handler: async () => ({}),
           method: 'get',
           path: '/orgs/:orgId/users/:userId',
-          handler: async () => ({}),
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
     const op = spec.paths['/orgs/{orgId}/users/{userId}']?.get;
 
     expect(op?.parameters).toEqual([
-      { name: 'orgId', in: 'path', required: true, schema: { type: 'string' } },
-      { name: 'userId', in: 'path', required: true, schema: { type: 'string' } },
+      { in: 'path', name: 'orgId', required: true, schema: { type: 'string' } },
+      {
+        in: 'path',
+        name: 'userId',
+        required: true,
+        schema: { type: 'string' },
+      },
     ]);
   });
 
   it('uses custom summary/tags/description from openapi metadata', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: {
-            summary: 'List users',
             description: 'Returns all users',
+            summary: 'List users',
             tags: ['users'],
           },
+          path: '/users',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -263,18 +302,18 @@ describe('generateOpenApiSpec', () => {
       name: z.string(),
     });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: {
             responseSchema: UserResponseSchema,
           },
+          path: '/users',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -289,21 +328,21 @@ describe('generateOpenApiSpec', () => {
   it('uses custom responses from openapi metadata', () => {
     const ErrorSchema = z.object({ error: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: {
             responses: {
               200: { description: 'Success' },
               404: { description: 'Not found', schema: ErrorSchema },
             },
           },
+          path: '/users',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -318,9 +357,9 @@ describe('generateOpenApiSpec', () => {
 
   it('handles empty routes array gracefully', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [],
       proxyRoutes: [],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -331,10 +370,15 @@ describe('generateOpenApiSpec', () => {
 
   it('generates default 200 response when no openapi metadata', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
-        apiRoute({ access: 'public', method: 'get', path: '/health', handler: async () => ({}) }),
+        apiRoute({
+          access: 'public',
+          handler: async () => ({}),
+          method: 'get',
+          path: '/health',
+        }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -345,31 +389,35 @@ describe('generateOpenApiSpec', () => {
 
   it('adds JWKS description for jwks auth strategy', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
+      apiRoutes: [
+        apiRoute({
+          access: 'private',
+          handler: async () => ({}),
+          method: 'get',
+          path: '/profile',
+        }),
+      ],
       security: {
         auth: {
-          strategy: 'jwks',
           jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+          strategy: 'jwks',
         },
       },
-      apiRoutes: [
-        apiRoute({ access: 'private', method: 'get', path: '/profile', handler: async () => ({}) }),
-      ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
 
     expect(spec.components?.securitySchemes?.BearerAuth).toEqual({
-      type: 'http',
-      scheme: 'bearer',
       bearerFormat: 'JWT',
       description: 'JWT authentication via JWKS',
+      scheme: 'bearer',
+      type: 'http',
     });
   });
 
   it('generates proxy route summary from target', () => {
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       proxyRoutes: [
         proxyRoute({
           access: 'public',
@@ -378,6 +426,7 @@ describe('generateOpenApiSpec', () => {
           target: 'https://api.example.com',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -389,23 +438,23 @@ describe('generateOpenApiSpec', () => {
   it('deduplicates shared Zod schema across routes via WeakMap', () => {
     const SharedSchema = z.object({ id: z.string(), name: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: SharedSchema },
+          path: '/users',
         }),
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/admin/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: SharedSchema },
+          path: '/admin/users',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -418,23 +467,23 @@ describe('generateOpenApiSpec', () => {
   it('deduplicates shared validationSchema across routes', () => {
     const SharedBody = z.object({ name: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
+          handler: async () => ({}),
           method: 'post',
           path: '/users',
           validationSchema: SharedBody,
-          handler: async () => ({}),
         }),
         apiRoute({
           access: 'public',
+          handler: async () => ({}),
           method: 'post',
           path: '/admin/users',
           validationSchema: SharedBody,
-          handler: async () => ({}),
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -446,19 +495,19 @@ describe('generateOpenApiSpec', () => {
   it('uses schemaName from openapi metadata for response schema', () => {
     const UserSchema = z.object({ id: z.string(), name: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: {
-            schemaName: 'User',
             responseSchema: UserSchema,
+            schemaName: 'User',
           },
+          path: '/users',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -471,19 +520,19 @@ describe('generateOpenApiSpec', () => {
   });
 
   it('uses requestSchemaName from openapi metadata for validationSchema', () => {
-    const CreateUserSchema = z.object({ name: z.string(), email: z.string() });
+    const CreateUserSchema = z.object({ email: z.string(), name: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
+          handler: async () => ({}),
           method: 'post',
+          openapi: { requestSchemaName: 'CreateUser' },
           path: '/users',
           validationSchema: CreateUserSchema,
-          handler: async () => ({}),
-          openapi: { requestSchemaName: 'CreateUser' },
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -499,23 +548,23 @@ describe('generateOpenApiSpec', () => {
     const UserSchema = z.object({ id: z.string() });
     const AdminSchema = z.object({ role: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: UserSchema },
+          path: '/users',
         }),
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/admins',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: AdminSchema },
+          path: '/admins',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -527,23 +576,23 @@ describe('generateOpenApiSpec', () => {
   it('deduplicates shared non-object schema (e.g. z.array) across routes', () => {
     const SharedArraySchema = z.array(z.object({ id: z.string() }));
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: SharedArraySchema },
+          path: '/users',
         }),
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/admin/users',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: SharedArraySchema },
+          path: '/admin/users',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -556,16 +605,16 @@ describe('generateOpenApiSpec', () => {
   it('registers non-object schemas as component refs instead of inlining', () => {
     const TagsSchema = z.enum(['admin', 'user']);
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/tags',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: TagsSchema },
+          path: '/tags',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -581,16 +630,16 @@ describe('generateOpenApiSpec', () => {
     const ItemSchema = z.object({ id: z.string() });
     const ListSchema = z.array(ItemSchema);
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'get',
-          path: '/items',
           handler: async () => ({}),
+          method: 'get',
           openapi: { responseSchema: ListSchema },
+          path: '/items',
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);
@@ -603,23 +652,23 @@ describe('generateOpenApiSpec', () => {
 
   it('uses schemaName and requestSchemaName independently without collision', () => {
     const UserResponse = z.object({ id: z.string(), name: z.string() });
-    const CreateUserBody = z.object({ name: z.string(), email: z.string() });
+    const CreateUserBody = z.object({ email: z.string(), name: z.string() });
     const config: ServerConfig = {
-      spa: { root: '/var/www' },
       apiRoutes: [
         apiRoute({
           access: 'public',
-          method: 'post',
-          path: '/users',
-          validationSchema: CreateUserBody,
           handler: async () => ({}),
+          method: 'post',
           openapi: {
-            schemaName: 'User',
             requestSchemaName: 'CreateUser',
             responseSchema: UserResponse,
+            schemaName: 'User',
           },
+          path: '/users',
+          validationSchema: CreateUserBody,
         }),
       ],
+      spa: { root: '/var/www' },
     };
 
     const spec = generateOpenApiSpec(config);

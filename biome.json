@@ -1,19 +1,26 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
-  "organizeImports": {
+  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "noDuplicateClasses": "on",
+        "organizeImports": "on",
+        "useSortedAttributes": "on",
+        "useSortedInterfaceMembers": "on",
+        "useSortedKeys": "on",
+        "useSortedProperties": "on"
+      }
+    },
     "enabled": true
   },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "suspicious": {
-        "noExplicitAny": "off"
-      },
-      "complexity": {
-        "useLiteralKeys": "off"
-      }
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": ["**/*.{ts,css,json}"]
   },
   "formatter": {
     "enabled": true,
@@ -21,13 +28,65 @@
     "indentWidth": 2,
     "lineWidth": 100
   },
+  "html": {
+    "formatter": {
+      "enabled": false
+    },
+    "linter": {
+      "enabled": true
+    },
+    "parser": {
+      "interpolation": true
+    }
+  },
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
-      "trailingCommas": "es5"
+      "semicolons": "always",
+      "trailingCommas": "all"
     }
   },
-  "files": {
-    "ignore": [".vscode/**", "**/dist/**", "**/node_modules/**", "**/*.json", "**/.angular/**"]
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "a11y": {
+        "useButtonType": "error",
+        "useGenericFontNames": "error"
+      },
+      "complexity": {
+        "noImportantStyles": "off",
+        "noStaticOnlyClass": "off",
+        "useLiteralKeys": "off",
+        "useOptionalChain": "error"
+      },
+      "correctness": {
+        "noEmptyPattern": "error",
+        "noUnknownPseudoElement": "off",
+        "useParseIntRadix": "error"
+      },
+      "nursery": {
+        "useExplicitType": "error"
+      },
+      "recommended": true,
+      "style": {
+        "noNonNullAssertion": "off",
+        "useNodejsImportProtocol": "error",
+        "useTemplate": "error"
+      },
+      "suspicious": {
+        "noConfusingVoidType": "error",
+        "noConsole": "error",
+        "noControlCharactersInRegex": "error",
+        "noExplicitAny": "error",
+        "noGlobalIsFinite": "error",
+        "useIterableCallbackReturn": "error"
+      }
+    }
+  },
+  "root": false,
+  "vcs": {
+    "clientKind": "git",
+    "enabled": true,
+    "useIgnoreFile": true
   }
 }

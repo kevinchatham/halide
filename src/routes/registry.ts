@@ -12,7 +12,7 @@ import { createBodyValidationMiddleware } from '../middleware/validate';
 import { createProxyService } from '../services/proxy';
 
 async function resolveSecret(
-  secret: string | (() => string) | (() => Promise<string>)
+  secret: string | (() => string) | (() => Promise<string>),
 ): Promise<string> {
   if (typeof secret === 'function') {
     return secret();
@@ -25,7 +25,7 @@ function getAuthConfig<TClaims = unknown>(config: ServerConfig<TClaims>) {
 }
 
 async function createAuthMiddlewareFromConfig<TClaims = unknown>(
-  config: ServerConfig<TClaims>
+  config: ServerConfig<TClaims>,
 ): Promise<RequestHandler | undefined> {
   const auth = getAuthConfig(config);
   if (!auth) return undefined;
@@ -39,7 +39,7 @@ async function createAuthMiddlewareFromConfig<TClaims = unknown>(
 
   if (secret !== undefined) {
     const resolvedSecret = await resolveSecret(
-      secret as string | (() => string) | (() => Promise<string>)
+      secret as string | (() => string) | (() => Promise<string>),
     );
     return createAuthMiddleware<TClaims>(new TextEncoder().encode(resolvedSecret), auth.audience);
   }
@@ -49,22 +49,22 @@ async function createAuthMiddlewareFromConfig<TClaims = unknown>(
 
 function buildRequestContext(req: Request): RequestContext {
   return {
-    method: req.method.toLowerCase() as RequestContext['method'],
-    path: req.path,
+    body: req.body,
     headers: req.headers as Record<string, string | string[]>,
+    method: req.method.toLowerCase() as RequestContext['method'],
     params: Object.fromEntries(Object.entries(req.params || {}).map(([k, v]) => [k, String(v)])),
+    path: req.path,
     query: Object.fromEntries(
       Object.entries(req.query || {}).map(([k, v]) => [
         k,
         Array.isArray(v) ? v.map(String) : String(v),
-      ])
+      ]),
     ),
-    body: req.body,
   };
 }
 
 function createAuthorizeMiddleware<TClaims = unknown>(
-  authorizeFn: NonNullable<ApiRoute<TClaims>['authorize'] | ProxyRoute<TClaims>['authorize']>
+  authorizeFn: NonNullable<ApiRoute<TClaims>['authorize'] | ProxyRoute<TClaims>['authorize']>,
 ): RequestHandler {
   return async (req, res, next) => {
     const ctx = buildRequestContext(req);
@@ -84,7 +84,7 @@ function createAuthorizeMiddleware<TClaims = unknown>(
 
 function createObservationMiddleware<TClaims = unknown>(
   observability: ObservabilityConfig<TClaims>,
-  routeObserve: boolean | undefined
+  routeObserve: boolean | undefined,
 ): RequestHandler | undefined {
   if (!observability.onRequest && !observability.onResponse) return undefined;
   if (routeObserve === false) return undefined;
@@ -99,9 +99,9 @@ function createObservationMiddleware<TClaims = unknown>(
     if (observability.onResponse) {
       res.on('finish', () => {
         observability.onResponse?.(ctx, claims, {
-          statusCode: res.statusCode,
           durationMs: Date.now() - start,
           error: res.locals?.error,
+          statusCode: res.statusCode,
         });
       });
     }
@@ -112,7 +112,7 @@ function createObservationMiddleware<TClaims = unknown>(
 
 export async function registerRoutes<TClaims = unknown>(
   app: Express | Router,
-  config: ServerConfig<TClaims>
+  config: ServerConfig<TClaims>,
 ): Promise<void> {
   const { apiRoutes, proxyRoutes, observability } = config;
   const router = app as Router;
@@ -137,7 +137,9 @@ export async function registerRoutes<TClaims = unknown>(
         middlewares.push(createBodyValidationMiddleware(route.validationSchema));
       }
       const handlerMiddleware: RequestHandler = async (req, res, next) => {
-        const ctx = buildRequestContext(req) as RequestContext & { body: unknown };
+        const ctx = buildRequestContext(req) as RequestContext & {
+          body: unknown;
+        };
         const claims = req.claims as TClaims | undefined;
         try {
           const result = await route.handler(ctx, claims);
@@ -160,7 +162,7 @@ export async function registerRoutes<TClaims = unknown>(
         route.proxyPath,
         route.identity,
         route.transform,
-        route.timeout
+        route.timeout,
       );
       type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
       const methods = route.methods as HttpMethod[];

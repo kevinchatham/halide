@@ -10,9 +10,9 @@ function getFallbackMiddleware(spaConfig: Parameters<typeof createSpaHandler>[0]
 describe('createSpaHandler', () => {
   it('returns two middlewares (static + fallback)', () => {
     const middlewares = createSpaHandler({
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     expect(middlewares).toHaveLength(2);
@@ -22,15 +22,15 @@ describe('createSpaHandler', () => {
 
   it('fallback returns 404 for /api paths', () => {
     const fallback = getFallbackMiddleware({
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     const req = { path: '/api/users' } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -42,9 +42,9 @@ describe('createSpaHandler', () => {
 
   it('fallback sends index.html for non-api paths', () => {
     const fallback = getFallbackMiddleware({
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     const req = { path: '/about' } as any;
@@ -57,15 +57,15 @@ describe('createSpaHandler', () => {
 
     expect(res.sendFile).toHaveBeenCalledWith(
       path.join('/var/www', 'index.html'),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('uses custom fallback file', () => {
     const fallback = getFallbackMiddleware({
+      fallback: 'app.html',
       name: 'test-app',
       root: '/public',
-      fallback: 'app.html',
     });
 
     const req = { path: '/deep/nested/route' } as any;
@@ -78,15 +78,15 @@ describe('createSpaHandler', () => {
 
     expect(res.sendFile).toHaveBeenCalledWith(
       path.join('/public', 'app.html'),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('fallback calls next on sendFile error', () => {
     const fallback = getFallbackMiddleware({
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     const req = { path: '/about' } as any;
@@ -108,15 +108,15 @@ describe('createSpaHandler', () => {
   it('fallback returns 404 for paths matching custom apiPrefix', () => {
     const fallback = getFallbackMiddleware({
       apiPrefix: '/v1',
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     const req = { path: '/v1/users' } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -129,9 +129,9 @@ describe('createSpaHandler', () => {
   it('fallback serves index.html when apiPrefix is empty string', () => {
     const fallback = getFallbackMiddleware({
       apiPrefix: '',
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     const req = { path: '/api/users' } as any;
@@ -144,16 +144,16 @@ describe('createSpaHandler', () => {
 
     expect(res.sendFile).toHaveBeenCalledWith(
       path.join('/var/www', 'index.html'),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
   it('fallback serves index.html for paths not matching custom apiPrefix', () => {
     const fallback = getFallbackMiddleware({
       apiPrefix: '/graphql',
+      fallback: 'index.html',
       name: 'test-app',
       root: '/var/www',
-      fallback: 'index.html',
     });
 
     const req = { path: '/about' } as any;
@@ -166,7 +166,7 @@ describe('createSpaHandler', () => {
 
     expect(res.sendFile).toHaveBeenCalledWith(
       path.join('/var/www', 'index.html'),
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });

@@ -4,8 +4,8 @@ import { createRateLimitMiddleware } from './rateLimit';
 describe('createRateLimitMiddleware', () => {
   function makeMockRequest(ip?: string, forwardedFor?: string): Request {
     return {
-      ip,
       headers: forwardedFor ? { 'x-forwarded-for': forwardedFor } : {},
+      ip,
     } as unknown as Request;
   }
 
@@ -19,8 +19,8 @@ describe('createRateLimitMiddleware', () => {
     const status = vi.fn().mockReturnThis();
     const json = vi.fn();
     const set = vi.fn();
-    const res = { status, json, set } as unknown as Response;
-    return { res, next: vi.fn() as unknown as NextFunction, status, json, set };
+    const res = { json, set, status } as unknown as Response;
+    return { json, next: vi.fn() as unknown as NextFunction, res, set, status };
   }
 
   let disposeFns: Array<() => void>;
@@ -42,7 +42,7 @@ describe('createRateLimitMiddleware', () => {
   }
 
   it('allows requests within the limit', () => {
-    const middleware = create({ windowMs: 1000, maxRequests: 2 });
+    const middleware = create({ maxRequests: 2, windowMs: 1000 });
     const req = makeMockRequest('127.0.0.1');
     const { res, next } = makeMockResponse();
 
@@ -52,7 +52,7 @@ describe('createRateLimitMiddleware', () => {
   });
 
   it('blocks requests exceeding the limit', () => {
-    const middleware = create({ windowMs: 1000, maxRequests: 2 });
+    const middleware = create({ maxRequests: 2, windowMs: 1000 });
     const { res, next } = makeMockResponse();
     const req = makeMockRequest('127.0.0.1');
 
@@ -66,7 +66,7 @@ describe('createRateLimitMiddleware', () => {
   });
 
   it('includes Retry-After header on 429 response', () => {
-    const middleware = create({ windowMs: 1000, maxRequests: 1 });
+    const middleware = create({ maxRequests: 1, windowMs: 1000 });
     const { res, set, next } = makeMockResponse();
     const req = makeMockRequest('127.0.0.1');
 
@@ -78,7 +78,7 @@ describe('createRateLimitMiddleware', () => {
 
   it('resets window after time expires', () => {
     vi.useFakeTimers();
-    const middleware = create({ windowMs: 1000, maxRequests: 1 });
+    const middleware = create({ maxRequests: 1, windowMs: 1000 });
     const req = makeMockRequest('127.0.0.1');
 
     const { res: res1, next: next1 } = makeMockResponse();
@@ -98,7 +98,7 @@ describe('createRateLimitMiddleware', () => {
   });
 
   it('tracks different IPs separately', () => {
-    const middleware = create({ windowMs: 1000, maxRequests: 1 });
+    const middleware = create({ maxRequests: 1, windowMs: 1000 });
     const req1 = makeMockRequest('127.0.0.1');
     const req2 = makeMockRequest('192.168.1.1');
 
@@ -113,7 +113,7 @@ describe('createRateLimitMiddleware', () => {
   });
 
   it('uses X-Forwarded-For for client identification', () => {
-    const middleware = create({ windowMs: 1000, maxRequests: 1 });
+    const middleware = create({ maxRequests: 1, windowMs: 1000 });
     const req = makeMockRequest('127.0.0.1', '10.0.0.1');
 
     const { res: res1, next: next1 } = makeMockResponse();

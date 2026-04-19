@@ -18,34 +18,29 @@ export function createProxyService<TClaims = unknown>(
   proxyPath: string | undefined,
   identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined,
   transform?: TransformFn,
-  timeout?: number
+  timeout?: number,
 ): RequestHandler {
   const rewritePath = proxyPath ?? routePath;
   const proxy = createProxyMiddleware({
-    target,
     changeOrigin: true,
-    timeout: timeout ?? DEFAULTS.proxy.timeoutMs,
-    pathRewrite: {
-      [`^${routePath}`]: rewritePath,
-    },
     on: {
       proxyReq: (proxyReq, req) => {
         const expressReq = req as Request;
         if (identity && expressReq.claims) {
           const ctx: RequestContext = {
-            method: expressReq.method.toLowerCase() as RequestContext['method'],
-            path: expressReq.path,
+            body: expressReq.body,
             headers: expressReq.headers as Record<string, string | string[]>,
+            method: expressReq.method.toLowerCase() as RequestContext['method'],
             params: Object.fromEntries(
-              Object.entries(expressReq.params || {}).map(([k, v]) => [k, String(v)])
+              Object.entries(expressReq.params || {}).map(([k, v]) => [k, String(v)]),
             ),
+            path: expressReq.path,
             query: Object.fromEntries(
               Object.entries(expressReq.query || {}).map(([k, v]) => [
                 k,
                 Array.isArray(v) ? v.map(String) : String(v),
-              ])
+              ]),
             ),
-            body: expressReq.body,
           };
           const headers = identity(ctx, expressReq.claims as TClaims);
           if (headers) {
@@ -58,6 +53,11 @@ export function createProxyService<TClaims = unknown>(
         }
       },
     },
+    pathRewrite: {
+      [`^${routePath}`]: rewritePath,
+    },
+    target,
+    timeout: timeout ?? DEFAULTS.proxy.timeoutMs,
   });
 
   if (!transform) {

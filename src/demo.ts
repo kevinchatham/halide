@@ -13,14 +13,14 @@
 
 import { z } from 'zod';
 import {
+  apiRoute,
   type ObservabilityConfig,
   type OpenApiConfig,
+  proxyRoute,
   type RequestContext,
   type SecurityConfig,
   type ServerConfig,
   type SpaConfig,
-  apiRoute,
-  proxyRoute,
 } from './config/types'; // from 'bspa'
 import { createServer } from './runtime'; // from 'bspa';
 
@@ -47,13 +47,13 @@ type CreateUserSchema = z.infer<typeof CreateUserSchema>;
  */
 const profileRoute = apiRoute<UserClaims>({
   access: 'private',
-  method: 'get',
-  path: '/profile',
   authorize: (_ctx, claims) => !!claims?.role && claims.role === 'admin',
   handler: async (ctx, claims) => ({
     ctx: JSON.stringify(ctx),
     user: claims?.sub,
   }),
+  method: 'get',
+  path: '/profile',
 });
 
 /**
@@ -64,17 +64,17 @@ const profileRoute = apiRoute<UserClaims>({
  */
 const userRoute = apiRoute<UserClaims, CreateUserSchema>({
   access: 'public',
-  method: 'post',
-  path: '/users',
-  validationSchema: CreateUserSchema,
   handler: async (ctx) => {
     return {
-      id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       email: ctx.body.email,
+      id: crypto.randomUUID(),
       name: ctx.body.name,
     };
   },
+  method: 'post',
+  path: '/users',
+  validationSchema: CreateUserSchema,
 });
 
 /**
@@ -84,9 +84,9 @@ const userRoute = apiRoute<UserClaims, CreateUserSchema>({
  */
 const healthRoute = apiRoute({
   access: 'public',
+  handler: async () => ({ status: 'ok' }),
   method: 'get',
   path: '/health',
-  handler: async () => ({ status: 'ok' }),
 });
 
 /**
@@ -122,11 +122,11 @@ const usersProxyRoute = proxyRoute<UserClaims>({
  */
 const ordersProxyRoute = proxyRoute<UserClaims>({
   access: 'private',
+  authorize: (ctx: RequestContext, claims: UserClaims | undefined) =>
+    !!claims?.role && (claims.role === 'admin' || claims.role === 'user'),
   methods: ['get'],
   path: '/api/orders',
   target: 'https://api.example.com',
-  authorize: (ctx: RequestContext, claims: UserClaims | undefined) =>
-    !!claims?.role && (claims.role === 'admin' || claims.role === 'user'),
 });
 
 /**
@@ -140,7 +140,7 @@ const observability: ObservabilityConfig<UserClaims> = {
   },
   onResponse: (ctx, claims, { statusCode, durationMs }) => {
     console.log(
-      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${claims?.sub ?? 'anonymous'})`
+      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${claims?.sub ?? 'anonymous'})`,
     );
   },
 };
@@ -157,6 +157,10 @@ const observability: ObservabilityConfig<UserClaims> = {
  * - `rateLimit.windowMs`: time window in milliseconds for rate limiting (15 minutes)
  */
 const security: SecurityConfig = {
+  auth: {
+    secret: () => process.env.JWT_SECRET ?? '',
+    strategy: 'bearer',
+  },
   cors: {
     credentials: true,
     methods: ['get', 'post', 'put', 'delete', 'patch'],
@@ -166,10 +170,6 @@ const security: SecurityConfig = {
     directives: {
       'default-src': ["'self'"],
     },
-  },
-  auth: {
-    strategy: 'bearer',
-    secret: () => process.env.JWT_SECRET ?? '',
   },
   rateLimit: {
     maxRequests: 100,
@@ -184,9 +184,9 @@ const security: SecurityConfig = {
  * - `fallback`: file served for unmatched routes to support client-side routing
  */
 const spa: SpaConfig = {
+  fallback: 'index.html',
   name: 'my-app',
   root: '/var/www',
-  fallback: 'index.html',
 };
 
 /**
@@ -198,11 +198,11 @@ const spa: SpaConfig = {
  */
 const openapi: OpenApiConfig = {
   enabled: true,
-  path: '/swagger',
   options: {
-    title: 'My App API',
     description: 'Auto-generated API documentation',
+    title: 'My App API',
   },
+  path: '/swagger',
 };
 
 /**
@@ -217,12 +217,12 @@ const openapi: OpenApiConfig = {
  * Passed to `createServer()` to bootstrap the bSPA BFF server.
  */
 const exampleConfig: ServerConfig<UserClaims> = {
-  spa,
-  security,
-  observability,
   apiRoutes: [profileRoute, userRoute, healthRoute],
-  proxyRoutes: [usersProxyRoute, ordersProxyRoute],
+  observability,
   openapi,
+  proxyRoutes: [usersProxyRoute, ordersProxyRoute],
+  security,
+  spa,
 };
 
 createServer(exampleConfig).then((server) => server.start());

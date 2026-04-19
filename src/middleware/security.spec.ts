@@ -10,11 +10,11 @@ describe('createSecurityMiddleware', () => {
   it('applies helmet with default directives', () => {
     const handler = createSecurityMiddleware({ directives: undefined });
 
-    const req = { method: 'GET', path: '/', headers: {} } as any;
+    const req = { headers: {}, method: 'GET', path: '/' } as any;
     const res = {
-      setHeader: vi.fn(),
       getHeader: vi.fn(),
       removeHeader: vi.fn(),
+      setHeader: vi.fn(),
     } as any;
     const next = vi.fn();
 
@@ -22,7 +22,7 @@ describe('createSecurityMiddleware', () => {
 
     expect(res.setHeader).toHaveBeenCalledWith(
       'Content-Security-Policy',
-      expect.stringContaining("'self'")
+      expect.stringContaining("'self'"),
     );
   });
 
@@ -34,11 +34,11 @@ describe('createSecurityMiddleware', () => {
       },
     });
 
-    const req = { method: 'GET', path: '/', headers: {} } as any;
+    const req = { headers: {}, method: 'GET', path: '/' } as any;
     const res = {
-      setHeader: vi.fn(),
       getHeader: vi.fn(),
       removeHeader: vi.fn(),
+      setHeader: vi.fn(),
     } as any;
     const next = vi.fn();
 
@@ -46,18 +46,18 @@ describe('createSecurityMiddleware', () => {
 
     expect(res.setHeader).toHaveBeenCalledWith(
       'Content-Security-Policy',
-      expect.stringContaining("'none'")
+      expect.stringContaining("'none'"),
     );
   });
 
   it('calls next after applying helmet', () => {
     const handler = createSecurityMiddleware({ directives: undefined });
 
-    const req = { method: 'GET', path: '/', headers: {} } as any;
+    const req = { headers: {}, method: 'GET', path: '/' } as any;
     const res = {
-      setHeader: vi.fn(),
       getHeader: vi.fn(),
       removeHeader: vi.fn(),
+      setHeader: vi.fn(),
     } as any;
     const next = vi.fn();
 

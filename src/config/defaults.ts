@@ -1,34 +1,34 @@
 import { contentSecurityPolicy } from 'helmet';
 
 export const DEFAULTS = {
-  spa: {
-    apiPrefix: '/api',
-    fallback: 'index.html',
-    name: 'app',
-  },
   cors: {
+    credentials: false,
     methods: ['get', 'post', 'put', 'delete', 'patch'] as string[],
     origin: ['*'] as string[],
-    credentials: false,
-  },
-  rateLimit: {
-    windowMs: 900_000,
-    maxRequests: 100,
   },
   csp: {
     default: contentSecurityPolicy.getDefaultDirectives(),
   },
   openapi: {
+    includeProxyRoutes: true,
     path: '/swagger',
     title: 'bSPA API',
     version: '1.0.0',
-    includeProxyRoutes: true,
   },
   proxy: {
     timeoutMs: 60_000,
   },
+  rateLimit: {
+    maxRequests: 100,
+    windowMs: 900_000,
+  },
   route: {
     method: 'get' as const,
+  },
+  spa: {
+    apiPrefix: '/api',
+    fallback: 'index.html',
+    name: 'app',
   },
 } as const;
 

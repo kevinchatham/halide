@@ -35,8 +35,8 @@ function extractPathParams(path: string): OpenAPIV3.ParameterObject[] {
     const paramName = match[1];
     if (paramName) {
       params.push({
-        name: paramName,
         in: 'path',
+        name: paramName,
         required: true,
         schema: { type: 'string' },
       });
@@ -54,7 +54,7 @@ function convertZodSchema(
   schema: import('zod').ZodSchema,
   schemaName: string,
   components: Record<string, OpenAPIV3.SchemaObject>,
-  ctx: SchemaContext
+  ctx: SchemaContext,
 ): OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject {
   const existing = ctx.dedup.get(schema);
   if (existing) {
@@ -76,13 +76,15 @@ function convertZodSchema(
 function buildResponses(
   routeOpenapi: import('../config/types').OpenApiRouteMeta | undefined,
   components: Record<string, OpenAPIV3.SchemaObject>,
-  ctx: SchemaContext
+  ctx: SchemaContext,
 ): OpenAPIV3.ResponsesObject {
   const responses: OpenAPIV3.ResponsesObject = {};
 
   if (routeOpenapi?.responses) {
     for (const [status, resp] of Object.entries(routeOpenapi.responses)) {
-      const response: OpenAPIV3.ResponseObject = { description: resp.description };
+      const response: OpenAPIV3.ResponseObject = {
+        description: resp.description,
+      };
       if (resp.schema) {
         const name = generateSchemaName('Response', ctx.counter);
         const schemaRef = convertZodSchema(resp.schema, name, components, ctx);
@@ -95,7 +97,9 @@ function buildResponses(
     return responses;
   }
 
-  const defaultResponse: OpenAPIV3.ResponseObject = { description: 'Successful response' };
+  const defaultResponse: OpenAPIV3.ResponseObject = {
+    description: 'Successful response',
+  };
   if (routeOpenapi?.responseSchema) {
     const name = routeOpenapi.schemaName ?? generateSchemaName('Response', ctx.counter);
     const schemaRef = convertZodSchema(routeOpenapi.responseSchema, name, components, ctx);
@@ -109,7 +113,7 @@ function buildResponses(
 
 export function generateOpenApiSpec<TClaims>(
   config: ServerConfig<TClaims>,
-  options?: OpenApiOptions
+  options?: OpenApiOptions,
 ): OpenAPIV3.Document {
   const ctx: SchemaContext = {
     counter: { value: 0 },
@@ -128,9 +132,9 @@ export function generateOpenApiSpec<TClaims>(
     hasSecurity && config.security?.auth
       ? {
           BearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
             bearerFormat: 'JWT',
+            scheme: 'bearer',
+            type: 'http',
             ...(config.security.auth.strategy === 'jwks' && {
               description: 'JWT authentication via JWKS',
             }),
@@ -171,10 +175,10 @@ export function generateOpenApiSpec<TClaims>(
           route.openapi?.requestSchemaName ?? generateSchemaName('RequestBody', ctx.counter);
         const schemaRef = convertZodSchema(route.validationSchema, schemaName, components, ctx);
         operation.requestBody = {
-          required: true,
           content: {
             'application/json': { schema: schemaRef },
           },
+          required: true,
         };
       }
 
@@ -198,8 +202,8 @@ export function generateOpenApiSpec<TClaims>(
         const methodKey = method as keyof MutablePathItem;
         const parameters = extractPathParams(route.path);
         const operation: OpenAPIV3.OperationObject = {
-          summary: route.openapi?.summary ?? `Proxy to ${route.target}`,
           responses: buildResponses(route.openapi, components, ctx),
+          summary: route.openapi?.summary ?? `Proxy to ${route.target}`,
         };
 
         if (parameters.length > 0) {
@@ -225,8 +229,8 @@ export function generateOpenApiSpec<TClaims>(
   // MutablePathItem intentionally omits complex intersection constraints of
   // PathItemObject for internal mutation; the output is structurally compatible at runtime.
   const doc: OpenAPIV3.Document = {
-    openapi: '3.0.3',
     info: { title, version },
+    openapi: '3.0.3',
     paths: paths as unknown as OpenAPIV3.PathsObject,
   };
 

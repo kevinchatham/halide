@@ -20,8 +20,8 @@ describe('registerRoutes', () => {
   it('does nothing when routes is missing', async () => {
     const app = { get: vi.fn() } as unknown as Express | Router;
     const config = {
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
     } as any;
 
     await registerRoutes(app, config);
@@ -31,28 +31,28 @@ describe('registerRoutes', () => {
 
   it('registers public proxy routes without auth middleware', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/users',
           access: 'public',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api.example.com',
+          path: '/users',
           proxyPath: '/api/users',
+          target: 'https://api.example.com',
+          type: 'proxy',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -66,11 +66,11 @@ describe('registerRoutes', () => {
 
   it('registers private proxy routes with auth middleware', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     const mockAuthMiddleware = vi.fn();
@@ -78,18 +78,18 @@ describe('registerRoutes', () => {
     vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/admin',
           access: 'private',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api.example.com',
+          path: '/admin',
           proxyPath: '/api/admin',
+          target: 'https://api.example.com',
+          type: 'proxy',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -103,36 +103,36 @@ describe('registerRoutes', () => {
 
   it('registers multiple proxy routes', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/users',
           access: 'public',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api1.example.com',
+          path: '/users',
           proxyPath: '/users',
+          target: 'https://api1.example.com',
+          type: 'proxy',
         },
         {
-          type: 'proxy',
-          path: '/orders',
           access: 'public',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api2.example.com',
+          path: '/orders',
           proxyPath: '/orders',
+          target: 'https://api2.example.com',
+          type: 'proxy',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -148,11 +148,11 @@ describe('registerRoutes', () => {
 
   it('uses JWKS middleware when strategy is jwks', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     const mockJwksMiddleware = vi.fn();
@@ -160,27 +160,30 @@ describe('registerRoutes', () => {
     vi.mocked(createJwksAuthMiddleware).mockReturnValue(mockJwksMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: {
-        auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
-      },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/admin',
           access: 'private',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api.example.com',
+          path: '/admin',
           proxyPath: '/admin',
+          target: 'https://api.example.com',
+          type: 'proxy',
         },
       ],
+      security: {
+        auth: {
+          jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+          strategy: 'jwks',
+        },
+      },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
       'https://auth.example.com/.well-known/jwks.json',
-      undefined
+      undefined,
     );
     expect(app.get).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
     expect(app.post).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
@@ -191,11 +194,11 @@ describe('registerRoutes', () => {
 
   it('registers private proxy routes with auth middleware', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     const mockAuthMiddleware = vi.fn();
@@ -203,18 +206,18 @@ describe('registerRoutes', () => {
     vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/admin',
           access: 'private',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api.example.com',
+          path: '/admin',
           proxyPath: '/api/admin',
+          target: 'https://api.example.com',
+          type: 'proxy',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -228,36 +231,36 @@ describe('registerRoutes', () => {
 
   it('registers multiple proxy routes', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/users',
           access: 'public',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api1.example.com',
+          path: '/users',
           proxyPath: '/users',
+          target: 'https://api1.example.com',
+          type: 'proxy',
         },
         {
-          type: 'proxy',
-          path: '/orders',
           access: 'public',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api2.example.com',
+          path: '/orders',
           proxyPath: '/orders',
+          target: 'https://api2.example.com',
+          type: 'proxy',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -273,11 +276,11 @@ describe('registerRoutes', () => {
 
   it('uses JWKS middleware when strategy is jwks', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     const mockJwksMiddleware = vi.fn();
@@ -285,27 +288,30 @@ describe('registerRoutes', () => {
     vi.mocked(createJwksAuthMiddleware).mockReturnValue(mockJwksMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: {
-        auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
-      },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/admin',
           access: 'private',
           methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api.example.com',
+          path: '/admin',
           proxyPath: '/admin',
+          target: 'https://api.example.com',
+          type: 'proxy',
         },
       ],
+      security: {
+        auth: {
+          jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+          strategy: 'jwks',
+        },
+      },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
       'https://auth.example.com/.well-known/jwks.json',
-      undefined
+      undefined,
     );
     expect(app.get).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
     expect(app.post).toHaveBeenCalledWith('/admin', mockJwksMiddleware, mockProxyHandler);
@@ -319,9 +325,16 @@ describe('registerRoutes', () => {
     const mockHandler = vi.fn();
 
     const config = {
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: mockHandler,
+          path: '/health',
+          type: 'api',
+        },
+      ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      apiRoutes: [{ type: 'api', path: '/health', access: 'public', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);
@@ -337,9 +350,16 @@ describe('registerRoutes', () => {
     vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
 
     const config = {
+      apiRoutes: [
+        {
+          access: 'private',
+          handler: mockHandler,
+          path: '/profile',
+          type: 'api',
+        },
+      ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      apiRoutes: [{ type: 'api', path: '/profile', access: 'private', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);
@@ -356,12 +376,22 @@ describe('registerRoutes', () => {
     vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       apiRoutes: [
-        { type: 'api', path: '/public', access: 'public', handler: mockHandler1 },
-        { type: 'api', path: '/private', access: 'private', handler: mockHandler2 },
+        {
+          access: 'public',
+          handler: mockHandler1,
+          path: '/public',
+          type: 'api',
+        },
+        {
+          access: 'private',
+          handler: mockHandler2,
+          path: '/private',
+          type: 'api',
+        },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -378,12 +408,24 @@ describe('registerRoutes', () => {
     vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       apiRoutes: [
-        { type: 'api', path: '/create', access: 'public', handler: mockHandler, method: 'post' },
-        { type: 'api', path: '/update', access: 'private', handler: mockHandler, method: 'post' },
+        {
+          access: 'public',
+          handler: mockHandler,
+          method: 'post',
+          path: '/create',
+          type: 'api',
+        },
+        {
+          access: 'private',
+          handler: mockHandler,
+          method: 'post',
+          path: '/update',
+          type: 'api',
+        },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -399,11 +441,17 @@ describe('registerRoutes', () => {
     const mockHandler = vi.fn();
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       apiRoutes: [
-        { type: 'api', path: '/update/:id', access: 'public', handler: mockHandler, method: 'put' },
+        {
+          access: 'public',
+          handler: mockHandler,
+          method: 'put',
+          path: '/update/:id',
+          type: 'api',
+        },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -418,17 +466,17 @@ describe('registerRoutes', () => {
     vi.mocked(createAuthMiddleware).mockReturnValue(mockAuthMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       apiRoutes: [
         {
-          type: 'api',
-          path: '/delete/:id',
           access: 'private',
           handler: mockHandler,
           method: 'delete',
+          path: '/delete/:id',
+          type: 'api',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -436,7 +484,7 @@ describe('registerRoutes', () => {
     expect(app.delete).toHaveBeenCalledWith(
       '/delete/:id',
       mockAuthMiddleware,
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
@@ -445,9 +493,9 @@ describe('registerRoutes', () => {
     const mockHandler = vi.fn();
 
     const config = {
+      apiRoutes: [{ access: 'public', handler: mockHandler, path: '/data', type: 'api' }],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
       spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
-      apiRoutes: [{ type: 'api', path: '/data', access: 'public', handler: mockHandler }],
     } as any;
 
     await registerRoutes(app, config);
@@ -462,29 +510,39 @@ describe('registerRoutes', () => {
     vi.mocked(createJwksAuthMiddleware).mockReturnValue(mockJwksMiddleware as any);
 
     const config = {
-      spa: { root: '/var/www' },
+      apiRoutes: [
+        {
+          access: 'private',
+          handler: mockHandler,
+          path: '/profile',
+          type: 'api',
+        },
+      ],
       security: {
-        auth: { strategy: 'jwks', jwksUri: 'https://auth.example.com/.well-known/jwks.json' },
+        auth: {
+          jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+          strategy: 'jwks',
+        },
       },
-      apiRoutes: [{ type: 'api', path: '/profile', access: 'private', handler: mockHandler }],
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
 
     expect(createJwksAuthMiddleware).toHaveBeenCalledWith(
       'https://auth.example.com/.well-known/jwks.json',
-      undefined
+      undefined,
     );
     expect(app.get).toHaveBeenCalledWith('/profile', mockJwksMiddleware, expect.any(Function));
   });
 
   it('passes identity function to createProxyService', async () => {
     const app = {
+      delete: vi.fn(),
       get: vi.fn(),
+      patch: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
-      patch: vi.fn(),
-      delete: vi.fn(),
     } as unknown as Express | Router;
     const mockProxyHandler = vi.fn();
     vi.mocked(createProxyService).mockReturnValue(mockProxyHandler as any);
@@ -494,19 +552,19 @@ describe('registerRoutes', () => {
     });
 
     const config = {
-      spa: { root: '/var/www' },
-      security: { auth: { strategy: 'bearer', secret: 'secret' } },
       proxyRoutes: [
         {
-          type: 'proxy',
-          path: '/users',
           access: 'private',
-          methods: ['get', 'post', 'put', 'patch', 'delete'],
-          target: 'https://api.example.com',
-          proxyPath: '/api/users',
           identity: identityFn,
+          methods: ['get', 'post', 'put', 'patch', 'delete'],
+          path: '/users',
+          proxyPath: '/api/users',
+          target: 'https://api.example.com',
+          type: 'proxy',
         },
       ],
+      security: { auth: { secret: 'secret', strategy: 'bearer' } },
+      spa: { root: '/var/www' },
     } as any;
 
     await registerRoutes(app, config);
@@ -517,7 +575,7 @@ describe('registerRoutes', () => {
       '/api/users',
       identityFn,
       undefined,
-      undefined
+      undefined,
     );
   });
 });

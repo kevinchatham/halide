@@ -1,19 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "Node16",
-    "moduleResolution": "node16",
-    "strict": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "module": "Node16",
     "moduleDetection": "force",
+    "moduleResolution": "node16",
     "noUncheckedIndexedAccess": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "target": "ES2022",
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*"]

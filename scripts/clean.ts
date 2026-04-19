@@ -14,10 +14,10 @@ Promise.all(
     const files = await glob(pattern, { dot: true });
     for (const f of files) {
       try {
-        rmSync(f, { recursive: true, force: true });
+        rmSync(f, { force: true, recursive: true });
       } catch (err) {
         console.error(`Failed to remove ${f}:`, err);
       }
     }
-  })
+  }),
 ).catch(() => {});

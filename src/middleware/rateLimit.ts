@@ -1,8 +1,8 @@
 import type { Request, RequestHandler } from 'express';
 
 interface RateLimitConfig {
-  windowMs: number;
   maxRequests: number;
+  windowMs: number;
 }
 
 interface WindowEntry {
@@ -67,7 +67,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
   };
 
   return {
-    middleware,
     dispose: () => clearInterval(timer),
+    middleware,
   };
 }

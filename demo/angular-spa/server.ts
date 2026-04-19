@@ -4,10 +4,10 @@ import { createServer } from 'bspa';
 import type { Request, Response } from 'express';
 
 interface JwtClaims {
-  sub: string;
-  name: string;
   admin: boolean;
   iat: number;
+  name: string;
+  sub: string;
 }
 
 const DEMO_JWT =
@@ -20,64 +20,64 @@ function generateMockJwt(): string {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const server = createServer<JwtClaims>({
-  spa: {
-    name: 'angular-spa',
-    root: path.join(__dirname, './browser'),
-    fallback: 'index.html',
-  },
-  proxy: {
-    basePath: '/api',
-    routes: [
-      { path: '/users', access: 'private', target: 'http://localhost:3000' },
-      { path: '/products', access: 'private', target: 'http://localhost:3000' },
-    ],
-  },
   api: {
     basePath: '/bff',
     routes: [
       {
-        path: '/token',
         access: 'public',
-        method: 'get',
         handler: (_req: Request, res: Response): void => {
           res.json({ token: generateMockJwt() });
         },
+        method: 'get',
+        path: '/token',
       },
       {
-        path: '/config',
         access: 'public',
-        method: 'get',
         handler: (_req: Request, res: Response): void => {
           res.json({
             apiUrl: 'http://localhost:3000',
             environment: process.env['NODE_ENV'] || 'development',
           });
         },
+        method: 'get',
+        path: '/config',
       },
       {
-        path: '/admin',
         access: 'private',
-        method: 'get',
         handler: (req: Request, res: Response): void => {
-          res.json({ user: req.claims, data: 'secret' });
+          res.json({ data: 'secret', user: req.claims });
         },
+        method: 'get',
+        path: '/admin',
       },
+    ],
+  },
+  auth: {
+    secret: 'a-string-secret-at-least-256-bits-long',
+    strategy: 'bearer',
+  },
+  proxy: {
+    basePath: '/api',
+    routes: [
+      { access: 'private', path: '/users', target: 'http://localhost:3000' },
+      { access: 'private', path: '/products', target: 'http://localhost:3000' },
     ],
   },
   security: {
     cors: {
-      origin: ['http://localhost:4200', 'http://localhost:3001'],
       credentials: true,
+      origin: ['http://localhost:4200', 'http://localhost:3001'],
     },
     csp: {
+      connectSrc: ["'self'"],
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
-      connectSrc: ["'self'"],
     },
   },
-  auth: {
-    strategy: 'bearer',
-    secret: 'a-string-secret-at-least-256-bits-long',
+  spa: {
+    fallback: 'index.html',
+    name: 'angular-spa',
+    root: path.join(__dirname, './browser'),
   },
 });
 

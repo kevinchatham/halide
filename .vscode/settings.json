@@ -1,9 +1,6 @@
 {
+  "cSpell.words": ["APIV", "bspa"],
   "terminal.integrated.env.linux": {
     "NODE_ENV": "development"
-  },
-  "cSpell.words": [
-    "APIV",
-    "bspa"
-  ]
+  }
 }

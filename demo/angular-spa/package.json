@@ -1,17 +1,4 @@
 {
-  "name": "bspa-angular-spa-demo",
-  "version": "0.0.0",
-  "scripts": {
-    "ng": "ng",
-    "serve": "ng serve",
-    "serve:server":"nodemon",
-    "build": "ng build && npm run build:server",
-    "build:server":"tsc --project tsconfig.server.json",
-    "watch": "ng build --watch --configuration development",
-    "test": "ng test"
-  },
-  "private": true,
-  "packageManager": "npm@11.8.0",
   "dependencies": {
     "@angular/common": "^21.2.0",
     "@angular/compiler": "^21.2.0",
@@ -31,5 +18,18 @@
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"
-  }
+  },
+  "name": "bspa-angular-spa-demo",
+  "packageManager": "npm@11.8.0",
+  "private": true,
+  "scripts": {
+    "build": "ng build && npm run build:server",
+    "build:server": "tsc --project tsconfig.server.json",
+    "ng": "ng",
+    "serve": "ng serve",
+    "serve:server": "nodemon",
+    "test": "ng test",
+    "watch": "ng build --watch --configuration development"
+  },
+  "version": "0.0.0"
 }

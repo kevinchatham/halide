@@ -21,8 +21,8 @@ vi.mock('jose', async (importOriginal) => {
 const secret = new TextEncoder().encode('test-secret');
 
 interface TestClaims {
-  sub: string;
   role: string;
+  sub: string;
 }
 
 async function createValidToken(claims: Record<string, unknown>): Promise<string> {
@@ -39,8 +39,8 @@ describe('createAuthMiddleware', () => {
 
     const req = { headers: {} } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -56,8 +56,8 @@ describe('createAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Basic abc123' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -74,8 +74,8 @@ describe('createAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Bearer invalid-token' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -89,15 +89,15 @@ describe('createAuthMiddleware', () => {
   });
 
   it('calls next with valid token and attaches claims', async () => {
-    const claims = { sub: 'user-123', role: 'admin' };
+    const claims = { role: 'admin', sub: 'user-123' };
     vi.mocked(verifyJwt).mockResolvedValue(claims);
 
     const handler = createAuthMiddleware<TestClaims>(secret);
 
     const req = { headers: { authorization: 'Bearer valid-token' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -118,8 +118,8 @@ describe('createAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Bearer bad-token' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -139,8 +139,8 @@ describe('createAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Bearer my-token-here' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -162,8 +162,8 @@ describe('createJwksAuthMiddleware', () => {
 
     const req = { headers: {} } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -179,8 +179,8 @@ describe('createJwksAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Basic abc123' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
@@ -192,7 +192,7 @@ describe('createJwksAuthMiddleware', () => {
 
   it('calls next with valid token and attaches claims', async () => {
     mockJwksVerify.mockResolvedValueOnce({
-      payload: { sub: 'user-123', role: 'admin' },
+      payload: { role: 'admin', sub: 'user-123' },
       protectedHeader: { alg: 'RS256' },
     });
 
@@ -200,14 +200,14 @@ describe('createJwksAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Bearer valid-token' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 
     await handler(req, res, next);
 
-    expect(req.claims).toEqual({ sub: 'user-123', role: 'admin' });
+    expect(req.claims).toEqual({ role: 'admin', sub: 'user-123' });
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
@@ -219,8 +219,8 @@ describe('createJwksAuthMiddleware', () => {
 
     const req = { headers: { authorization: 'Bearer invalid-token' } } as any;
     const res = {
-      status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
     } as any;
     const next = vi.fn();
 

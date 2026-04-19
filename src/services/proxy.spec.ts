@@ -18,13 +18,13 @@ describe('createProxyService', () => {
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: 'https://api.example.com',
         changeOrigin: true,
-        timeout: DEFAULTS.proxy.timeoutMs,
         pathRewrite: {
           '^/api/users': '/users',
         },
-      })
+        target: 'https://api.example.com',
+        timeout: DEFAULTS.proxy.timeoutMs,
+      }),
     );
   });
 
@@ -33,13 +33,13 @@ describe('createProxyService', () => {
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: 'https://backend.example.com',
         changeOrigin: true,
-        timeout: DEFAULTS.proxy.timeoutMs,
         pathRewrite: {
           '^/v1/data': '/data',
         },
-      })
+        target: 'https://backend.example.com',
+        timeout: DEFAULTS.proxy.timeoutMs,
+      }),
     );
   });
 
@@ -57,15 +57,18 @@ describe('createProxyService', () => {
     mockedCreateProxyMiddleware.mockReturnValue(mockHandler as any);
 
     const transform = ({ body }: { body: unknown }) => ({
-      body: { ...(typeof body === 'object' && body ? body : {}), transformed: true },
-      headers: { 'x-custom': 'value', host: 'evil' },
+      body: {
+        ...(typeof body === 'object' && body ? body : {}),
+        transformed: true,
+      },
+      headers: { host: 'evil', 'x-custom': 'value' },
     });
     const result = createProxyService(
       'https://api.example.com',
       '/api',
       '/api',
       undefined,
-      transform
+      transform,
     );
 
     const req = { body: { key: 'val' }, headers: { host: 'test' } } as any;
@@ -91,12 +94,12 @@ describe('createProxyService', () => {
       '/api',
       '/api',
       undefined,
-      transform
+      transform,
     );
 
     const req = {
       body: {},
-      headers: { 'set-cookie': ['a=1', 'b=2'], host: 'test' },
+      headers: { host: 'test', 'set-cookie': ['a=1', 'b=2'] },
     } as any;
     const res = {} as any;
     const next = vi.fn();
@@ -118,12 +121,12 @@ describe('createProxyService', () => {
       '/api',
       '/api',
       undefined,
-      transform
+      transform,
     );
 
     const req = {
       body: {},
-      headers: { 'x-dup': ['val1', 'val2'], host: 'test' },
+      headers: { host: 'test', 'x-dup': ['val1', 'val2'] },
     } as any;
     const res = {} as any;
     const next = vi.fn();
@@ -138,14 +141,14 @@ describe('createProxyService', () => {
 
     const transform = () => ({
       body: {},
-      headers: { 'X-Custom': 'value', 'X-Another-Header': 'test' },
+      headers: { 'X-Another-Header': 'test', 'X-Custom': 'value' },
     });
     const result = createProxyService(
       'https://api.example.com',
       '/api',
       '/api',
       undefined,
-      transform
+      transform,
     );
 
     const req = { body: {}, headers: { host: 'test' } } as any;
@@ -172,7 +175,7 @@ describe('createProxyService', () => {
       '/api',
       '/api',
       undefined,
-      transform
+      transform,
     );
 
     const req = { body: {}, headers: { host: 'test' } } as any;
@@ -195,7 +198,7 @@ describe('createProxyService', () => {
       '/api',
       '/api',
       undefined,
-      transform
+      transform,
     );
 
     const req = { body: {}, headers: {} } as any;
@@ -218,7 +221,7 @@ describe('createProxyService', () => {
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
         timeout: 60_000,
-      })
+      }),
     );
   });
 
@@ -229,13 +232,13 @@ describe('createProxyService', () => {
       '/users',
       undefined,
       undefined,
-      5000
+      5000,
     );
 
     expect(mockedCreateProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
         timeout: 5000,
-      })
+      }),
     );
   });
 });
