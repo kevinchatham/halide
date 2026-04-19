@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { products } from '../data/store.js';
-import { CreateProductSchema, ProductSchema, UpdateProductSchema } from '../schemas/product.js';
+import { products } from '../data/store';
+import { CreateProductSchema, ProductSchema, UpdateProductSchema } from '../schemas/product';
 
 const router = Router();
 

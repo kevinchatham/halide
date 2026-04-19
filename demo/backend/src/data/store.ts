@@ -1,5 +1,5 @@
-import type { Product } from '../schemas/product.js';
-import type { User } from '../schemas/user.js';
+import type { Product } from '../schemas/product';
+import type { User } from '../schemas/user';
 
 export const users: User[] = [
   {

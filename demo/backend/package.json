@@ -8,16 +8,16 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "nodemon": "^3.1.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.9.0"
   },
   "main": "./dist/index.js",
   "name": "bspa-backend-demo",
   "private": true,
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "serve": "nodemon",
     "start": "node dist/index.js"
   },
-  "type": "commonjs",
   "version": "0.0.0"
 }
