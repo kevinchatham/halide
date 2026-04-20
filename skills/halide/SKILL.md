@@ -364,25 +364,25 @@ observability: {
 
 ### Types
 
-| Type                              | Description                                                                  |
-| --------------------------------- | ---------------------------------------------------------------------------- |
-| `Server`                          | Return type of `createServer` — `{ start, stop }`                            |
-| `CreateAppResult`                 | Return type of `createApp` — `{ app, rateLimitDispose }`                     |
-| `ServerConfig<TClaims>`           | Full server configuration                                                    |
-| `SpaConfig`                       | SPA/static serving config — `root` is required                               |
-| `ApiRoute<TClaims, TBody>`        | API route definition                                                         |
-| `ProxyRoute<TClaims>`             | Proxy route definition                                                       |
-| `SecurityConfig`                  | Security configuration (auth, CORS, CSP, rate limit)                         |
-| `SecurityAuthConfig`              | Auth configuration (`strategy`, `secret`, `jwksUri`, `audience`)             |
-| `CorsConfig`                      | CORS configuration                                                           |
-| `CspDirectives`                   | CSP directive map (camelCase keys)                                           |
-| `CspOptions`                      | CSP options — `{ directives?: CspDirectives }`                               |
-| `OpenApiConfig`                   | OpenAPI configuration (`enabled`, `path`, `options`)                         |
-| `OpenApiRouteMeta`                | Route-level OpenAPI metadata                                                 |
-| `ObservabilityConfig<TClaims>`    | Observability configuration                                                  |
-| `RequestContext`                  | Request data passed to handlers (method, path, headers, params, query, body) |
-| `ApiRouteHandler<TClaims, TBody>` | API route handler — `(ctx, claims, logger) => Promise<unknown>`              |
+| Type                              | Description                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `Server`                          | Return type of `createServer` — `{ start, stop }`                               |
+| `CreateAppResult`                 | Return type of `createApp` — `{ app, rateLimitDispose }`                        |
+| `ServerConfig<TClaims>`           | Full server configuration                                                       |
+| `SpaConfig`                       | SPA/static serving config — `root` is required                                  |
+| `ApiRoute<TClaims, TBody>`        | API route definition                                                            |
+| `ProxyRoute<TClaims>`             | Proxy route definition                                                          |
+| `SecurityConfig`                  | Security configuration (auth, CORS, CSP, rate limit)                            |
+| `SecurityAuthConfig`              | Auth configuration (`strategy`, `secret`, `jwksUri`, `audience`)                |
+| `CorsConfig`                      | CORS configuration                                                              |
+| `CspDirectives`                   | CSP directive map (camelCase keys)                                              |
+| `CspOptions`                      | CSP options — `{ directives?: CspDirectives }`                                  |
+| `OpenApiConfig`                   | OpenAPI configuration (`enabled`, `path`, `options`)                            |
+| `OpenApiRouteMeta`                | Route-level OpenAPI metadata                                                    |
+| `ObservabilityConfig<TClaims>`    | Observability configuration                                                     |
+| `RequestContext`                  | Request data passed to handlers (method, path, headers, params, query, body)    |
+| `ApiRouteHandler<TClaims, TBody>` | API route handler — `(ctx, claims, logger) => Promise<unknown>`                 |
 | `AuthorizeFn<TClaims>`            | Authorization callback — `(ctx, claims, logger) => boolean \| Promise<boolean>` |
-| `ClaimExtractor<TClaims>`         | Internal type for claim extraction from Hono Context                         |
-| `TransformFn`                     | Proxy request transform — `({ body, headers }) => { body, headers }`         |
-| `Logger`                          | Logger interface — `debug`, `error`, `info`, `warn`                          |
+| `ClaimExtractor<TClaims>`         | Internal type for claim extraction from Hono Context                            |
+| `TransformFn`                     | Proxy request transform — `({ body, headers }) => { body, headers }`            |
+| `Logger`                          | Logger interface — `debug`, `error`, `info`, `warn`                             |

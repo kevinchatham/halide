@@ -1,8 +1,37 @@
 {
   "name": "halide",
-  "version": "0.0.0",
-  "type": "module",
+  "version": "0.0.1",
+  "description": "A declarative BFF (Backend for Frontend) runtime that standardizes SPA communication with auth, proxy, CSP, rate limiting, and OpenAPI support",
+  "keywords": [
+    "angular",
+    "api",
+    "authentication",
+    "backend-for-frontend",
+    "bff",
+    "cli",
+    "cors",
+    "csp",
+    "esm",
+    "hono",
+    "jwks",
+    "jwt",
+    "openapi",
+    "proxy",
+    "rate-limit",
+    "react",
+    "server",
+    "spa",
+    "svelte",
+    "typescript",
+    "vue"
+  ],
   "license": "MIT",
+  "author": "kevinchatham",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinchatham/halide.git"
+  },
+  "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,15 +51,15 @@
   "bin": {
     "halide": "./dist/cli/index.js"
   },
-  "engines": {
-    "node": ">=24.0.0"
-  },
   "files": [
     "dist",
     "LICENSE",
     "package.json",
     "README.md"
   ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "build": "tsc --noEmit && tsup",
     "cli": "node dist/cli/index.js",
@@ -64,19 +93,15 @@
     "zod-openapi": "^4.2.4"
   },
   "devDependencies": {
-    "@angular/cli": "^21.0.0",
-    "@angular/core": "^21.0.0",
     "@biomejs/biome": "2.4.12",
     "@sonar/scan": "^4.3.5",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.15",
-    "concurrently": "^9.2.1",
     "dotenv-cli": "^11.0.0",
     "nodemon": "^3.1.14",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.7.1",
-    "rimraf": "^6.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.0",
     "vitest": "^4.1.4"
