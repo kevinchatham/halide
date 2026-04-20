@@ -55,6 +55,14 @@ Halide provides a shared structure for all of these concerns. The result is a co
 ## Get started
 
 ```bash
+npx halide init
+```
+
+This detects your package manager, installs halide, scaffolds a `server.ts` entry point with a health route, creates an `AGENTS.md` for AI-assisted development, and installs agent skills.
+
+Or install manually:
+
+```bash
 npm install halide
 ```
 

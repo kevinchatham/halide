@@ -2,6 +2,7 @@ import { rmSync } from 'node:fs';
 import { glob } from 'glob';
 
 const patterns: string[] = [
+  '.scannerwork',
   '**/.angular',
   '**/dist',
   '**/package-lock.json',
@@ -10,7 +11,7 @@ const patterns: string[] = [
   'node_modules',
 ];
 
-Promise.all(
+await Promise.all(
   patterns.map(async (pattern) => {
     const files = await glob(pattern, { dot: true });
     for (const f of files) {
@@ -22,4 +23,4 @@ Promise.all(
       }
     }
   }),
-).catch(() => {});
+);

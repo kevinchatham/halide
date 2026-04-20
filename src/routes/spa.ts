@@ -11,14 +11,16 @@ export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): {
 } {
   const { apiPrefix = DEFAULTS.spa.apiPrefix, root, fallback = DEFAULTS.spa.fallback } = spaConfig;
 
-  const staticMiddleware = serveStatic({ root });
+  const resolvedRoot = path.resolve(root);
+
+  const staticMiddleware = serveStatic({ root: resolvedRoot });
 
   const spaFallback = async (c: Context): Promise<Response> => {
     if (apiPrefix && c.req.path.startsWith(apiPrefix)) {
       return c.json({ error: 'Not Found' }, 404);
     }
     try {
-      const content = await fs.readFile(path.join(root, fallback), 'utf-8');
+      const content = await fs.readFile(path.join(resolvedRoot, fallback), 'utf-8');
       return c.html(content);
     } catch {
       return c.notFound();

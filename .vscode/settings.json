@@ -1,5 +1,5 @@
 {
-  "cSpell.words": ["APIV", "halide", "SONARQUBE"],
+  "cSpell.words": ["APIV", "halide", "scannerwork", "SONARQUBE"],
   "sonarlint.connectedMode.project": {
     "connectionId": "http-desktop-9000",
     "projectKey": "halide"
