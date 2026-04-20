@@ -36,6 +36,5 @@ describe('DEFAULTS', () => {
     expect(DEFAULTS.openapi.path).toBe('/swagger');
     expect(DEFAULTS.openapi.title).toBe('Halide API');
     expect(DEFAULTS.openapi.version).toBe('1.0.0');
-    expect(DEFAULTS.openapi.includeProxyRoutes).toBe(true);
   });
 });

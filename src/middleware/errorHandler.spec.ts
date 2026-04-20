@@ -1,5 +1,5 @@
-import type { Request, Response } from 'express';
-import type { Logger } from '../config/types';
+import { Hono } from 'hono';
+import type { Logger } from '../types';
 import { createErrorHandler } from './errorHandler';
 
 const logger: Logger = {
@@ -11,88 +11,57 @@ const logger: Logger = {
 
 describe('createErrorHandler', () => {
   it('logs the error with method and path', () => {
+    const app = new Hono();
     const handler = createErrorHandler(logger);
+    app.onError(handler);
+    app.get('/test', () => {
+      throw new Error('Test error');
+    });
 
-    const req = { method: 'GET', path: '/test' } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      locals: {},
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-    const error = new Error('Test error');
+    app.request('/test');
 
-    handler(error, req, res, next);
-
-    expect(logger.error).toHaveBeenCalledWith('[error] GET /test:', error);
+    expect(logger.error).toHaveBeenCalledWith('[error] GET /test:', expect.any(Error));
   });
 
-  it('returns 500 with error message', () => {
+  it('returns 500 with error message', async () => {
+    const app = new Hono();
     const handler = createErrorHandler(logger);
+    app.onError(handler);
+    app.post('/api/data', () => {
+      throw new Error('Something broke');
+    });
 
-    const req = { method: 'POST', path: '/api/data' } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      locals: {},
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-    const error = new Error('Something broke');
+    const res = await app.request('/api/data', { method: 'POST' });
 
-    handler(error, req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Internal Server Error' });
   });
 
-  it('handles errors without a message', () => {
+  it('handles errors without a message', async () => {
+    const app = new Hono();
     const handler = createErrorHandler(logger);
+    app.onError(handler);
+    app.delete('/resource', () => {
+      throw new Error();
+    });
 
-    const req = { method: 'DELETE', path: '/resource' } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      locals: {},
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
+    const res = await app.request('/resource', { method: 'DELETE' });
 
-    handler(new Error(), req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' });
+    expect(res.status).toBe(500);
   });
 
-  it('stores Error instances in res.locals.error', () => {
+  it('handles non-Error thrown values', () => {
     const handler = createErrorHandler(logger);
+    const mockJson = vi.fn().mockReturnValue(new Response());
+    const mockContext = {
+      json: mockJson,
+      req: { method: 'GET', path: '/test' },
+    } as unknown as Parameters<typeof handler>[1];
 
-    const req = { method: 'GET', path: '/test' } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      locals: {},
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-    const error = new Error('boom');
+    handler('string error', mockContext);
 
-    handler(error, req, res, next);
-
-    expect(res.locals.error).toBe(error);
-  });
-
-  it('wraps non-Error values in res.locals.error', () => {
-    const handler = createErrorHandler(logger);
-
-    const req = { method: 'GET', path: '/test' } as unknown as Request;
-    const res = {
-      json: vi.fn().mockReturnThis(),
-      locals: {},
-      status: vi.fn().mockReturnThis(),
-    } as unknown as Response;
-    const next = vi.fn();
-
-    handler('string error', req, res, next);
-
-    expect(res.locals.error).toBeInstanceOf(Error);
-    expect(res.locals.error.message).toBe('string error');
+    expect(mockJson).toHaveBeenCalledWith({ error: 'Internal Server Error' }, 500);
+    expect(logger.error).toHaveBeenCalledWith('[error] GET /test:', expect.any(Error));
   });
 });

@@ -15,7 +15,7 @@ describe('validateServerConfig', () => {
         security: {
           auth: { secret: () => 'secret123', strategy: 'bearer' },
           cors: { credentials: true, origin: ['http://localhost:3000'] },
-          csp: { directives: { 'default-src': ["'self'"] } },
+          csp: { directives: { defaultSrc: ["'self'"] } },
         },
         spa: { fallback: 'index.html', name: 'test', root: '/public' },
       }),
@@ -332,5 +332,73 @@ describe('validateServerConfig', () => {
         spa: { root: '/var/www' },
       }),
     ).not.toThrow();
+  });
+
+  it('accepts valid spa.port', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: 8080, root: '/var/www' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects spa.port of 0', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: 0, root: '/var/www' },
+      }),
+    ).toThrow('spa.port must be an integer between 1 and 65535');
+  });
+
+  it('rejects negative spa.port', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: -1, root: '/var/www' },
+      }),
+    ).toThrow('spa.port must be an integer between 1 and 65535');
+  });
+
+  it('rejects spa.port above 65535', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: 70000, root: '/var/www' },
+      }),
+    ).toThrow('spa.port must be an integer between 1 and 65535');
+  });
+
+  it('rejects non-integer spa.port', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: 80.5, root: '/var/www' },
+      }),
+    ).toThrow('spa.port must be an integer between 1 and 65535');
+  });
+
+  it('accepts spa.port of 1', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: 1, root: '/var/www' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts spa.port of 65535', () => {
+    expect(() =>
+      validateServerConfig({
+        spa: { port: 65535, root: '/var/www' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects kebab-case CSP directive keys', () => {
+    expect(() =>
+      validateServerConfig({
+        security: {
+          // @ts-expect-error - intentionally passing kebab-case for runtime validation test
+          csp: { directives: { 'default-src': ["'self'"] } },
+        },
+        spa: { root: '/var/www' },
+      }),
+    ).toThrow("CSP directive 'default-src' uses kebab-case");
   });
 });

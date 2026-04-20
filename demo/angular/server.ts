@@ -1,8 +1,8 @@
 import path from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import type { Request, Response } from 'express';
-import type { Server } from 'halide';
-import { createServer } from 'halide';
+import type { RequestContext, Server } from 'halide';
+import { apiRoute, createServer, proxyRoute } from 'halide';
 
 interface JwtClaims {
   admin: boolean;
@@ -20,59 +20,62 @@ function generateMockJwt(): string {
 
 const __dirname: string = path.dirname(fileURLToPath(import.meta.url));
 
-const server: Server = createServer<JwtClaims>({
-  api: {
-    basePath: '/bff',
-    routes: [
-      {
-        access: 'public',
-        handler: (_req: Request, res: Response): void => {
-          res.json({ token: generateMockJwt() });
-        },
-        method: 'get',
-        path: '/token',
-      },
-      {
-        access: 'public',
-        handler: (_req: Request, res: Response): void => {
-          res.json({
-            apiUrl: 'http://localhost:3000',
-            environment: process.env['NODE_ENV'] || 'development',
-          });
-        },
-        method: 'get',
-        path: '/config',
-      },
-      {
-        access: 'private',
-        handler: (req: Request, res: Response): void => {
-          res.json({ data: 'secret', user: req.claims });
-        },
-        method: 'get',
-        path: '/admin',
-      },
-    ],
-  },
-  auth: {
-    secret: 'a-string-secret-at-least-256-bits-long',
-    strategy: 'bearer',
-  },
-  proxy: {
-    basePath: '/api',
-    routes: [
-      { access: 'private', path: '/users', target: 'http://localhost:3000' },
-      { access: 'private', path: '/products', target: 'http://localhost:3000' },
-    ],
-  },
+const server: Server = await createServer<JwtClaims>({
+  apiRoutes: [
+    apiRoute({
+      access: 'public',
+      handler: async () => ({ token: generateMockJwt() }),
+      method: 'get',
+      path: '/token',
+    }),
+    apiRoute({
+      access: 'public',
+      handler: async () => ({
+        apiUrl: 'http://localhost:3000',
+        environment: process.env['NODE_ENV'] || 'development',
+      }),
+      method: 'get',
+      path: '/config',
+    }),
+    apiRoute({
+      access: 'private',
+      handler: async (_ctx: RequestContext, claims: JwtClaims | undefined) => ({
+        data: 'secret',
+        user: claims,
+      }),
+      method: 'get',
+      path: '/admin',
+    }),
+  ],
+  proxyRoutes: [
+    proxyRoute({
+      access: 'private',
+      methods: ['get', 'post', 'put', 'patch', 'delete'],
+      path: '/users',
+      target: 'http://localhost:3000',
+    }),
+    proxyRoute({
+      access: 'private',
+      methods: ['get', 'post', 'put', 'patch', 'delete'],
+      path: '/products',
+      target: 'http://localhost:3000',
+    }),
+  ],
   security: {
+    auth: {
+      secret: () => 'a-string-secret-at-least-256-bits-long',
+      strategy: 'bearer',
+    },
     cors: {
       credentials: true,
-      origin: ['http://localhost:4200', 'http://localhost:3001'],
+      origin: ['http://localhost:4200', 'http://localhost:3553'],
     },
     csp: {
-      connectSrc: ["'self'"],
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      directives: {
+        connectSrc: ["'self'"],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+      },
     },
   },
   spa: {

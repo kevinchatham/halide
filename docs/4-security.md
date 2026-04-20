@@ -13,9 +13,9 @@ security: {
   },
   csp: {
     directives: {
-      'default-src': ["'self'"],
-      'script-src': ["'self'"],
-      'connect-src': ["'self'", 'https://api.example.com'],
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", 'https://api.example.com'],
     },
   },
   rateLimit: {
@@ -26,5 +26,5 @@ security: {
 ```
 
 - **CORS**: Wildcard origin (`*`) cannot be combined with `credentials: true`. The validator will catch this.
-- **CSP**: Defaults to Helmet's `contentSecurityPolicy.getDefaultDirectives()` if not specified.
+- **CSP**: Applied via `hono/secure-headers`. Defaults to a restrictive policy if not specified.
 - **Rate limiting**: IP-based sliding window. Defaults to 100 requests per 15 minutes.

@@ -10,6 +10,7 @@ npm run lint:watch     # nodemon reruns lint:fix on .ts/.json changes
 npm run typecheck      # tsc --noEmit
 npm run test           # vitest run --coverage (single run + coverage)
 npm run test:watch     # vitest (watch, no coverage)
+npm run test:ui        # vitest --ui
 npm run clean          # npx tsx scripts/clean.ts
 npx vitest run src/config/validate.spec.ts  # single test file
 ```
@@ -30,34 +31,34 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 
 ## Architecture
 
-- **Entry**: `src/index.ts` → re-exports `createServer<TClaims>` from `src/runtime.ts`
+- **Framework**: Hono (not Express). All HTTP types come from `hono`, not `express`
+- **Entry**: `src/index.ts` → re-exports `createServer<TClaims>` from `src/config/runtime.ts`
 - `ServerConfig` uses **separate arrays**: `apiRoutes` (type `'api'`) + `proxyRoutes` (type `'proxy'`), not a single `routes` array
 - Auth config is nested: `security.auth.strategy` (`'bearer'` | `'jwks'`), not a top-level `auth` key
-- API route handler signature is `(ctx, claims, logger)` — 3 params, not 2. `claims` is `TClaims | undefined`, `logger` is `Logger`
+- API route handler signature is `(ctx, claims, logger)` — 3 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context), `claims` is `TClaims | undefined`, `logger` is `Logger`
+- Auth uses `hono/jwt` (bearer) and `hono/jwk` (JWKS) — not `jose`
 - Validation is imperative (`validateServerConfig` in `src/config/validate.ts`), not Zod — Zod is only used for route body validation and OpenAPI schema generation
-- `src/middleware/validate.ts` — per-route body validation using Zod schemas (distinct from config validation)
+- CSP directives must use camelCase (`defaultSrc`), not kebab-case (`default-src`) — validator throws on kebab
 - SPA `apiPrefix` defaults to `'/api'` — paths starting with that prefix get 404 instead of SPA fallback (set `apiPrefix: ''` to disable)
-- `src/types/express.ts` — augments `Express.Request` with `claims?: unknown`
 - `src/demo.ts` exists but is **not exported** — used by demo apps only
 - **src/config/** — types, defaults, validation
-- **src/middleware/** — auth (bearer + JWKS), CORS, CSP, rate limit, request ID, error handler, Swagger UI, body validation
-- **src/routes/** — `registry.ts` (route registration), `spa.ts` (static file serving)
-- **src/services/** — proxy handler
-- **src/openapi/** — spec generator (uses `zod-to-json-schema`)
-- **src/utils/** — JWT helpers (uses `jose`)
+- **src/middleware/** — auth (bearer + JWKS via hono/jwt + hono/jwk), CORS, CSP, rate limit, request ID, error handler, OpenAPI (Scalar UI)
+- **src/routes/** — `apiRoute.ts`, `proxyRoute.ts`, `registry.ts` (route registration), `spa.ts` (static file serving)
+- **src/services/** — `proxy.ts` (proxy handler)
+- **src/cli/** — CLI commands (`npx halide init`)
+- **src/utils/** — does not exist; JWT helpers are in `src/middleware/auth.ts`
 
 ## Testing
 
 - Test files co-located as `*.spec.ts` alongside source
 - Vitest `globals: true` — use `describe`/`it`/`expect`/`vi` without imports
-- Auth tests mock `jose` and `../utils/jwt` with `vi.mock()`
+- Auth tests use real `hono/jwt` `sign()` for tokens and `Hono` app instances (no mocking)
 - Test environment is `node`
 
 ## TypeScript
 
 - Strict mode + `noUncheckedIndexedAccess`
 - Module: `es2022` / `bundler` resolution — use `.js` extensions in relative imports
-- Express 5 types (`@types/express@^5`)
 - Target: ES2022
 
 ## Demo
@@ -65,7 +66,7 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 ```bash
 npm run demo:install             # build + link + install both demos
 npm run demo:backend:serve       # port 3000
-npm run demo:angular:serve       # port 3001
+npm run demo:angular:serve       # port 3553
 ```
 
 `demo:link` builds the library and runs `npm link` so demos resolve `halide` locally. Demo apps are in `demo/backend/` and `demo/angular/`.
@@ -80,9 +81,10 @@ npm run demo:angular:serve       # port 3001
 - `noConfusingVoidType` is a Biome error — use `undefined` instead of `void` in return types
 - `noNonNullAssertion` is off — `!` is allowed when needed
 - Biome assist auto-runs on `lint:fix`: organizes imports, sorts interface members, object keys, and attributes
-- Default server port is 3001 (from `process.env.PORT` fallback in `runtime.ts`)
+- Default server port is 3553 (from `process.env.PORT` fallback in `runtime.ts`)
 - Private routes require `security.auth` to be configured — validation will throw otherwise
 - `package.json` declares `"type": "module"` — this is an ESM project
 - Node.js >=24.0.0 required (enforced in `engines`)
 - CORS wildcard origin (`*`) cannot be combined with `credentials: true` — config validator will throw
 - `apiRoute()` and `proxyRoute()` factory functions fill in `type` and default `authorize` — prefer them over raw route objects
+- `proxyRoute` requires `methods` array (not optional like `apiRoute.method`)

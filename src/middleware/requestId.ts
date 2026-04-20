@@ -1,22 +1,9 @@
-import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import type { Context, Next } from 'hono';
 
-declare global {
-  namespace Express {
-    interface Request {
-      requestId?: string;
-    }
-  }
-}
-
-export function createRequestIdMiddleware(): RequestHandler {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const requestId = (req.headers['x-request-id'] as string | undefined) ?? generateRequestId();
-    req.requestId = requestId;
-    res.setHeader('x-request-id', requestId);
-    next();
+export function createRequestIdMiddleware() {
+  return async (c: Context, next: Next): Promise<void> => {
+    const requestId = c.req.header('x-request-id') ?? crypto.randomUUID();
+    c.header('x-request-id', requestId);
+    await next();
   };
-}
-
-function generateRequestId(): string {
-  return crypto.randomUUID();
 }

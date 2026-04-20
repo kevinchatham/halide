@@ -9,10 +9,10 @@
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
     <img src="https://img.shields.io/badge/docs-1.0.0-cyan" alt="Documentation"/>
   </a>
+  <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
     <img src="https://img.shields.io/badge/node-%3E%3D24-1e293b" alt="Node.js"/>
   </a>
-  <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
 </p>
 
 ## What is Halide?
@@ -53,6 +53,14 @@ Halide provides a shared structure for all of these concerns. The result is a co
 - Optional OpenAPI documentation
 
 ## Get started
+
+```bash
+npx halide init
+```
+
+This detects your package manager, installs halide, scaffolds a `server.ts` entry point with a health route, creates an `AGENTS.md` for AI-assisted development, and installs agent skills.
+
+Or install manually:
 
 ```bash
 npm install halide
@@ -97,12 +105,12 @@ const server = await createServer({
 await server.start();
 ```
 
-> The server starts on port 3001 (override with the `PORT` environment variable).
+> The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
 
 ## When not to use Halide
 
 Halide is opinionated but extensible. API route handlers are arbitrary async functions, and proxy routes support per-route `authorize`, `transform`, and `identity` hooks. Consider alternatives if:
 
-- **You need direct control over the HTTP layer.** Halide abstracts Express behind a typed config. If you need to set custom response headers/status codes, stream responses, handle file uploads, or run arbitrary Express middleware, a full backend framework gives you that access.
+- **You need direct control over the HTTP layer.** Halide abstracts Hono behind a typed config. If you need to set custom response headers/status codes, stream responses, handle file uploads, or run arbitrary Hono middleware, a full backend framework gives you that access.
 - **You're building a multi-service backend, not just a BFF layer.** Halide sits between a frontend and its backends. If you need inter-service communication, routing, or discovery, an API gateway or service mesh is designed for that.
 - **You need infrastructure-level proxy control.** Halide provides per-route request transformation, identity header injection, and path rewriting, but does not expose response transformation, circuit breakers, TLS termination, load balancing, or retry policies. An API gateway or service mesh is a better fit for those.

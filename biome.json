@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
   "assist": {
     "actions": {
       "source": {
@@ -20,7 +20,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!coverage", "!dist", "**/*.{ts,css,json}"]
+    "includes": ["**", "!coverage", "!dist", "**/*.{ts,css,json}", "!**/package.json"]
   },
   "formatter": {
     "enabled": true,

@@ -17,6 +17,7 @@ const CreateUserSchema = z.object({
 const server = await createServer<UserClaims>({
   spa: {
     name: 'dashboard',
+    port: 3553,
     root: './dist/browser',
   },
 
@@ -27,9 +28,9 @@ const server = await createServer<UserClaims>({
     },
     csp: {
       directives: {
-        'default-src': ["'self'"],
-        'script-src': ["'self'"],
-        'connect-src': ["'self'"],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        connectSrc: ["'self'"],
       },
     },
     auth: {

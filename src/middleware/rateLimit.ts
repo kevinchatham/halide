@@ -1,4 +1,4 @@
-import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import type { Context, Next } from 'hono';
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -10,19 +10,17 @@ interface WindowEntry {
   resetTime: number;
 }
 
-function getClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') {
+function getClientIp(c: Context): string {
+  const forwarded = c.req.header('x-forwarded-for');
+  if (forwarded) {
     const first = forwarded.split(',')[0];
-    if (first) {
-      return first.trim();
-    }
+    if (first) return first.trim();
   }
-  return req.ip || 'unknown';
+  return 'unknown';
 }
 
 export function createRateLimitMiddleware(config: RateLimitConfig): {
-  middleware: RequestHandler;
+  middleware: (c: Context, next: Next) => Promise<Response | undefined>;
   dispose: () => void;
 } {
   const store = new Map<string, WindowEntry>();
@@ -41,8 +39,8 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
   const timer = setInterval(sweep, sweepInterval);
   timer.unref();
 
-  const middleware: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
-    const clientIp = getClientIp(req);
+  const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
+    const clientIp = getClientIp(c);
     const now = Date.now();
     const entry = store.get(clientIp);
 
@@ -51,19 +49,19 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
         count: 1,
         resetTime: now + config.windowMs,
       });
-      return next();
+      await next();
+      return;
     }
 
     entry.count += 1;
 
     if (entry.count > config.maxRequests) {
       const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
-      res.set('Retry-After', String(retryAfter));
-      res.status(429).json({ error: 'Too Many Requests' });
-      return;
+      c.header('Retry-After', String(retryAfter));
+      return c.json({ error: 'Too Many Requests' }, 429);
     }
 
-    next();
+    await next();
   };
 
   return {

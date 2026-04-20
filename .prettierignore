@@ -6,6 +6,7 @@
 !**/*.yml
 !**/*.yaml
 !**/*.md
+!**/package.json
 
 # But also re-include directories (IMPORTANT)
 !*/

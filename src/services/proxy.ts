@@ -1,13 +1,8 @@
-import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import type { Context } from 'hono';
+import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
-import type { Logger, RequestContext, TransformFn } from '../config/types';
+import type { Logger, ProxyRoute, RequestContext } from '../types';
 
-// READONLY_HEADERS and ARRAY_HEADERS follow Node's http.IncomingMessage.headers convention
-// (also used by Express's req.headers): all keys are lowercase, multi-value headers like
-// set-cookie are stored as arrays, and certain hop-by-hop/protocol headers must not be
-// overwritten. Transform output keys are normalized to lowercase before writing back to
-// req.headers to maintain consistency with this convention.
 const READONLY_HEADERS: Set<string> = new Set([
   'host',
   'connection',
@@ -24,20 +19,15 @@ export function serializeQueryParam(v: unknown): string | string[] {
   return typeof v === 'string' ? v : JSON.stringify(v);
 }
 
-export function buildRequestContextFromExpress(req: Request): RequestContext {
+export function buildRequestContextFromHono(c: Context, body?: unknown): RequestContext {
   return {
-    body: req.body,
-    headers: req.headers as Record<string, string | string[]>,
-    method: req.method.toLowerCase() as RequestContext['method'],
-    params: Object.fromEntries(
-      Object.entries(req.params || {}).map(([k, v]) => [
-        k,
-        typeof v === 'string' ? v : JSON.stringify(v),
-      ]),
-    ),
-    path: req.path,
+    body,
+    headers: c.req.header() as Record<string, string | string[]>,
+    method: c.req.method.toLowerCase() as RequestContext['method'],
+    params: Object.fromEntries(Object.entries(c.req.param()).map(([k, v]) => [k, v ?? ''])),
+    path: c.req.path,
     query: Object.fromEntries(
-      Object.entries(req.query || {}).map(([k, v]) => [k, serializeQueryParam(v)]),
+      Object.entries(c.req.query()).map(([k, v]) => [k, serializeQueryParam(v)]),
     ),
   };
 }
@@ -63,75 +53,88 @@ function normalizeHeaders(headers: Record<string, unknown>): {
   return { headers: normalized, multiValueKeys };
 }
 
-function applyTransformedHeaders(
-  req: Request,
-  transformedHeaders: Record<string, string>,
-  multiValueKeys: Set<string>,
+function applyIdentityHeaders<TClaims>(
+  headers: Record<string, string | undefined>,
+  route: ProxyRoute<TClaims>,
+  claims: TClaims | undefined,
+  c: Context,
+  parsedBody: unknown,
 ): void {
-  for (const [key, value] of Object.entries(transformedHeaders)) {
-    const lowerKey = key.toLowerCase();
-    if (READONLY_HEADERS.has(lowerKey)) continue;
-    if (ARRAY_HEADERS.has(lowerKey)) continue;
-    if (multiValueKeys.has(lowerKey)) continue;
-    req.headers[lowerKey] = value;
+  if (!route.identity || !claims) return;
+  const ctx = buildRequestContextFromHono(c, parsedBody);
+  const identityHeaders = route.identity(ctx, claims);
+  if (!identityHeaders) return;
+  for (const [key, value] of Object.entries(identityHeaders)) {
+    if (value !== undefined) {
+      headers[key] = value;
+    }
+  }
+}
+
+function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
+  const lowerKey = key.toLowerCase();
+  return (
+    !READONLY_HEADERS.has(lowerKey) && !ARRAY_HEADERS.has(lowerKey) && !multiValueKeys.has(lowerKey)
+  );
+}
+
+function applyTransform<TClaims>(
+  route: ProxyRoute<TClaims>,
+  parsedBody: unknown,
+  c: Context,
+  headers: Record<string, string | undefined>,
+  logger?: Logger,
+): BodyInit | null {
+  if (!route.transform) return c.req.raw.body;
+  try {
+    const jsonBody = parsedBody ?? {};
+    const { headers: normalizedHeaders, multiValueKeys } = normalizeHeaders(c.req.header());
+    const transformed = route.transform({ body: jsonBody, headers: normalizedHeaders });
+    const body = JSON.stringify(transformed.body);
+    for (const [key, value] of Object.entries(transformed.headers)) {
+      if (isWritableHeader(key, multiValueKeys)) {
+        headers[key.toLowerCase()] = value;
+      }
+    }
+    return body;
+  } catch (err) {
+    logger?.error('[halide] Transform error:', err);
+    throw err;
   }
 }
 
 export function createProxyService<TClaims = unknown>(
-  target: string,
-  routePath: string,
-  proxyPath: string | undefined,
-  identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined,
-  transform?: TransformFn,
-  timeout?: number,
+  route: ProxyRoute<TClaims>,
+  claims: TClaims | undefined,
   logger?: Logger,
-): RequestHandler {
-  const rewritePath = proxyPath ?? routePath;
-  const proxy = createProxyMiddleware({
-    changeOrigin: true,
-    on: {
-      proxyReq: (
-        proxyReq: import('node:http').ClientRequest,
-        req: import('node:http').IncomingMessage,
-      ) => {
-        const expressReq = req as Request;
-        if (!identity || !expressReq.claims) return;
+  parsedBody?: unknown,
+): (c: Context) => Promise<Response> {
+  const target = route.target;
+  const routePath = route.path;
+  const rewritePath = route.proxyPath ?? routePath;
+  const timeoutMs = route.timeout ?? DEFAULTS.proxy.timeoutMs;
 
-        const ctx = buildRequestContextFromExpress(expressReq);
-        const headers = identity(ctx, expressReq.claims as TClaims);
-        if (!headers) return;
+  return async (c: Context): Promise<Response> => {
+    const rewrittenPath = c.req.path.replace(new RegExp(`^${routePath}`), rewritePath);
+    const targetUrl = new URL(rewrittenPath + c.req.url.replace(c.req.path, ''), target).toString();
 
-        for (const [key, value] of Object.entries(headers)) {
-          if (value !== undefined) {
-            proxyReq.setHeader(key, value);
-          }
-        }
-      },
-    },
-    pathRewrite: {
-      [`^${routePath}`]: rewritePath,
-    },
-    target,
-    timeout: timeout ?? DEFAULTS.proxy.timeoutMs,
-  });
+    const headers: Record<string, string | undefined> = { ...c.req.header() };
 
-  if (!transform) {
-    return proxy;
-  }
+    applyIdentityHeaders(headers, route, claims, c, parsedBody);
 
-  return (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = typeof req.body === 'object' && req.body ? req.body : {};
-      const { headers, multiValueKeys } = normalizeHeaders(req.headers);
-      const transformed = transform({ body, headers });
+    const body = applyTransform(route, parsedBody, c, headers, logger);
 
-      req.body = transformed.body;
-      applyTransformedHeaders(req, transformed.headers, multiValueKeys);
-    } catch (err) {
-      logger?.error('[halide] Transform error:', err);
-      next(err);
-      return;
-    }
-    proxy(req, res, next);
+    const signal = AbortSignal.timeout(timeoutMs);
+
+    const proxyRequest = new Request(targetUrl, {
+      body,
+      // @ts-expect-error - duplex is needed for streaming request bodies
+      duplex: 'half',
+      headers: headers as Record<string, string>,
+      method: c.req.method,
+      signal,
+    });
+
+    return proxy(proxyRequest);
   };
 }
