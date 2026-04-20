@@ -49,7 +49,7 @@
     "./*": "./dist/*"
   },
   "bin": {
-    "halide": "./dist/cli/index.js"
+    "halide": "dist/cli/index.js"
   },
   "files": [
     "dist",

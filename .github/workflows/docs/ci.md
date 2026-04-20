@@ -6,11 +6,11 @@ Executes automated linting, building, and unit testing on every push to `main` a
 
 **Jobs:**
 
-| Job | Purpose |
-|-----|---------|
-| `lint` | Runs `npm run lint` (Biome checks) |
-| `build` | Runs `npm run build` (tsup → dist/) |
-| `test` | Runs `npm run test` (Vitest with coverage) |
+| Job     | Purpose                                    |
+| ------- | ------------------------------------------ |
+| `lint`  | Runs `npm run lint` (Biome checks)         |
+| `build` | Runs `npm run build` (tsup → dist/)        |
+| `test`  | Runs `npm run test` (Vitest with coverage) |
 
 All three jobs run in parallel on `ubuntu-latest` with Node.js 24.
 
