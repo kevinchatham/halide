@@ -9,10 +9,10 @@
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
     <img src="https://img.shields.io/badge/docs-1.0.0-cyan" alt="Documentation"/>
   </a>
+  <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
     <img src="https://img.shields.io/badge/node-%3E%3D24-1e293b" alt="Node.js"/>
   </a>
-  <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
 </p>
 
 ## What is Halide?
