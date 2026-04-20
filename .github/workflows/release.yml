@@ -1,0 +1,120 @@
+# ============================================
+# 📦 Release Workflow
+# --------------------------------------------
+# This workflow handles the release process:
+# 1. Pre-flight: Checks if version is already published
+# 2. Publish NPM: Publishes to NPM if needed
+# 3. Create Release: Creates a GitHub release
+#
+# 🔁 Triggered on push to main
+# ============================================
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  pre-flight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      npm_publish: ${{ steps.check-npm.outputs.publish }}
+      create_release: ${{ steps.check-release.outputs.publish }}
+      version: ${{ steps.check-npm.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Check NPM version status
+        id: check-npm
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "version=${PACKAGE_VERSION}" >> $GITHUB_OUTPUT
+
+          echo "Checking if version $PACKAGE_VERSION for $PACKAGE_NAME is published..."
+          NPM_VERSION=$(npm view $PACKAGE_NAME@$PACKAGE_VERSION version 2>/dev/null || true)
+
+          if [[ -z "$NPM_VERSION" ]]; then
+            echo "Version $PACKAGE_VERSION is not published. Proceeding..."
+            echo "publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $PACKAGE_VERSION is already published. Skipping."
+            echo "publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check GitHub Release status
+        id: check-release
+        run: |
+          TAG_NAME="v${{ steps.check-npm.outputs.version }}"
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists. Skipping."
+            echo "publish=false" >> $GITHUB_OUTPUT
+          else
+            echo "Release $TAG_NAME does not exist. Proceeding."
+            echo "publish=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.HALIDE_GITHUB_TOKEN }}
+
+  publish-npm:
+    name: Publish to NPM
+    needs: pre-flight
+    if: needs.pre-flight.outputs.npm_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install dependencies and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish to NPM
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.HALIDE_NPM_TOKEN }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: [pre-flight, publish-npm]
+    if: |
+      (needs.publish-npm.result == 'success' || needs.publish-npm.result == 'skipped') &&
+      needs.pre-flight.outputs.create_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "v${{ needs.pre-flight.outputs.version }}" \
+            --title "Release v${{ needs.pre-flight.outputs.version }}" \
+            --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.HALIDE_GITHUB_TOKEN }}

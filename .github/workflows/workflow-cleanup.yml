@@ -1,0 +1,76 @@
+# ============================================
+# 🧹 GitHub Workflow Cleanup
+# --------------------------------------------
+# This workflow deletes old workflow runs.
+#
+# 🔁 Triggered in two ways:
+# - 🗓 Scheduled every Sunday at midnight UTC
+# - 🧑‍💻 Manually via workflow_dispatch
+#
+# ⚙️ Behavior:
+# - If `older_than_days` is provided:
+#     → Deletes *all* runs older than that many days
+# - If `older_than_days` is NOT provided:
+#     → Deletes *only failed* runs regardless of age
+#
+# Only affects runs with `status=completed` (not in-progress)
+# ============================================
+
+name: Workflow Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      older_than_days:
+        description: 'Delete ANY run older than this many days (optional)'
+        required: false
+        default: '30'
+        type: string
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at midnight UTC
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  cleanup:
+    name: Cleanup Workflow Runs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete matching runs
+        run: |
+          REPO="${{ github.repository }}"
+          INPUT_DAYS="${{ github.event.inputs.older_than_days }}"
+          echo "🔍 Evaluating workflow runs for cleanup"
+
+          if [[ -n "$INPUT_DAYS" ]]; then
+            CUTOFF_DATE=$(date -u -d "$INPUT_DAYS days ago" +%s)
+            echo "🧹 Deleting ALL runs older than $INPUT_DAYS days"
+            FILTER_BY_DATE=true
+          else
+            echo "🧹 Deleting all FAILED runs (no age filter)"
+            FILTER_BY_DATE=false
+          fi
+
+          # Fetch runs using gh run list for better pagination and filtering
+          if [[ "$FILTER_BY_DATE" == true ]]; then
+            # Convert cutoff date to ISO format for gh CLI
+            CUTOFF_ISO=$(date -u -d "$INPUT_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
+            RUNS=$(gh run list --status completed --limit 1000 --json id,createdAt --jq ".[] | select(.createdAt < \"$CUTOFF_ISO\") | .id")
+          else
+            RUNS=$(gh run list --status completed --limit 1000 --json id,conclusion --jq '.[] | select(.conclusion == "failure") | .id')
+          fi
+
+          if [[ -z "$RUNS" ]]; then
+            echo "✅ No matching runs found."
+            exit 0
+          fi
+
+          for RUN_ID in $RUNS; do
+            echo "🧹 Deleting run $RUN_ID..."
+            gh run delete "$RUN_ID"
+          done
+
+          echo "🏁 Cleanup complete."

@@ -11,7 +11,6 @@ openapi: {
     description: 'Auto-generated API documentation',
     version: '1.0.0',
     servers: [{ url: 'https://api.example.com', description: 'Production' }],
-    includeProxyRoutes: true,  // include proxy routes in the spec (default: true)
   },
 }
 ```

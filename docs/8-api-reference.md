@@ -4,6 +4,10 @@
 
 Creates and returns a Halide server. Validates the config before starting.
 
+### `createApp<TClaims>(config): Promise<CreateAppResult>`
+
+Creates a Hono app instance without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing or custom server setups.
+
 ### `Server`
 
 | Method    | Description                                                               |
@@ -25,25 +29,21 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function.
 | --------------------------------- | ----------------------------------------------------------------------- |
 | `ServerConfig<TClaims>`           | Top-level configuration object                                          |
 | `Server`                          | Running server instance (`start`, `stop`)                               |
+| `CreateAppResult`                 | Return type of `createApp()` — `{ app, rateLimitDispose }`              |
 | `ApiRoute<TClaims, TBody>`        | API route definition                                                    |
-| `ApiRouteInput<TClaims, TBody>`   | Input type for `apiRoute()` (excludes computed `type` field)            |
 | `ApiRouteHandler<TClaims, TBody>` | `(ctx, claims, logger) => Promise<unknown>`                             |
 | `ProxyRoute<TClaims>`             | Proxy route definition                                                  |
-| `ProxyRouteInput<TClaims>`        | Input type for `proxyRoute()` (excludes computed `type` field)          |
-| `Route<TClaims, TBody>`           | Union of `ApiRoute \| ProxyRoute`                                       |
 | `AuthorizeFn<TClaims>`            | `(ctx, claims, logger) => boolean \| Promise<boolean>`                  |
 | `TransformFn`                     | `({ body, headers }) => { body, headers }`                              |
 | `RequestContext`                  | Normalized request context (method, path, headers, params, query, body) |
-| `ResponseContext`                 | Response metadata (statusCode, durationMs, error?)                      |
 | `SecurityConfig`                  | CORS, CSP, auth, rate limit configuration                               |
 | `SecurityAuthConfig`              | Auth strategy, secret/JWKS, audience                                    |
 | `CorsConfig`                      | Origin, methods, credentials, headers                                   |
 | `CspOptions`                      | Content Security Policy directives                                      |
 | `CspDirectives`                   | CSP directive map (keys are directive names)                            |
-| `CspDirectiveValue`               | Single CSP directive value (string or function)                         |
 | `SpaConfig`                       | Static file serving and port configuration                              |
 | `ObservabilityConfig<TClaims>`    | Logger, request ID, lifecycle hooks                                     |
-| `OpenApiConfig`                   | Swagger UI toggle, path, and options                                    |
-| `OpenApiOptions`                  | OpenAPI document options (title, version, description, servers)         |
+| `OpenApiConfig`                   | OpenAPI toggle, path, and options                                       |
 | `OpenApiRouteMeta`                | Per-route OpenAPI metadata (summary, tags, schemas)                     |
 | `Logger`                          | `{ debug, error, info, warn }` interface                                |
+| `ClaimExtractor<TClaims>`         | Function to extract claims from a Hono Context                          |

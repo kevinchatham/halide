@@ -28,9 +28,9 @@ const server = await createServer<UserClaims>({
     },
     csp: {
       directives: {
-        'default-src': ["'self'"],
-        'script-src': ["'self'"],
-        'connect-src': ["'self'"],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        connectSrc: ["'self'"],
       },
     },
     auth: {

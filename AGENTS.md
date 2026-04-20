@@ -32,7 +32,7 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 ## Architecture
 
 - **Framework**: Hono (not Express). All HTTP types come from `hono`, not `express`
-- **Entry**: `src/index.ts` → re-exports `createServer<TClaims>` from `src/runtime.ts`
+- **Entry**: `src/index.ts` → re-exports `createServer<TClaims>` from `src/config/runtime.ts`
 - `ServerConfig` uses **separate arrays**: `apiRoutes` (type `'api'`) + `proxyRoutes` (type `'proxy'`), not a single `routes` array
 - Auth config is nested: `security.auth.strategy` (`'bearer'` | `'jwks'`), not a top-level `auth` key
 - API route handler signature is `(ctx, claims, logger)` — 3 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context), `claims` is `TClaims | undefined`, `logger` is `Logger`
@@ -42,10 +42,10 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 - SPA `apiPrefix` defaults to `'/api'` — paths starting with that prefix get 404 instead of SPA fallback (set `apiPrefix: ''` to disable)
 - `src/demo.ts` exists but is **not exported** — used by demo apps only
 - **src/config/** — types, defaults, validation
-- **src/middleware/** — auth (bearer + JWKS via hono/jwt + hono/jwk), CORS, CSP, rate limit, request ID, error handler, Swagger UI
-- **src/routes/** — `registry.ts` (route registration), `spa.ts` (static file serving)
-- **src/services/** — proxy handler
-- **src/openapi/** — spec generator (uses `hono-openapi` + `zod-openapi`)
+- **src/middleware/** — auth (bearer + JWKS via hono/jwt + hono/jwk), CORS, CSP, rate limit, request ID, error handler, OpenAPI (Scalar UI)
+- **src/routes/** — `apiRoute.ts`, `proxyRoute.ts`, `registry.ts` (route registration), `spa.ts` (static file serving)
+- **src/services/** — `proxy.ts` (proxy handler)
+- **src/cli/** — CLI commands (`npx halide init`)
 - **src/utils/** — does not exist; JWT helpers are in `src/middleware/auth.ts`
 
 ## Testing
