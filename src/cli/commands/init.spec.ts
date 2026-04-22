@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildAgentsMd,
   detectPackageManager,
   getInstallCmd,
   init,
@@ -9,12 +8,6 @@ import {
   SERVER_TS,
   TSCONFIG_SERVER,
 } from './init';
-
-declare global {
-  var HALIDE_VERSION: string | undefined;
-}
-
-globalThis.HALIDE_VERSION = undefined;
 
 const mockExecSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
@@ -79,37 +72,19 @@ describe('detectPackageManager', () => {
 
 describe('getInstallCmd', () => {
   it('returns correct npm command', () => {
-    expect(getInstallCmd('npm')).toBe('npm install halide');
+    expect(getInstallCmd('npm')).toBe('npm install halide && npm install -D @types/node');
   });
 
   it('returns correct pnpm command', () => {
-    expect(getInstallCmd('pnpm')).toBe('pnpm add halide');
+    expect(getInstallCmd('pnpm')).toBe('pnpm add halide && pnpm add -D @types/node');
   });
 
   it('returns correct yarn command', () => {
-    expect(getInstallCmd('yarn')).toBe('yarn add halide');
+    expect(getInstallCmd('yarn')).toBe('yarn add halide && yarn add -D @types/node');
   });
 
   it('returns correct bun command', () => {
-    expect(getInstallCmd('bun')).toBe('bun add halide');
-  });
-});
-
-describe('buildAgentsMd', () => {
-  it('wraps content with version markers', () => {
-    const result = buildAgentsMd('1.2.3');
-    expect(result).toContain('<!-- halide:1.2.3 -->');
-    expect(result).toContain('<!-- /halide -->');
-    expect(result).toContain('# Halide Agent Guide');
-  });
-
-  it('places start marker before content and end marker after', () => {
-    const result = buildAgentsMd('0.0.0');
-    const startIdx = result.indexOf('<!-- halide:0.0.0 -->');
-    const contentIdx = result.indexOf('# Halide Agent Guide');
-    const endIdx = result.indexOf('<!-- /halide -->');
-    expect(startIdx).toBeLessThan(contentIdx);
-    expect(contentIdx).toBeLessThan(endIdx);
+    expect(getInstallCmd('bun')).toBe('bun add halide && bun add -D @types/node');
   });
 });
 
@@ -142,61 +117,21 @@ describe('init', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       return false;
     });
 
     await init();
 
     expect(mockExecSync).toHaveBeenCalledWith(
-      'npm install halide',
+      'npm install halide && npm install -D @types/node',
       expect.objectContaining({ cwd: projectDir, stdio: 'pipe' }),
     );
-  });
-
-  it('runs skills add command', async () => {
-    mockExistsSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return true;
-      if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
-      return false;
-    });
-
-    await init();
-
-    expect(mockExecSync).toHaveBeenCalledWith(
-      'npx skills add kevinchatham/halide --all -y',
-      expect.objectContaining({ cwd: projectDir, stdio: 'pipe' }),
-    );
-  });
-
-  it('continues if skills add fails and prints stderr', async () => {
-    mockExistsSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return true;
-      if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
-      return false;
-    });
-    const stderrOutput = 'npx: command not found\n';
-    const skillsError = new Error('skills not found') as Error & { stderr: Buffer };
-    skillsError.stderr = Buffer.from(stderrOutput);
-    mockExecSync.mockImplementation((cmd: string) => {
-      if (cmd.includes('skills add')) throw skillsError;
-      return Buffer.from('');
-    });
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-
-    await expect(init()).resolves.toBeUndefined();
-    expect(stderrSpy).toHaveBeenCalledWith(stderrOutput);
-
-    stderrSpy.mockRestore();
   });
 
   it('creates server.ts if it does not exist', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       return false;
     });
 
@@ -213,7 +148,6 @@ describe('init', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return true;
-      if (p.endsWith('AGENTS.md')) return false;
       return false;
     });
 
@@ -225,69 +159,19 @@ describe('init', () => {
     expect(serverWriteCall).toBeUndefined();
   });
 
-  it('creates AGENTS.md if it does not exist', async () => {
+  it('runs skills add interactively with stdio inherit', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       return false;
     });
 
     await init();
 
-    expect(mockWriteFileSync).toHaveBeenCalledWith(
-      path.join(projectDir, 'AGENTS.md'),
-      expect.stringContaining('<!-- halide:'),
-      'utf8',
-    );
-  });
-
-  it('appends Halide section when AGENTS.md exists without markers', async () => {
-    mockExistsSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return true;
-      if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return true;
-      return false;
+    expect(mockExecSync).toHaveBeenCalledWith('npx skills add kevinchatham/halide', {
+      cwd: projectDir,
+      stdio: 'inherit',
     });
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0"}';
-      return '# Existing content\n';
-    });
-
-    await init();
-
-    expect(mockAppendFileSync).toHaveBeenCalledWith(
-      path.join(projectDir, 'AGENTS.md'),
-      expect.stringContaining('<!-- halide:'),
-      'utf8',
-    );
-    const writeCall = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('AGENTS.md'),
-    );
-    expect(writeCall).toBeUndefined();
-  });
-
-  it('replaces delimited block when AGENTS.md has existing markers', async () => {
-    const existingContent = `# My Project\n\n<!-- halide:0.0.1 -->\n# Old Halide Content\n<!-- /halide -->\n`;
-    mockExistsSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return true;
-      if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return true;
-      return false;
-    });
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0"}';
-      return existingContent;
-    });
-
-    await init();
-
-    expect(mockWriteFileSync).toHaveBeenCalledWith(
-      path.join(projectDir, 'AGENTS.md'),
-      expect.not.stringContaining('<!-- halide:0.0.1 -->'),
-      'utf8',
-    );
-    expect(mockAppendFileSync).not.toHaveBeenCalled();
   });
 
   it('detects pnpm and uses pnpm add', async () => {
@@ -295,14 +179,13 @@ describe('init', () => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('pnpm-lock.yaml')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       return false;
     });
 
     await init();
 
     expect(mockExecSync).toHaveBeenCalledWith(
-      'pnpm add halide',
+      'pnpm add halide && pnpm add -D @types/node',
       expect.objectContaining({ cwd: projectDir, stdio: 'pipe' }),
     );
   });
@@ -367,7 +250,6 @@ describe('writeTsconfigServer', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       return false;
     });
@@ -385,7 +267,6 @@ describe('writeTsconfigServer', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return true;
       return false;
     });
@@ -423,7 +304,6 @@ describe('addServerReference', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.json')) return true;
       return false;
@@ -442,7 +322,6 @@ describe('addServerReference', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.json')) return true;
       return false;
@@ -466,7 +345,6 @@ describe('addServerReference', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.json')) return true;
       return false;
@@ -489,7 +367,6 @@ describe('addServerReference', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.json')) return false;
       return false;
@@ -528,7 +405,6 @@ describe('excludeServerFromApp', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.app.json')) return true;
       return false;
@@ -547,7 +423,6 @@ describe('excludeServerFromApp', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.app.json')) return true;
       return false;
@@ -571,7 +446,6 @@ describe('excludeServerFromApp', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.app.json')) return true;
       return false;
@@ -596,7 +470,6 @@ describe('excludeServerFromApp', () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
-      if (p.endsWith('AGENTS.md')) return false;
       if (p.endsWith('tsconfig.server.json')) return false;
       if (p.endsWith('tsconfig.app.json')) return false;
       return false;

@@ -1,22 +1,7 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-declare const HALIDE_VERSION: string | undefined;
-
-function getHalideVersion(): string {
-  if (HALIDE_VERSION !== undefined) return HALIDE_VERSION;
-  try {
-    const cliDir = path.dirname(fileURLToPath(import.meta.url));
-    const pkgPath = path.join(cliDir, '..', '..', 'package.json');
-    const raw = fs.readFileSync(pkgPath, 'utf8');
-    const parsed: { version: string } = JSON.parse(raw) as { version: string };
-    return parsed.version;
-  } catch {
-    return '0.0.0';
-  }
-}
+import stripJsonComments from 'strip-json-comments';
 
 const SERVER_TS = `import { createServer, apiRoute } from 'halide';
 
@@ -51,46 +36,6 @@ const TSCONFIG_SERVER = `{
 }
 `;
 
-const AGENTS_MD_CONTENT = `# Halide Agent Guide
-
-## Commands
-
-\`\`\`bash
-npm run build          # tsup → dist/ (ESM + CJS + .d.ts)
-npm run lint           # Biome check only (read-only, no Prettier)
-npm run lint:fix       # Biome check --write + Prettier --write (both run)
-npm run typecheck      # tsc --noEmit
-npm run test           # vitest run --coverage (single run + coverage)
-\`\`\`
-
-## Pre-commit workflow
-
-\`lint:fix\` → \`typecheck\` → \`test\` — run in this order. Coverage thresholds enforced at 80% (branches/functions/lines/statements).
-
-## Architecture
-
-- **Framework**: Hono (not Express). All HTTP types come from \`hono\`, not \`express\`
-- \`ServerConfig\` uses **separate arrays**: \`apiRoutes\` (type \`'api'\`) + \`proxyRoutes\` (type \`'proxy'\`), not a single \`routes\` array
-- API route handler signature is \`(ctx, claims, logger)\` — 3 params. \`ctx\` is \`RequestContext & { body: TBody }\` (plain object, not Hono Context), \`claims\` is \`TClaims | undefined\`, \`logger\` is \`Logger\`
-- Auth config is nested: \`security.auth.strategy\` (\`'bearer'\` | \`'jwks'\`), not a top-level \`auth\` key
-- Auth uses \`hono/jwt\` (bearer) and \`hono/jwk\` (JWKS) — not \`jose\`
-- Validation is imperative (\`validateServerConfig\`), not Zod — Zod is only used for route body validation and OpenAPI schema generation
-- CSP directives must use **camelCase** (\`defaultSrc\`), not kebab-case (\`default-src\`) — validator throws on kebab
-
-## Route Factories
-
-- Use \`apiRoute()\` and \`proxyRoute()\` factory functions — they fill in \`type\` and default \`authorize\`
-- \`proxyRoute\` requires a \`methods\` array (not optional like \`apiRoute.method\`)
-
-## Gotchas
-
-- Private routes require \`security.auth\` to be configured — validation will throw otherwise
-- CORS wildcard origin (\`*\`) cannot be combined with \`credentials: true\` — config validator will throw
-- SPA \`apiPrefix\` defaults to \`'/api'\` — paths starting with that prefix get 404 instead of SPA fallback (set \`apiPrefix: ''\` to disable)
-- Node.js >=24.0.0 required
-- \`package.json\` declares \`"type": "module"\` — this is an ESM project
-`;
-
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }
@@ -104,36 +49,6 @@ function runQuietly(cmd: string, cwd: string): void {
     }
     throw err;
   }
-}
-
-const START_MARKER_RE = /<!-- halide:([\w.]+) -->/;
-const BLOCK_RE = /<!-- halide:[\w.]+ -->[\s\S]*?<!-- \/halide -->/;
-
-function buildAgentsMd(version: string): string {
-  return `<!-- halide:${version} -->\n${AGENTS_MD_CONTENT}\n<!-- /halide -->\n`;
-}
-
-function writeAgentsMd(cwd: string, version: string): void {
-  const agentsMd = buildAgentsMd(version);
-  const agentsPath = path.join(cwd, 'AGENTS.md');
-
-  if (!fs.existsSync(agentsPath)) {
-    fs.writeFileSync(agentsPath, agentsMd, 'utf8');
-    log('✓ Created AGENTS.md');
-    return;
-  }
-
-  const existing = fs.readFileSync(agentsPath, 'utf8');
-
-  if (!START_MARKER_RE.test(existing)) {
-    fs.appendFileSync(agentsPath, `\n\n${agentsMd}`, 'utf8');
-    log('✓ Appended Halide section to existing AGENTS.md');
-    return;
-  }
-
-  const updated = existing.replace(BLOCK_RE, agentsMd);
-  fs.writeFileSync(agentsPath, updated, 'utf8');
-  log('✓ Updated Halide section in AGENTS.md');
 }
 
 function writeTsconfigServer(cwd: string): void {
@@ -151,7 +66,7 @@ function addServerReference(cwd: string): void {
   if (!fs.existsSync(tsconfigPath)) return;
 
   const raw = fs.readFileSync(tsconfigPath, 'utf8');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
 
   if (!Array.isArray(parsed.references)) return;
 
@@ -170,7 +85,7 @@ function excludeServerFromApp(cwd: string): void {
   if (!fs.existsSync(appPath)) return;
 
   const raw = fs.readFileSync(appPath, 'utf8');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
 
   if (!Array.isArray(parsed.exclude)) {
     parsed.exclude = ['server.ts'];
@@ -198,10 +113,10 @@ function detectPackageManager(cwd: string): PackageManager {
 
 function getInstallCmd(pkgManager: PackageManager): string {
   const cmds: Record<PackageManager, string> = {
-    bun: 'bun add halide',
-    npm: 'npm install halide',
-    pnpm: 'pnpm add halide',
-    yarn: 'yarn add halide',
+    bun: 'bun add halide && bun add -D @types/node',
+    npm: 'npm install halide && npm install -D @types/node',
+    pnpm: 'pnpm add halide && pnpm add -D @types/node',
+    yarn: 'yarn add halide && yarn add -D @types/node',
   };
   return cmds[pkgManager];
 }
@@ -234,29 +149,11 @@ export async function init(): Promise<undefined> {
   addServerReference(cwd);
   excludeServerFromApp(cwd);
 
-  writeAgentsMd(cwd, getHalideVersion());
-
-  try {
-    runQuietly('npx skills add kevinchatham/halide --all -y', cwd);
-    log('✓ Installing halide agent skills');
-  } catch (err: unknown) {
-    if (err instanceof Error && 'stderr' in err) {
-      process.stderr.write((err as Error & { stderr: Buffer }).stderr.toString());
-    }
-    process.stderr.write('⚠ Failed to install agent skills — you can run this manually later:\n');
-    process.stderr.write('  npx skills add kevinchatham/halide --all -y\n');
-  }
+  execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
 
   log('\nDone! Next steps:');
   log('  1. Edit server.ts to configure your routes and SPA');
   log('  2. Run your server with: npx tsx server.ts');
 }
 
-export {
-  buildAgentsMd,
-  detectPackageManager,
-  getInstallCmd,
-  runQuietly,
-  SERVER_TS,
-  TSCONFIG_SERVER,
-};
+export { detectPackageManager, getInstallCmd, runQuietly, SERVER_TS, TSCONFIG_SERVER };

@@ -89,6 +89,29 @@ export async function createServer<TClaims = unknown>(
   const logger = configInput.observability?.logger ?? createNoopLogger();
 
   let httpServer: ReturnType<typeof serve> | undefined;
+  let isShuttingDown = false;
+
+  const shutdown = async (signal: string): Promise<void> => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    logger.info(
+      `[${configInput.spa.name ?? DEFAULTS.spa.name}] Received ${signal}, shutting down...`,
+    );
+    rateLimitDispose?.();
+    const server = httpServer;
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+    process.exit(0);
+  };
 
   return {
     start: async () => {
@@ -108,8 +131,16 @@ export async function createServer<TClaims = unknown>(
           },
         );
       });
+      process.on('SIGINT', () => {
+        void shutdown('SIGINT');
+      });
+      process.on('SIGTERM', () => {
+        void shutdown('SIGTERM');
+      });
     },
     stop: async () => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
       rateLimitDispose?.();
       const server = httpServer;
       if (!server) {
