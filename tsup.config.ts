@@ -1,8 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { defineConfig } from 'tsup';
-
-const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string };
 
 export default defineConfig([
   {
@@ -18,9 +14,6 @@ export default defineConfig([
       js: '#!/usr/bin/env node',
     },
     clean: true,
-    define: {
-      HALIDE_VERSION: JSON.stringify(pkg.version),
-    },
     entry: ['src/cli/index.ts'],
     format: ['esm'],
     outDir: 'dist/cli',

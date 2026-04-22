@@ -345,10 +345,10 @@ describe('createServer', () => {
       await server.stop();
       expect(infoMessages[0]).toContain('48921');
     } finally {
-      if (originalPort !== undefined) {
-        process.env.PORT = originalPort;
-      } else {
+      if (originalPort === undefined) {
         delete process.env.PORT;
+      } else {
+        process.env.PORT = originalPort;
       }
     }
   });
@@ -374,10 +374,10 @@ describe('createServer', () => {
       await server.stop();
       expect(infoMessages[0]).toContain('3999');
     } finally {
-      if (originalPort !== undefined) {
-        process.env.PORT = originalPort;
-      } else {
+      if (originalPort === undefined) {
         delete process.env.PORT;
+      } else {
+        process.env.PORT = originalPort;
       }
     }
   });
@@ -385,5 +385,40 @@ describe('createServer', () => {
   it('stop resolves gracefully when server was never started', async () => {
     const server = await createServer(minimalConfig);
     await expect(server.stop()).resolves.toBeUndefined();
+  });
+
+  it('registers SIGINT and SIGTERM handlers after start', async () => {
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    const server = await createServer({
+      ...minimalConfig,
+      spa: { ...minimalConfig.spa, port: getFreePort() },
+    });
+    await server.start();
+    await server.stop();
+    expect(onSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+    expect(onSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+    onSpy.mockRestore();
+  });
+
+  it('does not register signal handlers before start', async () => {
+    const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
+    const _server = await createServer(minimalConfig);
+    const sigintCalls = onSpy.mock.calls.filter((c) => c[0] === 'SIGINT');
+    const sigtermCalls = onSpy.mock.calls.filter((c) => c[0] === 'SIGTERM');
+    expect(sigintCalls.length).toBe(0);
+    expect(sigtermCalls.length).toBe(0);
+    onSpy.mockRestore();
+  });
+
+  it('prevents double shutdown when stop is called before signal', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    const server = await createServer({
+      ...minimalConfig,
+      spa: { ...minimalConfig.spa, port: getFreePort() },
+    });
+    await server.start();
+    await server.stop();
+    expect(exitSpy).not.toHaveBeenCalled();
+    exitSpy.mockRestore();
   });
 });
