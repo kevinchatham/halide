@@ -31,6 +31,7 @@ const TSCONFIG_SERVER = `{
     "moduleResolution": "bundler",
     "outDir": "./dist",
     "rootDirs": ["."],
+    "skipLibCheck": true,
     "target": "es2022",
     "types": ["node"]
   },
@@ -103,6 +104,21 @@ function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
+function addTypeModuleToPackageJson(cwd: string): void {
+  const pkgPath = path.join(cwd, 'package.json');
+  const raw = fs.readFileSync(pkgPath, 'utf8');
+  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
+
+  if (parsed.type === 'module') {
+    log('✓ "type": "module" already exists in package.json — skipping');
+    return;
+  }
+
+  parsed.type = 'module';
+  fs.writeFileSync(pkgPath, JSON.stringify(parsed, null, 2), 'utf8');
+  log('✓ Added "type": "module" to package.json');
+}
+
 function addScriptsToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -116,11 +132,11 @@ function addScriptsToPackageJson(cwd: string): void {
   let added = false;
 
   if (!scripts['halide:start']) {
-    scripts['halide:start'] = 'npx tsx server.ts';
+    scripts['halide:start'] = 'npm run halide:build && node dist/server.js';
     added = true;
   }
   if (!scripts['halide:build']) {
-    scripts['halide:build'] = 'tsc --config tsconfig.server.json';
+    scripts['halide:build'] = 'tsc --project tsconfig.server.json';
     added = true;
   }
 
@@ -179,17 +195,19 @@ export async function init(): Promise<undefined> {
   writeTsconfigServer(cwd);
   addServerReference(cwd);
   excludeServerFromApp(cwd);
+  addTypeModuleToPackageJson(cwd);
   addScriptsToPackageJson(cwd);
 
   execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
 
   log('\nDone! Next steps:');
   log('  1. Edit server.ts to configure your routes and SPA');
-  log('  2. Run your server with: npx tsx server.ts');
+  log('  2. Run your server with: npm run halide:start');
 }
 
 export {
   addScriptsToPackageJson,
+  addTypeModuleToPackageJson,
   detectPackageManager,
   getInstallCmd,
   runQuietly,
