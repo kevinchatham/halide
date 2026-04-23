@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  addScriptsToPackageJson,
   detectPackageManager,
   getInstallCmd,
   init,
@@ -95,7 +96,14 @@ describe('init', () => {
     vi.stubEnv('PATH', '/usr/bin');
     process.cwd = (): string => projectDir;
     mockExecSync.mockReturnValue(Buffer.from(''));
-    mockReadFileSync.mockReturnValue('{"version":"0.0.0"}');
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return '{"version":"0.0.0","scripts":{}}';
+      if (p.endsWith('tsconfig.json'))
+        return '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}';
+      if (p.endsWith('tsconfig.app.json'))
+        return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
+      return '{"version":"0.0.0"}';
+    });
   });
 
   afterEach(() => {
@@ -238,7 +246,14 @@ describe('writeTsconfigServer', () => {
     vi.stubEnv('PATH', '/usr/bin');
     process.cwd = (): string => projectDir;
     mockExecSync.mockReturnValue(Buffer.from(''));
-    mockReadFileSync.mockReturnValue('{"version":"0.0.0"}');
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return '{"version":"0.0.0","scripts":{}}';
+      if (p.endsWith('tsconfig.json'))
+        return '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}';
+      if (p.endsWith('tsconfig.app.json'))
+        return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
+      return '{"version":"0.0.0"}';
+    });
   });
 
   afterEach(() => {
@@ -288,7 +303,7 @@ describe('addServerReference', () => {
     process.cwd = (): string => projectDir;
     mockExecSync.mockReturnValue(Buffer.from(''));
     mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0"}';
+      if (p.endsWith('package.json')) return '{"version":"0.0.0","scripts":{}}';
       if (p.endsWith('tsconfig.json'))
         return '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}';
       return '';
@@ -389,7 +404,7 @@ describe('excludeServerFromApp', () => {
     process.cwd = (): string => projectDir;
     mockExecSync.mockReturnValue(Buffer.from(''));
     mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0"}';
+      if (p.endsWith('package.json')) return '{"version":"0.0.0","scripts":{}}';
       if (p.endsWith('tsconfig.app.json'))
         return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
       return '';
@@ -481,5 +496,118 @@ describe('excludeServerFromApp', () => {
       String(c[0]).endsWith('tsconfig.app.json'),
     );
     expect(writeCall).toBeUndefined();
+  });
+});
+
+describe('addScriptsToPackageJson', () => {
+  const projectDir = '/fake/project';
+
+  beforeEach(() => {
+    vi.stubEnv('PATH', '/usr/bin');
+    process.cwd = (): string => projectDir;
+    mockExecSync.mockReturnValue(Buffer.from(''));
+  });
+
+  afterEach(() => {
+    process.cwd = originalCwd;
+    vi.clearAllMocks();
+  });
+
+  it('adds both scripts when scripts object exists but halide scripts are missing', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return '{"version":"0.0.0","scripts":{"test":"vitest"}}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir);
+
+    expect(mockWriteFileSync).toHaveBeenCalledWith(
+      path.join(projectDir, 'package.json'),
+      expect.stringContaining('"halide:start"'),
+      'utf8',
+    );
+    expect(mockWriteFileSync).toHaveBeenCalledWith(
+      path.join(projectDir, 'package.json'),
+      expect.stringContaining('"halide:build"'),
+      'utf8',
+    );
+  });
+
+  it('adds both scripts when scripts object does not exist', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return '{"version":"0.0.0"}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir);
+
+    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('package.json'),
+    );
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
+    expect(parsed.scripts).toEqual({
+      'halide:build': 'tsc --config tsconfig.server.json',
+      'halide:start': 'npx tsx server.ts',
+    });
+  });
+
+  it('skips when both scripts already exist', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json'))
+        return '{"version":"0.0.0","scripts":{"halide:start":"npx tsx server.ts","halide:build":"tsc --config tsconfig.server.json"}}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir);
+
+    const writeCall = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('package.json'),
+    );
+    expect(writeCall).toBeUndefined();
+  });
+
+  it('adds only missing script when one exists', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json'))
+        return '{"version":"0.0.0","scripts":{"halide:start":"npx tsx server.ts"}}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir);
+
+    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('package.json'),
+    );
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
+    const scripts = parsed.scripts as Record<string, string>;
+    expect(scripts['halide:start']).toBe('npx tsx server.ts');
+    expect(scripts['halide:build']).toBe('tsc --config tsconfig.server.json');
+  });
+
+  it('creates scripts object if package.json has no scripts field', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return '{"version":"0.0.0","name":"my-app"}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir);
+
+    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('package.json'),
+    );
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
+    expect(parsed.scripts).toBeDefined();
+    expect((parsed.scripts as Record<string, string>)['halide:start']).toBe('npx tsx server.ts');
+    expect((parsed.scripts as Record<string, string>)['halide:build']).toBe(
+      'tsc --config tsconfig.server.json',
+    );
   });
 });

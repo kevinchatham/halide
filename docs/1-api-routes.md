@@ -34,6 +34,12 @@ The handler receives three arguments:
 | `claims`  | `TClaims \| undefined`             | Decoded JWT claims (undefined for public routes)         |
 | `logger`  | `Logger`                           | Structured logger instance                               |
 
+`ctx` is a **plain object** (not a Hono Context). It is constructed from the Hono request with normalized method, path, headers, params, query, and body.
+
+Handler return values are JSON-serialized via `c.json(result)`.
+
+For routes without `validationSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.
+
 Use the `apiRoute()` factory to fill in the `type` field and default `authorize` function:
 
 ```ts

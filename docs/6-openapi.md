@@ -37,3 +37,30 @@ Attach metadata to individual routes for richer documentation:
 ```
 
 Zod schemas (both `validationSchema` and `openapi.responseSchema`) are automatically converted to JSON Schema in the generated spec.
+
+## Alternative: `openapi.responses`
+
+Instead of `responseSchema`, you can use `openapi.responses` to define multiple response codes:
+
+```ts
+{
+  type: 'api',
+  path: '/users/:id',
+  access: 'public',
+  method: 'get',
+  openapi: {
+    summary: 'Get a user',
+    responses: {
+      200: { description: 'User found', schema: UserSchema },
+      404: { description: 'User not found' },
+    },
+  },
+  handler: async (ctx) => getUser(ctx.params.id),
+}
+```
+
+When `responses` is present, `responseSchema` is ignored. When neither is present, a default `200` response with `'Successful response'` description is generated.
+
+## Hiding routes
+
+Set `observe: false` on a route to hide it from the OpenAPI documentation.

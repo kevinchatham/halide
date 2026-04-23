@@ -14,9 +14,9 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
 
 type HalideVariables = { rawBody?: unknown };
 
-async function createTestApp(config: ServerConfig): Promise<Hono<{ Variables: HalideVariables }>> {
+function createTestApp(config: ServerConfig): Hono<{ Variables: HalideVariables }> {
   const app = new Hono<{ Variables: HalideVariables }>();
-  await registerRoutes(app, config, noopLogger);
+  registerRoutes(app, config, noopLogger);
   return app;
 }
 

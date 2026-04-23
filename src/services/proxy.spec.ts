@@ -258,4 +258,64 @@ describe('createProxyService', () => {
 
     expect(transformFn).toHaveBeenCalled();
   });
+
+  it('transform receives normalized headers with array values joined', async () => {
+    const transformFn = vi.fn().mockImplementation(({ headers }) => {
+      expect(headers['x-multi']).toBe('a, b');
+      return { body: { ok: true }, headers: {} };
+    });
+
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['post'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      transform: transformFn,
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+
+    const app = new Hono();
+    app.post('/api/data', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    await app.request('/api/data', {
+      body: JSON.stringify({ original: true }),
+      headers: { 'Content-Type': 'application/json', 'x-multi': ['a', 'b'] as unknown as string },
+      method: 'POST',
+    });
+
+    expect(transformFn).toHaveBeenCalled();
+  });
+
+  it('transform sets-cookie header is not overwritten by transform headers', async () => {
+    const transformFn = vi.fn().mockReturnValue({
+      body: { transformed: true },
+      headers: { 'set-cookie': 'session=abc' },
+    });
+
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['post'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      transform: transformFn,
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+
+    const app = new Hono();
+    app.post('/api/data', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    await app.request('/api/data', {
+      body: JSON.stringify({ original: true }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+
+    expect(transformFn).toHaveBeenCalled();
+  });
 });

@@ -15,7 +15,8 @@ import { validateServerConfig } from './validate.js';
 type HalideVariables = { rawBody?: unknown };
 
 export interface Server {
-  start: () => Promise<void>;
+  ready: Promise<void>;
+  start: (onReady?: (port: number) => void) => void;
   stop: () => Promise<void>;
 }
 
@@ -24,9 +25,7 @@ export interface CreateAppResult {
   rateLimitDispose: (() => void) | undefined;
 }
 
-export async function createApp<TClaims = unknown>(
-  configInput: ServerConfig<TClaims>,
-): Promise<CreateAppResult> {
+export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>): CreateAppResult {
   validateServerConfig(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
@@ -68,7 +67,7 @@ export async function createApp<TClaims = unknown>(
     app.use('*', createRequestIdMiddleware());
   }
 
-  await registerRoutes<TClaims>(app, configInput, logger);
+  registerRoutes<TClaims>(app, configInput, logger);
 
   createOpenApiRoutes(configInput, app as unknown as Hono);
 
@@ -81,15 +80,22 @@ export async function createApp<TClaims = unknown>(
   return { app, rateLimitDispose };
 }
 
-export async function createServer<TClaims = unknown>(
-  configInput: ServerConfig<TClaims>,
-): Promise<Server> {
-  const { app, rateLimitDispose } = await createApp<TClaims>(configInput);
+export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaims>): Server {
+  const { app, rateLimitDispose } = createApp<TClaims>(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
 
   let httpServer: ReturnType<typeof serve> | undefined;
   let isShuttingDown = false;
+  let readyResolve!: () => void;
+  let readyReject!: (err: Error) => void;
+
+  const ready = new Promise<void>((resolve, reject) => {
+    readyResolve = resolve;
+    readyReject = reject;
+  });
+
+  void ready.catch(() => {});
 
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
@@ -114,22 +120,28 @@ export async function createServer<TClaims = unknown>(
   };
 
   return {
-    start: async () => {
+    ready,
+    start: (onReady?: (port: number) => void) => {
+      if (httpServer) return;
       const port =
         Number.parseInt(process.env.PORT || '', 10) || (configInput.spa.port ?? DEFAULTS.spa.port);
-      await new Promise<void>((resolve) => {
-        httpServer = serve(
-          {
-            fetch: app.fetch,
-            port,
-          },
-          () => {
-            logger.info(
-              `[${configInput.spa.name ?? DEFAULTS.spa.name}] Server running on port ${port}`,
-            );
-            resolve();
-          },
+      logger.info(`[${configInput.spa.name ?? DEFAULTS.spa.name}] Server starting on port ${port}`);
+      httpServer = serve(
+        {
+          fetch: app.fetch,
+          port,
+        },
+        () => {
+          readyResolve();
+          onReady?.(port);
+        },
+      );
+      httpServer.on('error', (err: Error) => {
+        readyReject(err);
+        logger.error(
+          `[${configInput.spa.name ?? DEFAULTS.spa.name}] Failed to start: ${err.message}`,
         );
+        process.exit(1);
       });
       process.on('SIGINT', () => {
         void shutdown('SIGINT');

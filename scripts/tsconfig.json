@@ -4,9 +4,9 @@
     "declarationMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "module": "Node16",
+    "module": "es2022",
     "moduleDetection": "force",
-    "moduleResolution": "node16",
+    "moduleResolution": "bundler",
     "noUncheckedIndexedAccess": true,
     "outDir": "./dist",
     "rootDirs": ["./src", "./scripts"],
@@ -17,5 +17,5 @@
     "typeRoots": ["../node_modules/@types"],
     "types": ["node"]
   },
-  "include": ["clean.ts"]
+  "include": ["clean.ts", "update-readme.ts"]
 }

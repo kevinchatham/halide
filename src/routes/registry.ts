@@ -20,9 +20,9 @@ async function resolveSecret(secret: () => string | Promise<string>): Promise<st
   return secret();
 }
 
-async function createClaimExtractor<TClaims = unknown>(
+function createClaimExtractor<TClaims = unknown>(
   config: ServerConfig<TClaims>,
-): Promise<ClaimExtractor<TClaims> | undefined> {
+): ClaimExtractor<TClaims> | undefined {
   const auth = config.security?.auth;
   if (!auth) return undefined;
 
@@ -32,9 +32,11 @@ async function createClaimExtractor<TClaims = unknown>(
   }
 
   if (auth.secret) {
-    const secret = await resolveSecret(auth.secret);
-    const audience = auth.audience;
-    return (c: Context) => extractBearerClaims<TClaims>(c, secret, audience);
+    const { secret, audience } = auth;
+    return async (c: Context) => {
+      const resolvedSecret = await resolveSecret(secret);
+      return extractBearerClaims<TClaims>(c, resolvedSecret, audience);
+    };
   }
 
   return undefined;
@@ -313,12 +315,12 @@ function registerProxyRoute<TClaims = unknown>(
   }
 }
 
-export async function registerRoutes<TClaims = unknown>(
+export function registerRoutes<TClaims = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims>,
   logger: Logger,
-): Promise<void> {
-  const claimExtractor = await createClaimExtractor<TClaims>(config);
+): void {
+  const claimExtractor = createClaimExtractor<TClaims>(config);
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {

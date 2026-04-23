@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { Hono } from 'hono';
 import { createSpaHandler } from './spa';
 
@@ -113,5 +116,27 @@ describe('createSpaHandler', () => {
     const res = await app.request('/about');
 
     expect(res.status).toBe(404);
+  });
+
+  it('serves HTML content when file exists on disk', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'halide-spa-'));
+    try {
+      await fs.writeFile(path.join(tmpDir, 'index.html'), '<html><body>Hello</body></html>');
+      const app = new Hono();
+      const { spaFallback } = createSpaHandler({
+        fallback: 'index.html',
+        name: 'test-app',
+        root: tmpDir,
+      });
+      app.all('/*', spaFallback);
+
+      const res = await app.request('/about');
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toBe('<html><body>Hello</body></html>');
+    } finally {
+      await fs.rm(tmpDir, { force: true, recursive: true });
+    }
   });
 });

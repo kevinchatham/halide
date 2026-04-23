@@ -14,7 +14,7 @@ const CreateUserSchema = z.object({
   name: z.string().min(1),
 });
 
-const server = await createServer<UserClaims>({
+const server = createServer<UserClaims>({
   spa: {
     name: 'dashboard',
     port: 3553,
@@ -109,5 +109,7 @@ const server = await createServer<UserClaims>({
   },
 });
 
-await server.start();
+server.start((port) => {
+  console.log(`Server running on port ${port}`);
+});
 ```
