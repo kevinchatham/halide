@@ -202,7 +202,7 @@ export async function init(): Promise<undefined> {
 
   log('\nDone! Next steps:');
   log('  1. Edit server.ts to configure your routes and SPA');
-  log('  2. Run your server with: npx tsx server.ts');
+  log('  2. Run your server with: npm run halide:start');
 }
 
 export {
