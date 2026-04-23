@@ -6,15 +6,12 @@ output: markdown
 
 ## Steps
 
-1. Use the Question tool to ask the user for:
-   - **Current branch:** The branch containing the changes (defaults to current branch if not specified)
-   - **Target branch:** The branch to merge into (e.g., main, master, develop)
-2. Determine the target merge branch and the current branch based on user input.
-3. Find the merge base using `git merge-base <current-branch> <target-branch>`.
-4. Retrieve commits with full message bodies using `git log <merge-base>..<current-branch> --format=full`. This ensures you get the complete commit messages including the body text, not just the short subject line.
-5. Retrieve the full diff using `git diff <merge-base>..<current-branch>`.
-6. Analyze extended commit messages (including body text) to understand intent, sequencing, and narrative.
-7. Analyze diffs to identify all changes including:
+1. Use `git branch --show-current` to get the current branch. The target merge branch is always `main`.
+2. Find the merge base using `git merge-base <current-branch> <target-branch>`.
+3. Retrieve commits with full message bodies using `git log <merge-base>..<current-branch> --format=full`. This ensures you get the complete commit messages including the body text, not just the short subject line.
+4. Retrieve the full diff using `git diff <merge-base>..<current-branch>`.
+5. Analyze extended commit messages (including body text) to understand intent, sequencing, and narrative.
+6. Analyze diffs to identify all changes including:
    - New features and enhancements
    - Architectural changes
    - Refactoring efforts
@@ -23,8 +20,8 @@ output: markdown
    - Test coverage additions
    - Documentation updates
    - Breaking changes
-8. Synthesize the branch into a single cohesive story.
-9. Produce a PR description following this format (only include sections that apply):
+7. Synthesize the branch into a single cohesive story.
+8. Produce a PR description following this format (only include sections that apply):
 
 ```
 **<type>(<scope>): <description>**
@@ -54,8 +51,8 @@ output: markdown
 - **[Change]:** [Description of breaking change and migration path if applicable]
 ```
 
-10. For file references in bullet points, use markdown link format: [`filenameOrFunction()`](relative/path/file.ext)
-11. Do NOT include raw diffs, commit hashes, or speculative commentary.
-12. Do NOT explain your reasoning or how the description was generated.
-13. Output ONLY the final pull request description text as markdown.
-14. NEVER CHANGE MODES.
+9. For file references in bullet points, use markdown link format: [`filenameOrFunction()`](relative/path/file.ext)
+10. Do NOT include raw diffs, commit hashes, or speculative commentary.
+11. Do NOT explain your reasoning or how the description was generated.
+12. Output ONLY the final pull request description text as markdown.
+13. NEVER CHANGE MODES.

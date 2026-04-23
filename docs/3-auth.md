@@ -16,6 +16,8 @@ security: {
 }
 ```
 
+Uses `hono/jwt` with HS256 algorithm. The `secret` can be a sync or async function returning the signing key.
+
 **JWKS (remote key set)**
 
 ```ts
@@ -27,6 +29,12 @@ security: {
   },
 }
 ```
+
+Uses `hono/jwk` with RS256 algorithm. The JWKS is fetched from `jwksUri` at runtime.
+
+The `audience` field is optional. When set, it validates the `aud` claim in the JWT payload. The `aud` claim can be a string or an array of strings.
+
+Failed authentication returns `401 Unauthorized` with `{ error: 'Unauthorized' }`.
 
 Routes with `access: 'private'` require a valid JWT. If any private route exists, `security.auth` must be configured; the server will refuse to start otherwise.
 

@@ -16,3 +16,15 @@ observability: {
 ```
 
 Per-route observability is controlled with the `observe` flag. Set `observe: false` on a route to skip hooks for that route.
+
+## ResponseContext
+
+The `onResponse` hook receives a `ResponseContext` object:
+
+| Field        | Type     | Description                                   |
+| ------------ | -------- | --------------------------------------------- |
+| `statusCode` | `number` | HTTP status code of the response              |
+| `durationMs` | `number` | Time in milliseconds from request start       |
+| `error?`     | `Error`  | Error thrown by the handler (undefined if OK) |
+
+Note: `ResponseContext` exists in `src/types.ts` but is **not exported** from `index.ts`.

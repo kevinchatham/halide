@@ -12,8 +12,13 @@ npm run test           # vitest run --coverage (single run + coverage)
 npm run test:watch     # vitest (watch, no coverage)
 npm run test:ui        # vitest --ui
 npm run clean          # npx tsx scripts/clean.ts
+npm run cli            # node dist/cli/index.js (run CLI directly)
+npm run kill           # fuser -k 3000/3553/4200/tcp (kill demo servers)
+npm run sonar          # npm run test && npx dotenv -- npx sonar
 npx vitest run src/config/validate.spec.ts  # single test file
 ```
+
+Note: `npm run build` has a `prebuild` hook that runs `tsx scripts/update-readme.ts` then `typecheck`.
 
 ## Pre-commit workflow
 

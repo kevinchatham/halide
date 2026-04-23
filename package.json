@@ -1,6 +1,6 @@
 {
   "name": "halide",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A declarative BFF (Backend for Frontend) runtime that standardizes SPA communication with auth, proxy, CSP, rate limiting, and OpenAPI support",
   "keywords": [
     "angular",
@@ -61,7 +61,8 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc --noEmit && tsup",
+    "prebuild": "npx tsx scripts/update-readme.ts && npm run typecheck",
+    "build": "tsup",
     "cli": "node dist/cli/index.js",
     "clean": "npx tsx scripts/clean.ts",
     "demo:angular:build": "cd demo/angular && npm run build",

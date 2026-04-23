@@ -20,7 +20,7 @@ function generateMockJwt(): string {
 
 const __dirname: string = path.dirname(fileURLToPath(import.meta.url));
 
-const server: Server = await createServer<JwtClaims>({
+const server: Server = createServer<JwtClaims>({
   apiRoutes: [
     apiRoute({
       access: 'public',
@@ -85,4 +85,7 @@ const server: Server = await createServer<JwtClaims>({
   },
 });
 
-await server.start();
+server.start((port) => {
+  // biome-ignore lint/suspicious/noConsole: startup logging
+  console.log(`Server running on port ${port}`);
+});

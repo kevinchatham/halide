@@ -173,7 +173,7 @@ const observability: ObservabilityConfig<UserClaims> = {
  * - `cors.credentials`: allows cookies and credentials in cross-origin requests
  * - `cors.methods`: HTTP methods permitted for cross-origin requests
  * - `cors.origin`: allowed origins for cross-origin requests (Angular dev server)
- * - `csp['default-src']`: Content-Security-Policy directive restricting resource loading to same-origin
+ * - `csp.directives.defaultSrc`: Content-Security-Policy directive restricting resource loading to same-origin
  * - `auth.strategy`: authentication strategy ('bearer' for JWT bearer tokens)
  * - `auth.secret`: function returning the JWT secret from the JWT_SECRET environment variable
  * - `rateLimit.maxRequests`: maximum number of requests allowed per window
@@ -248,6 +248,8 @@ const exampleConfig: ServerConfig<UserClaims> = {
   spa,
 };
 
-const server: Server = await createServer(exampleConfig);
+const server: Server = createServer(exampleConfig);
 
-await server.start();
+server.start((port) => {
+  observability.logger?.info(`Server running on port ${port}`);
+});

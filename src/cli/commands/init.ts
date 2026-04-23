@@ -5,7 +5,7 @@ import stripJsonComments from 'strip-json-comments';
 
 const SERVER_TS = `import { createServer, apiRoute } from 'halide';
 
-const server = await createServer({
+const server = createServer({
   apiRoutes: [
     apiRoute({
       access: 'public',
@@ -20,7 +20,9 @@ const server = await createServer({
   },
 });
 
-await server.start();
+server.start((port) => {
+  console.log(\`Server running on port \${port}\`);
+});
 `;
 
 const TSCONFIG_SERVER = `{
@@ -101,6 +103,35 @@ function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
+function addScriptsToPackageJson(cwd: string): void {
+  const pkgPath = path.join(cwd, 'package.json');
+  const raw = fs.readFileSync(pkgPath, 'utf8');
+  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
+
+  if (!parsed.scripts || typeof parsed.scripts !== 'object') {
+    parsed.scripts = {};
+  }
+
+  const scripts = parsed.scripts as Record<string, string>;
+  let added = false;
+
+  if (!scripts['halide:start']) {
+    scripts['halide:start'] = 'npx tsx server.ts';
+    added = true;
+  }
+  if (!scripts['halide:build']) {
+    scripts['halide:build'] = 'tsc --config tsconfig.server.json';
+    added = true;
+  }
+
+  if (added) {
+    fs.writeFileSync(pkgPath, JSON.stringify(parsed, null, 2), 'utf8');
+    log('✓ Added halide:start and halide:build scripts to package.json');
+  } else {
+    log('✓ halide scripts already exist in package.json — skipping');
+  }
+}
+
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
 function detectPackageManager(cwd: string): PackageManager {
@@ -148,6 +179,7 @@ export async function init(): Promise<undefined> {
   writeTsconfigServer(cwd);
   addServerReference(cwd);
   excludeServerFromApp(cwd);
+  addScriptsToPackageJson(cwd);
 
   execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
 
@@ -156,4 +188,11 @@ export async function init(): Promise<undefined> {
   log('  2. Run your server with: npx tsx server.ts');
 }
 
-export { detectPackageManager, getInstallCmd, runQuietly, SERVER_TS, TSCONFIG_SERVER };
+export {
+  addScriptsToPackageJson,
+  detectPackageManager,
+  getInstallCmd,
+  runQuietly,
+  SERVER_TS,
+  TSCONFIG_SERVER,
+};

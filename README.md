@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
-    <img src="https://img.shields.io/badge/docs-0.0.1-cyan" alt="Documentation"/>
+    <img src="https://img.shields.io/badge/docs-0.0.3-cyan" alt="Documentation"/>
   </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
@@ -29,7 +29,78 @@ Private backend services
 
 Halide is not an API gateway, a service mesh, or a full backend framework. It is specifically designed around SPA application boundaries.
 
-> Halides are compounds that bond separate elements into a stable structure.
+## Get started
+
+Run Halide in an empty project (`npm init`) or add it directly to your existing frontend project. The server runs as a standalone process alongside your SPA build tooling.
+
+```bash
+npx halide init
+```
+
+This automatically:
+
+1. Detects your package manager
+2. Installs `halide`
+3. Scaffolds a `server.ts` entry point with a health route
+4. Creates `tsconfig.server.json` and updates project references
+5. Adds `halide:start` and `halide:build` scripts to `package.json`
+6. Installs agent skill via `npx skills add kevinchatham/halide`
+
+### Manual Installation
+
+```bash
+npm install halide
+```
+
+```ts
+// routes.ts
+import { apiRoute, proxyRoute } from 'halide';
+
+export const healthRoute = apiRoute({
+  access: 'public',
+  method: 'get',
+  path: '/api/health',
+  handler: async () => ({ status: 'ok' }),
+});
+
+export const userProxyRoute = proxyRoute({
+  access: 'private',
+  methods: ['get', 'post'],
+  path: '/api/users',
+  target: 'http://user-svc:3000',
+});
+```
+
+```ts
+// server.ts
+import { healthRoute, userProxyRoute } from './routes';
+import { createServer, type ServerConfig } from 'halide';
+
+const config: ServerConfig = {
+  spa: {
+    root: './browser',
+  },
+  security: {
+    auth: {
+      strategy: 'jwks',
+      jwksUri: 'https://my-tenant.us.auth0.com/.well-known/jwks.json',
+      audience: 'https://api.example.com',
+    },
+  },
+  apiRoutes: [healthRoute],
+  proxyRoutes: [userProxyRoute],
+};
+
+const server = createServer(config);
+
+server.start((port) => console.log(`Serving on ${port}`));
+```
+
+```
+npm run halide:start
+```
+
+> The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
 
 ## Why Halide?
 
@@ -41,9 +112,7 @@ In most SPA setups, each application carries its own ad-hoc BFF implementation. 
 - CORS configuration is repeated across services, often inconsistently
 - No clear boundary between "frontend backend" and "actual backend" responsibilities
 
-Halide provides a shared structure for all of these concerns. The result is a consistent, predictable backend layer across all your SPAs, without duplication or drift.
-
-## What you get out of the box
+Halide provides a shared structure for all of these concerns, configured once and consistent across every SPA:
 
 - Static SPA hosting with fallback routing
 - Typed API routes with validation
@@ -52,60 +121,7 @@ Halide provides a shared structure for all of these concerns. The result is a co
 - CORS, CSP, and rate limiting
 - Optional OpenAPI documentation
 
-## Get started
-
-```bash
-npx halide init
-```
-
-This detects your package manager, installs halide, scaffolds a `server.ts` entry point with a health route, creates an `AGENTS.md` for AI-assisted development, and installs agent skills.
-
-Or install manually:
-
-```bash
-npm install halide
-```
-
-```ts
-import { createServer, apiRoute, proxyRoute } from 'halide';
-
-const spa = {
-  root: './browser',
-};
-
-const security = {
-  auth: {
-    strategy: 'jwks',
-    jwksUri: 'https://my-tenant.us.auth0.com/.well-known/jwks.json',
-    audience: 'https://api.example.com',
-  },
-};
-
-const healthRoute = apiRoute({
-  access: 'public',
-  method: 'get',
-  path: '/api/health',
-  handler: async (ctx, claims, logger) => ({ status: 'ok' }),
-});
-
-const userRoute = proxyRoute({
-  access: 'private',
-  methods: ['get', 'post'],
-  path: '/api/users',
-  target: 'http://user-svc:3000',
-});
-
-const server = await createServer({
-  spa,
-  security,
-  apiRoutes: [healthRoute],
-  proxyRoutes: [userRoute],
-});
-
-await server.start();
-```
-
-> The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
+The result is a predictable backend layer across all your SPAs, without duplication or drift.
 
 ## When not to use Halide
 

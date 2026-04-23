@@ -1,19 +1,20 @@
 # API reference
 
-### `createServer<TClaims>(config): Promise<Server>`
+### `createServer<TClaims>(config): Server`
 
-Creates and returns a Halide server. Validates the config before starting.
+Creates and returns a Halide server. Validates the config before starting. Synchronous — no `await` needed.
 
-### `createApp<TClaims>(config): Promise<CreateAppResult>`
+### `createApp<TClaims>(config): CreateAppResult`
 
-Creates a Hono app instance without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing or custom server setups.
+Creates a Hono app instance without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing or custom server setups. Synchronous — no `await` needed.
 
 ### `Server`
 
-| Method    | Description                                                               |
-| --------- | ------------------------------------------------------------------------- |
-| `start()` | Starts listening. Port resolution: `PORT` env → `spa.port` → default 3553 |
-| `stop()`  | Gracefully shuts down the HTTP server and cleans up resources             |
+| Property         | Description                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `ready`          | `Promise<void>` that resolves when the server is listening                                                                         |
+| `start(onReady)` | Starts listening. `onReady?: (port: number) => void` is called when ready. Port resolution: `PORT` env → `spa.port` → default 3553 |
+| `stop()`         | Gracefully shuts down the HTTP server and cleans up resources                                                                      |
 
 ### `apiRoute<TClaims, TBody>(input): ApiRoute`
 

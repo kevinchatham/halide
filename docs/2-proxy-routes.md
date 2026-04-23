@@ -36,3 +36,12 @@ const productsProxy = proxyRoute({
   proxyPath: '/products',
 });
 ```
+
+## Key details
+
+- **`methods` is required** — unlike `apiRoute`'s optional `method`, proxy routes require an array of methods.
+- **`proxyPath` defaults to `path`** — if omitted, the route path is used as-is for path prefix rewriting. For example, `path: '/api/products'` rewrites to `/api/products` on the target.
+- **`timeout` defaults to `60000`** (60 seconds) — uses `AbortSignal.timeout()` to abort slow requests.
+- **`identity(ctx, claims)`** — only called when `claims` is defined (private routes with successful auth). Returns a record of headers to inject into the proxied request.
+- **`transform({ body, headers })`** — called when present. Body is JSON-stringified, headers are normalized to lowercase. Without transform, the raw request body is forwarded as-is.
+- Path rewriting replaces the `path` prefix with `proxyPath` in the request URL before forwarding to `target`.
