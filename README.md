@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
-    <img src="https://img.shields.io/badge/docs-0.0.4-cyan" alt="Documentation"/>
+    <img src="https://img.shields.io/badge/docs-0.0.5-cyan" alt="Documentation"/>
   </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
@@ -97,7 +97,7 @@ server.start((port) => console.log(`Serving on ${port}`));
 ```
 
 ```
-npm run halide:start
+npx tsx server.ts
 ```
 
 > The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
