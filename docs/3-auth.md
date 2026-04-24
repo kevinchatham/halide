@@ -12,11 +12,12 @@ security: {
     strategy: 'bearer',
     secret: () => process.env.JWT_SECRET,
     audience: 'my-app',           // optional: validates the aud claim
+    secretTtl: 60,                // optional: cache secret for N seconds (default: 60, 0 to disable)
   },
 }
 ```
 
-Uses `hono/jwt` with HS256 algorithm. The `secret` can be a sync or async function returning the signing key.
+Uses `hono/jwt` with HS256 algorithm. The `secret` can be a sync or async function returning the signing key. The resolved secret is cached for `secretTtl` seconds (default: 60) to avoid repeated network calls. Set `secretTtl: 0` to disable caching.
 
 **JWKS (remote key set)**
 

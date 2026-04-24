@@ -1,6 +1,9 @@
 import type { Logger } from '../types';
 
 export const DEFAULTS = {
+  auth: {
+    secretTtl: 60,
+  },
   cors: {
     credentials: false,
     methods: ['get', 'post', 'put', 'delete', 'patch'] as string[],

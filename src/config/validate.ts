@@ -83,6 +83,11 @@ function validateAuth(auth?: AuthInput): void {
   if (auth?.strategy === 'jwks' && !auth.jwksUri) {
     throw new Error('auth.jwksUri is required when strategy is jwks');
   }
+  if (auth?.secretTtl !== undefined) {
+    if (!Number.isInteger(auth.secretTtl) || auth.secretTtl < 0) {
+      throw new Error('auth.secretTtl must be a non-negative integer (seconds)');
+    }
+  }
 }
 
 function validateCspDirectives(csp?: CspOptions): void {

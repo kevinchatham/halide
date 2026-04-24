@@ -44,4 +44,28 @@ const productsProxy = proxyRoute({
 - **`timeout` defaults to `60000`** (60 seconds) — uses `AbortSignal.timeout()` to abort slow requests.
 - **`identity(ctx, claims)`** — only called when `claims` is defined (private routes with successful auth). Returns a record of headers to inject into the proxied request.
 - **`transform({ body, headers })`** — called when present. Body is JSON-stringified, headers are normalized to lowercase. Without transform, the raw request body is forwarded as-is.
-- Path rewriting replaces the `path` prefix with `proxyPath` in the request URL before forwarding to `target`.
+- **Path rewriting** replaces the `path` prefix with `proxyPath` in the request URL before forwarding to `target`.
+
+## Wildcard paths
+
+If `path` ends with `/*`, it matches all sub-paths. If `proxyPath` also ends with `/*`, the matched suffix is preserved. If `proxyPath` is a plain path, the suffix is still appended.
+
+```
+# Plain path rewriting
+Incoming: /api/products/123
+path:     /api/products
+proxyPath: /products
+Result:   http://target/products/123
+
+# Wildcard with wildcard proxyPath
+Incoming: /api/users/123
+path:     /api/*
+proxyPath: /backend/*
+Result:   http://target/backend/users/123
+
+# Wildcard with plain proxyPath
+Incoming: /api/users/123
+path:     /api/*
+proxyPath: /backend
+Result:   http://target/backend/users/123
+```

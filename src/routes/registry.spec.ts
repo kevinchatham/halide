@@ -509,6 +509,25 @@ describe('registerRoutes', () => {
       expect(res1.status).toBeLessThan(600);
       expect(res2.status).toBeLessThan(600);
     });
+
+    it('registers wildcard proxy route and matches sub-paths', async () => {
+      const app = await createTestApp({
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/api/*',
+            proxyPath: '/backend/*',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+        spa: { root: '/var/www' },
+      });
+
+      const res = await app.request('/api/users/123');
+      expect(res.status).toBeLessThan(600);
+    });
   });
 
   describe('JWKS strategy', () => {
@@ -533,6 +552,112 @@ describe('registerRoutes', () => {
 
       const res = await app.request('/profile');
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('Bearer secretTtl caching', () => {
+    it('caches secret and only calls secret function once within TTL', async () => {
+      vi.useFakeTimers();
+      const secretFn = vi.fn().mockReturnValue('test-secret');
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'private',
+            handler: async () => ({ ok: true }),
+            path: '/profile',
+            type: 'api',
+          },
+        ],
+        security: {
+          auth: { secret: secretFn, secretTtl: 60, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      });
+
+      const token = await createValidToken({ sub: 'user-123' });
+
+      const res1 = await app.request('/profile', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res1.status).toBe(200);
+      expect(secretFn).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(30_000);
+
+      const res2 = await app.request('/profile', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res2.status).toBe(200);
+      expect(secretFn).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it('re-fetches secret after TTL expires', async () => {
+      vi.useFakeTimers();
+      const secretFn = vi.fn().mockReturnValue('test-secret');
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'private',
+            handler: async () => ({ ok: true }),
+            path: '/profile',
+            type: 'api',
+          },
+        ],
+        security: {
+          auth: { secret: secretFn, secretTtl: 60, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      });
+
+      const token = await createValidToken({ sub: 'user-123' });
+
+      await app.request('/profile', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(secretFn).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(61_000);
+
+      await app.request('/profile', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(secretFn).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it('does not cache when secretTtl is 0', async () => {
+      const secretFn = vi.fn().mockReturnValue('test-secret');
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'private',
+            handler: async () => ({ ok: true }),
+            path: '/profile',
+            type: 'api',
+          },
+        ],
+        security: {
+          auth: { secret: secretFn, secretTtl: 0, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      });
+
+      const token = await createValidToken({ sub: 'user-123' });
+
+      const res1 = await app.request('/profile', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res1.status).toBe(200);
+      expect(secretFn).toHaveBeenCalledTimes(1);
+
+      const res2 = await app.request('/profile', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res2.status).toBe(200);
+      expect(secretFn).toHaveBeenCalledTimes(2);
     });
   });
 
