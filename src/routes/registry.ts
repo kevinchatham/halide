@@ -13,15 +13,13 @@ import type {
   RequestContext,
   ServerConfig,
 } from '../types';
+import { createSecretCache } from '../utils/secretCache';
 
 type HalideVariables = { rawBody?: unknown };
 
-async function resolveSecret(secret: () => string | Promise<string>): Promise<string> {
-  return secret();
-}
-
 function createClaimExtractor<TClaims = unknown>(
   config: ServerConfig<TClaims>,
+  logger: Logger,
 ): ClaimExtractor<TClaims> | undefined {
   const auth = config.security?.auth;
   if (!auth) return undefined;
@@ -32,9 +30,11 @@ function createClaimExtractor<TClaims = unknown>(
   }
 
   if (auth.secret) {
-    const { secret, audience } = auth;
+    const { secret, audience, secretTtl } = auth;
+    const ttl = secretTtl ?? DEFAULTS.auth.secretTtl;
+    const cachedResolver = createSecretCache(ttl, logger);
     return async (c: Context) => {
-      const resolvedSecret = await resolveSecret(secret);
+      const resolvedSecret = await cachedResolver(secret);
       return extractBearerClaims<TClaims>(c, resolvedSecret, audience);
     };
   }
@@ -320,7 +320,7 @@ export function registerRoutes<TClaims = unknown>(
   config: ServerConfig<TClaims>,
   logger: Logger,
 ): void {
-  const claimExtractor = createClaimExtractor<TClaims>(config);
+  const claimExtractor = createClaimExtractor<TClaims>(config, logger);
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {

@@ -115,10 +115,24 @@ export function createProxyService<TClaims = unknown>(
   const timeoutMs = route.timeout ?? DEFAULTS.proxy.timeoutMs;
 
   return async (c: Context): Promise<Response> => {
-    const rewrittenPath = c.req.path.replace(new RegExp(`^${routePath}`), rewritePath);
+    const isWildcard = routePath.endsWith('/*');
+    const prefix = isWildcard ? routePath.slice(0, -2) : routePath;
+    const rewritePrefix =
+      isWildcard && rewritePath.endsWith('/*') ? rewritePath.slice(0, -2) : rewritePath;
+
+    let rewrittenPath: string;
+    if (isWildcard) {
+      const suffix = c.req.path.startsWith(prefix) ? c.req.path.slice(prefix.length) : '';
+      rewrittenPath = rewritePrefix + suffix;
+    } else {
+      rewrittenPath = c.req.path.replace(new RegExp(`^${routePath}`), rewritePath);
+    }
     const targetUrl = new URL(rewrittenPath + c.req.url.replace(c.req.path, ''), target).toString();
 
     const headers: Record<string, string | undefined> = { ...c.req.header() };
+    delete headers['host'];
+    delete headers['Host'];
+    headers['x-forwarded-host'] = c.req.header('host') ?? '';
 
     applyIdentityHeaders(headers, route, claims, c, parsedBody);
 

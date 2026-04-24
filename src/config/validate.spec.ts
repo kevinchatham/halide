@@ -401,4 +401,48 @@ describe('validateServerConfig', () => {
       }),
     ).toThrow("CSP directive 'default-src' uses kebab-case");
   });
+
+  it('rejects negative secretTtl', () => {
+    expect(() =>
+      validateServerConfig({
+        security: {
+          auth: { secret: () => 'secret', secretTtl: -1, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      }),
+    ).toThrow('auth.secretTtl must be a non-negative integer (seconds)');
+  });
+
+  it('rejects non-integer secretTtl', () => {
+    expect(() =>
+      validateServerConfig({
+        security: {
+          auth: { secret: () => 'secret', secretTtl: 1.5, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      }),
+    ).toThrow('auth.secretTtl must be a non-negative integer (seconds)');
+  });
+
+  it('accepts secretTtl of 0', () => {
+    expect(() =>
+      validateServerConfig({
+        security: {
+          auth: { secret: () => 'secret', secretTtl: 0, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts secretTtl of 60', () => {
+    expect(() =>
+      validateServerConfig({
+        security: {
+          auth: { secret: () => 'secret', secretTtl: 60, strategy: 'bearer' },
+        },
+        spa: { root: '/var/www' },
+      }),
+    ).not.toThrow();
+  });
 });

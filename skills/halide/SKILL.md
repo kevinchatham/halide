@@ -156,11 +156,14 @@ Uses `hono/jwt` internally.
 security: {
   auth: {
     strategy: 'bearer',
-    secret: () => process.env.JWT_SECRET,    // string or async function
-    audience: 'my-app',                       // optional — validates the 'aud' claim
+    secret: () => vaultClient.readSecret('jwt-signing-key'), // async function
+    audience: 'my-app',
+    secretTtl: 60, // optional — TTL in seconds for caching the secret. Default: 60. Set to 0 to disable caching.
   },
 }
 ```
+
+The `secret` field accepts an async function. The result is cached for `secretTtl` seconds (default: 60) to avoid repeated network calls. Set `secretTtl: 0` to disable caching and resolve on every request.
 
 ### JWKS (remote key set, RS256)
 
@@ -175,8 +178,6 @@ security: {
   },
 }
 ```
-
-The `secret` field can be a synchronous or async function — it is resolved on each request.
 
 ### How auth works
 
@@ -292,6 +293,30 @@ Result:   http://products.internal/products/123
 ```
 
 Query parameters and the remainder of the path are forwarded as-is.
+
+**Wildcard paths:** The `path` can end with `/*` to match all sub-paths. When using wildcards, the `proxyPath` can also use `/*` to preserve the matched suffix:
+
+```
+Incoming: /api/users/123
+path:     /api/*
+proxyPath: /backend/*
+Result:   http://products.internal/backend/users/123
+```
+
+If `proxyPath` is a plain path (no wildcard), the suffix is still appended:
+
+```
+Incoming: /api/users/123
+path:     /api/*
+proxyPath: /backend
+Result:   http://products.internal/backend/users/123
+```
+
+### Host Header Behavior
+
+The original `Host` header from the client request is **NOT** forwarded to the backend. Instead, the `host` header is derived from the target URL, which is the correct behavior for most backend services and CDNs. The original host value is preserved as `X-Forwarded-Host` for backend reference.
+
+This prevents routing issues with CDNs (like Akamai) that use the `host` header to route requests — forwarding the client's host header to the backend would cause 404 errors.
 
 ### Identity Headers
 

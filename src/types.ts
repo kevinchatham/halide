@@ -128,6 +128,7 @@ export type SecurityAuthConfig = {
   jwksUri?: string;
   strategy?: 'bearer' | 'jwks';
   secret?: () => string | Promise<string>;
+  secretTtl?: number;
 };
 
 export type SecurityConfig = {

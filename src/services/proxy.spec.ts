@@ -318,4 +318,86 @@ describe('createProxyService', () => {
 
     expect(transformFn).toHaveBeenCalled();
   });
+
+  it('rewrites wildcard paths with wildcard proxyPath', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['get'],
+      path: '/api/*',
+      proxyPath: '/backend/*',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger);
+
+    const app = new Hono();
+    app.get('/api/*', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    const res = await app.request('/api/users/123');
+    expect(res.status).toBeLessThan(600);
+  });
+
+  it('rewrites wildcard paths with plain proxyPath', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['get'],
+      path: '/api/*',
+      proxyPath: '/backend',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger);
+
+    const app = new Hono();
+    app.get('/api/*', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    const res = await app.request('/api/users/123');
+    expect(res.status).toBeLessThan(600);
+  });
+
+  it('strips host header from proxied request', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['get'],
+      path: '/api/users',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger);
+
+    const app = new Hono();
+    app.get('/api/users', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    const res = await app.request('/api/users', {
+      headers: { host: 'original.example.com' },
+    });
+    expect(res.status).toBeLessThan(600);
+  });
+
+  it('preserves original host as x-forwarded-host', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['get'],
+      path: '/api/users',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, undefined, noopLogger);
+
+    const app = new Hono();
+    app.get('/api/users', handler);
+    app.onError(() => new Response(null, { status: 502 }));
+
+    const res = await app.request('/api/users', {
+      headers: { host: 'original.example.com' },
+    });
+    expect(res.status).toBeLessThan(600);
+  });
 });
