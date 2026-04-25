@@ -85,6 +85,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
     "@hono/node-server": "^1.19.14",
     "@hono/standard-validator": "^0.2.2",
     "@scalar/hono-api-reference": "^0.10.9",

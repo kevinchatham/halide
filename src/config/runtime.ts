@@ -61,6 +61,22 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
     rateLimitDispose = dispose;
   }
 
+  const openapiEnabled = configInput.openapi?.enabled ?? false;
+
+  if (openapiEnabled) {
+    logger.warn(
+      `[${
+        configInput.spa.name ?? DEFAULTS.spa.name
+      }] OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
+    );
+    const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<
+      import('../types.js').CspDirectives
+    >;
+    const swaggerPath = configInput.openapi?.path ?? DEFAULTS.openapi.path;
+    app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
+    app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
+  }
+
   app.use('*', createSecurityMiddleware(security?.csp ?? {}));
 
   if (configInput.observability?.requestId) {
@@ -106,6 +122,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
     rateLimitDispose?.();
     const server = httpServer;
     if (server) {
+      (server as import('node:http').Server).closeAllConnections?.();
       await new Promise<void>((resolve, reject) => {
         server.close((err) => {
           if (err) {
@@ -158,6 +175,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
       if (!server) {
         return;
       }
+      (server as import('node:http').Server).closeAllConnections?.();
       await new Promise<void>((resolve, reject) => {
         server.close((err) => {
           if (err) {

@@ -1,9 +1,11 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { confirm, input } from '@inquirer/prompts';
 import stripJsonComments from 'strip-json-comments';
 
-const SERVER_TS = `import { createServer, apiRoute } from 'halide';
+function generateServerTs(spaName: string, port: number): string {
+  return `import { createServer, apiRoute } from 'halide';
 
 const server = createServer({
   apiRoutes: [
@@ -15,7 +17,8 @@ const server = createServer({
     }),
   ],
   spa: {
-    name: 'my-app',
+    name: '${spaName}',
+    port: ${port},
     root: 'dist',
   },
 });
@@ -24,6 +27,7 @@ server.start((port) => {
   console.log(\`Server running on port \${port}\`);
 });
 `;
+}
 
 const TSCONFIG_SERVER = `{
   "compilerOptions": {
@@ -178,17 +182,46 @@ export async function init(): Promise<undefined> {
     process.exit(1);
   }
 
+  const spaName = await input({
+    default: 'my-app',
+    message: 'What is your SPA name?',
+    validate: (value: string) => {
+      if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
+      return 'SPA name must contain only letters, numbers, dashes, and underscores';
+    },
+  });
+
+  const port = Number(
+    await input({
+      default: '3553',
+      message: 'What port should the server listen on?',
+      validate: (value: string) => {
+        const portNum = Number.parseInt(value, 10);
+        if (Number.isNaN(portNum) || portNum < 1 || portNum > 65535) {
+          return 'Please enter a valid port number (1-65535)';
+        }
+        return true;
+      },
+    }),
+  );
+
+  const installSkills = await confirm({
+    default: true,
+    message: 'Install AI coding skills for halide?',
+  });
+
   const pkgManager = detectPackageManager(cwd);
   const installCmd = getInstallCmd(pkgManager);
 
+  log(`Installing halide via ${pkgManager}...`);
   runQuietly(installCmd, cwd);
-  log(`✓ Installing halide via ${pkgManager}`);
+  log(`✓ Installed halide via ${pkgManager}`);
 
   const serverPath = path.join(cwd, 'server.ts');
   if (fs.existsSync(serverPath)) {
     log('✓ server.ts already exists — skipping');
   } else {
-    fs.writeFileSync(serverPath, SERVER_TS, 'utf8');
+    fs.writeFileSync(serverPath, generateServerTs(spaName, port), 'utf8');
     log('✓ Created server.ts');
   }
 
@@ -198,7 +231,11 @@ export async function init(): Promise<undefined> {
   addTypeModuleToPackageJson(cwd);
   addScriptsToPackageJson(cwd);
 
-  execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
+  if (installSkills) {
+    execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
+  } else {
+    log('✓ Skipping skills installation');
+  }
 
   log('\nDone! Next steps:');
   log('  1. Edit server.ts to configure your routes and SPA');
@@ -209,8 +246,8 @@ export {
   addScriptsToPackageJson,
   addTypeModuleToPackageJson,
   detectPackageManager,
+  generateServerTs,
   getInstallCmd,
   runQuietly,
-  SERVER_TS,
   TSCONFIG_SERVER,
 };

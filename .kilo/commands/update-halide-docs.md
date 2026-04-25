@@ -9,7 +9,7 @@ This command audits the `docs/` directory against the actual source code and upd
 
 ## Target Files
 
-All documentation lives in `docs/`:
+Documentation lives in `docs/`. The files below are the starting point — create or remove files as the codebase requires:
 
 - `docs/0-spa.md` — SPA hosting configuration (root, port, fallback, apiPrefix)
 - `docs/1-api-routes.md` — API routes, handler signatures, body validation
@@ -42,9 +42,9 @@ Read these source files to establish what is actually exported and how it works:
 8. `src/services/proxy.ts` — proxy behavior (path rewriting, identity headers, transform, timeout)
 9. `package.json` — dependencies, scripts, engine requirements (Node.js >= 24.0.0, ESM)
 
-### Phase 2: Verify Each Doc File
+### Phase 2: Verify Each Doc File and Identify Gaps
 
-For each file in `docs/`, verify against source truth:
+First, scan all source files under `src/` to identify concepts that may lack documentation. Then for each existing file in `docs/`, verify against source truth:
 
 #### docs/0-spa.md
 - `spa.root` is the only required field
@@ -120,7 +120,7 @@ For each file in `docs/`, verify against source truth:
 - `createServer` is synchronous (no await)
 - `createApp` returns `{ app, rateLimitDispose }` — useful for testing
 
-### Phase 3: Update Documentation
+### Phase 3: Update and Reorganize Documentation
 
 For each file with discrepancies:
 
@@ -133,6 +133,17 @@ For each file with discrepancies:
 7. Update handler signatures — `(ctx, claims, logger)` with ctx as plain object
 8. Add documentation for any source features not yet documented
 9. Remove documentation for features that no longer exist
+
+For undocumented source concepts:
+
+1. Create new `docs/N-topic.md` files with appropriate numbered prefix
+2. Follow the same style and tone as existing docs
+3. Include code examples, type signatures, and default values
+
+For obsolete doc files:
+
+1. If an entire doc file describes concepts that no longer exist in the codebase, remove it
+2. If a concept moved to a different file, update references and remove the old file
 
 ### Phase 4: Cross-Reference Consistency
 
@@ -153,10 +164,11 @@ If source architecture changed (new directories, moved files, changed patterns):
 ## Important Rules
 
 - **Prettier owns `.md` files** — do NOT run Biome on `.md` files
-- Do NOT change the structure/organization of docs — only update content to match code
 - Preserve existing documentation style and tone
-- If a doc section describes something that no longer exists, remove it
-- If new source features exist that aren't documented, add them to the appropriate doc file
+- If an entire doc file describes concepts that no longer exist in the codebase, remove the file
+- If entire concepts exist in the source that have no documentation, create new files in `docs/` to cover them
+- Use numbered prefixes for new files to maintain ordering (e.g. `docs/9-cli.md`)
+- If new source features exist that aren't documented, add them to the appropriate doc file or create a new one
 - Keep code examples minimal and focused
 - When in doubt, check git history for the source file
 - Write docs from a developer's perspective — how would someone learn to use this library?

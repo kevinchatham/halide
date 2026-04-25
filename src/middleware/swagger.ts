@@ -24,5 +24,18 @@ export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app:
     }),
   );
 
-  app.get(swaggerPath, Scalar({ url: `${swaggerPath}/openapi.json` }));
+  app.get(
+    swaggerPath,
+    Scalar({
+      agent: {
+        disabled: true,
+      },
+      hideClientButton: true,
+      mcp: {
+        disabled: true,
+      },
+      showDeveloperTools: 'never',
+      url: `${swaggerPath}/openapi.json`,
+    }),
+  );
 }

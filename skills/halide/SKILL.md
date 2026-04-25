@@ -69,9 +69,11 @@ All imports come from `'halide'`:
 
 ```typescript
 const server = createServer(config);
-server.start((port) => { console.log(`Listening on ${port}`); });
+server.start((port) => {
+  console.log(`Listening on ${port}`);
+});
 await server.ready;
-await server.stop();  // graceful shutdown
+await server.stop(); // graceful shutdown
 ```
 
 - `createServer()` is **synchronous** — no `await` needed
