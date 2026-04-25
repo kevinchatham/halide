@@ -137,6 +137,20 @@ transform: ({ body, headers }) => ({
 
 If no transform is provided, the raw request body is forwarded as-is.
 
+### Host Header Behavior
+
+The original `Host` header from the client request is **NOT** forwarded to the backend. Instead, the `host` header is derived from the target URL, which is the correct behavior for most backend services and CDNs. The original host value is preserved as `X-Forwarded-Host` for backend reference.
+
+This prevents routing issues with CDNs (like Akamai) that use the `host` header to route requests — forwarding the client's host header to the backend would cause 404 errors.
+
+The following headers are stripped from proxied requests and cannot be overridden by `identity` or `transform`:
+
+- `host`
+- `connection`
+- `content-length`
+- `transfer-encoding`
+- `set-cookie` (multi-value, not writable)
+
 ### Timeout
 
 Defaults to **60,000ms** (60 seconds). Uses `AbortSignal.timeout()`.

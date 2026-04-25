@@ -1,5 +1,7 @@
 # API reference
 
+## Functions
+
 ### `createServer<TClaims>(config): Server`
 
 Creates and returns a Halide server. Validates the config before starting. Synchronous — no `await` needed.
@@ -7,6 +9,16 @@ Creates and returns a Halide server. Validates the config before starting. Synch
 ### `createApp<TClaims>(config): CreateAppResult`
 
 Creates a Hono app instance without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing or custom server setups. Synchronous — no `await` needed.
+
+### `apiRoute<TClaims, TBody>(input): ApiRoute`
+
+Factory that fills in `type: 'api'` and a default `authorize` function (always returns `true`).
+
+### `proxyRoute<TClaims>(input): ProxyRoute`
+
+Factory that fills in `type: 'proxy'` and a default `authorize` function (always returns `true`).
+
+## Interfaces
 
 ### `Server`
 
@@ -16,20 +28,19 @@ Creates a Hono app instance without starting an HTTP server. Returns `{ app, rat
 | `start(onReady)` | Starts listening. `onReady?: (port: number) => void` is called when ready. Port resolution: `PORT` env → `spa.port` → default 3553 |
 | `stop()`         | Gracefully shuts down the HTTP server and cleans up resources                                                                      |
 
-### `apiRoute<TClaims, TBody>(input): ApiRoute`
+### `CreateAppResult`
 
-Factory that fills in `type: 'api'` and a default `authorize` function.
+| Property           | Type                        | Description                                                                    |
+| ------------------ | --------------------------- | ------------------------------------------------------------------------------ |
+| `app`              | `Hono`                      | Hono app instance with all middleware and routes                               |
+| `rateLimitDispose` | `(() => void) \| undefined` | Cleanup function for rate limit timer (undefined if rate limiting not enabled) |
 
-### `proxyRoute<TClaims>(input): ProxyRoute`
-
-Factory that fills in `type: 'proxy'` and a default `authorize` function.
-
-### Exported types
+## Exported types
 
 | Type                              | Description                                                             |
 | --------------------------------- | ----------------------------------------------------------------------- |
 | `ServerConfig<TClaims>`           | Top-level configuration object                                          |
-| `Server`                          | Running server instance (`start`, `stop`)                               |
+| `Server`                          | Running server instance (`ready`, `start`, `stop`)                      |
 | `CreateAppResult`                 | Return type of `createApp()` — `{ app, rateLimitDispose }`              |
 | `ApiRoute<TClaims, TBody>`        | API route definition                                                    |
 | `ApiRouteHandler<TClaims, TBody>` | `(ctx, claims, logger) => Promise<unknown>`                             |
@@ -38,13 +49,19 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function.
 | `TransformFn`                     | `({ body, headers }) => { body, headers }`                              |
 | `RequestContext`                  | Normalized request context (method, path, headers, params, query, body) |
 | `SecurityConfig`                  | CORS, CSP, auth, rate limit configuration                               |
-| `SecurityAuthConfig`              | Auth strategy, secret/JWKS, audience                                    |
-| `CorsConfig`                      | Origin, methods, credentials, headers                                   |
-| `CspOptions`                      | Content Security Policy directives                                      |
-| `CspDirectives`                   | CSP directive map (keys are directive names)                            |
+| `SecurityAuthConfig`              | Auth strategy, secret/JWKS, audience, secretTtl                         |
+| `CorsConfig`                      | Origin, methods, credentials, allowedHeaders, exposedHeaders, maxAge    |
+| `CspOptions`                      | Content Security Policy directives container                            |
+| `CspDirectives`                   | CSP directive map (camelCase keys)                                      |
 | `SpaConfig`                       | Static file serving and port configuration                              |
 | `ObservabilityConfig<TClaims>`    | Logger, request ID, lifecycle hooks                                     |
 | `OpenApiConfig`                   | OpenAPI toggle, path, and options                                       |
 | `OpenApiRouteMeta`                | Per-route OpenAPI metadata (summary, tags, schemas)                     |
 | `Logger`                          | `{ debug, error, info, warn }` interface                                |
 | `ClaimExtractor<TClaims>`         | Function to extract claims from a Hono Context                          |
+
+## Not exported but referenced
+
+| Type              | Description                                                          |
+| ----------------- | -------------------------------------------------------------------- |
+| `ResponseContext` | `{ statusCode, durationMs, error? }` — used by `onResponse` hook arg |

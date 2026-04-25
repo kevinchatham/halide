@@ -4,10 +4,10 @@ import {
   addScriptsToPackageJson,
   addTypeModuleToPackageJson,
   detectPackageManager,
+  generateServerTs,
   getInstallCmd,
   init,
   runQuietly,
-  SERVER_TS,
   TSCONFIG_SERVER,
 } from './init';
 
@@ -16,18 +16,29 @@ const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockWriteFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockReadFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockAppendFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockInput: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockConfirm: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', () => ({
   execSync: mockExecSync,
 }));
 
-vi.mock('node:fs', () => ({
-  default: {
+vi.mock('node:fs', () => {
+  const mocks = {
     appendFileSync: mockAppendFileSync,
     existsSync: mockExistsSync,
     readFileSync: mockReadFileSync,
     writeFileSync: mockWriteFileSync,
-  },
+  };
+  return {
+    ...mocks,
+    default: mocks,
+  };
+});
+
+vi.mock('@inquirer/prompts', () => ({
+  confirm: mockConfirm,
+  input: mockInput,
 }));
 
 const originalCwd: () => string = process.cwd;
@@ -90,6 +101,21 @@ describe('getInstallCmd', () => {
   });
 });
 
+describe('generateServerTs', () => {
+  it('generates server.ts with given spa name and port', () => {
+    const result = generateServerTs('my-custom-app', 8080);
+    expect(result).toContain("name: 'my-custom-app'");
+    expect(result).toContain('port: 8080');
+    expect(result).toContain("import { createServer, apiRoute } from 'halide'");
+  });
+
+  it('generates server.ts with default spa name', () => {
+    const result = generateServerTs('my-app', 3553);
+    expect(result).toContain("name: 'my-app'");
+    expect(result).toContain('port: 3553');
+  });
+});
+
 describe('init', () => {
   const projectDir = '/fake/project';
 
@@ -105,6 +131,10 @@ describe('init', () => {
         return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
       return '{"version":"0.0.0"}';
     });
+    mockInput.mockImplementation((opts) =>
+      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app'),
+    );
+    mockConfirm.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -137,20 +167,43 @@ describe('init', () => {
     );
   });
 
-  it('creates server.ts if it does not exist', async () => {
+  it('creates server.ts with user-provided spa name', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
       return false;
     });
+    mockInput.mockImplementation((opts) =>
+      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-custom-app'),
+    );
 
     await init();
 
     expect(mockWriteFileSync).toHaveBeenCalledWith(
       path.join(projectDir, 'server.ts'),
-      SERVER_TS,
+      generateServerTs('my-custom-app', 3553),
       'utf8',
     );
+  });
+
+  it('rejects spa names with invalid characters', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      return false;
+    });
+    let nameValidate: (value: string) => string | boolean = () => true;
+    mockInput.mockImplementation((opts) => {
+      if (!opts.message.includes('port') && opts.validate) nameValidate = opts.validate;
+      return Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app');
+    });
+
+    await init();
+
+    expect(nameValidate('my-app')).toBe(true);
+    expect(nameValidate('My_App-123')).toBe(true);
+    expect(typeof nameValidate('hello world')).toBe('string');
+    expect(typeof nameValidate('app.name')).toBe('string');
+    expect(typeof nameValidate("app'; import")).toBe('string');
   });
 
   it('does not overwrite existing server.ts', async () => {
@@ -255,6 +308,10 @@ describe('writeTsconfigServer', () => {
         return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
       return '{"version":"0.0.0"}';
     });
+    mockInput.mockImplementation((opts) =>
+      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app'),
+    );
+    mockConfirm.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -309,6 +366,10 @@ describe('addServerReference', () => {
         return '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}';
       return '';
     });
+    mockInput.mockImplementation((opts) =>
+      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app'),
+    );
+    mockConfirm.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -410,6 +471,10 @@ describe('excludeServerFromApp', () => {
         return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
       return '';
     });
+    mockInput.mockImplementation((opts) =>
+      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app'),
+    );
+    mockConfirm.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -629,66 +694,7 @@ describe('addTypeModuleToPackageJson', () => {
   });
 
   it('adds "type": "module" when it does not exist', () => {
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0","name":"my-app"}';
-      return '';
-    });
-
-    addTypeModuleToPackageJson(projectDir);
-
-    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('package.json'),
-    );
-    expect(written).toBeDefined();
-    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
-    expect(parsed.type).toBe('module');
-  });
-
-  it('skips when "type": "module" already exists', () => {
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0","type":"module"}';
-      return '';
-    });
-
-    addTypeModuleToPackageJson(projectDir);
-
-    const writeCall = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('package.json'),
-    );
-    expect(writeCall).toBeUndefined();
-  });
-
-  it('overwrites when "type" is set to "commonjs"', () => {
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0","type":"commonjs"}';
-      return '';
-    });
-
-    addTypeModuleToPackageJson(projectDir);
-
-    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('package.json'),
-    );
-    expect(written).toBeDefined();
-    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
-    expect(parsed.type).toBe('module');
-  });
-});
-
-describe('addTypeModuleToPackageJson', () => {
-  const projectDir = '/fake/project';
-
-  beforeEach(() => {
-    vi.stubEnv('PATH', '/usr/bin');
-    process.cwd = (): string => projectDir;
-  });
-
-  afterEach(() => {
-    process.cwd = originalCwd;
-    vi.clearAllMocks();
-  });
-
-  it('adds "type": "module" when it does not exist', () => {
+    mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return '{"version":"0.0.0","name":"my-app"}';
       return '';

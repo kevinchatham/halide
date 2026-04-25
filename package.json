@@ -1,6 +1,6 @@
 {
   "name": "halide",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "A declarative BFF (Backend for Frontend) runtime that standardizes SPA communication with auth, proxy, CSP, rate limiting, and OpenAPI support",
   "keywords": [
     "angular",
@@ -85,6 +85,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
     "@hono/node-server": "^1.19.14",
     "@hono/standard-validator": "^0.2.2",
     "@scalar/hono-api-reference": "^0.10.9",

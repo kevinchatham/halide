@@ -19,7 +19,7 @@ security: {
 }
 ```
 
-The `secret` field accepts an async function. The result is cached for `secretTtl` seconds (default: 60) to avoid repeated network calls. Set `secretTtl: 0` to disable caching and resolve on every request.
+The `secret` field accepts a sync or async function. The result is cached for `secretTtl` seconds (default: 60) to avoid repeated calls. Set `secretTtl: 0` to disable caching and resolve on every request. `secretTtl` must be a non-negative integer (validator throws otherwise).
 
 ### JWKS (remote key set, RS256)
 

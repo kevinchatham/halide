@@ -1,15 +1,22 @@
 import type { Context, Next } from 'hono';
 
+/** Configuration for rate limiting. */
 interface RateLimitConfig {
+  /** Maximum requests allowed per window. */
   maxRequests: number;
+  /** Time window in milliseconds. */
   windowMs: number;
 }
 
+/** Internal storage for rate limit tracking. */
 interface WindowEntry {
+  /** Number of requests in current window. */
   count: number;
+  /** Timestamp when the window resets. */
   resetTime: number;
 }
 
+/** Extract client IP from request headers (supports X-Forwarded-For). */
 function getClientIp(c: Context): string {
   const forwarded = c.req.header('x-forwarded-for');
   if (forwarded) {
@@ -19,6 +26,11 @@ function getClientIp(c: Context): string {
   return 'unknown';
 }
 
+/**
+ * Create rate limiting middleware that restricts requests per client IP.
+ * @param config - Rate limit configuration (maxRequests and windowMs).
+ * @returns Object containing the middleware and a dispose function for cleanup.
+ */
 export function createRateLimitMiddleware(config: RateLimitConfig): {
   middleware: (c: Context, next: Next) => Promise<Response | undefined>;
   dispose: () => void;

@@ -50,8 +50,8 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 - **src/middleware/** — auth (bearer + JWKS via hono/jwt + hono/jwk), CORS, CSP, rate limit, request ID, error handler, OpenAPI (Scalar UI)
 - **src/routes/** — `apiRoute.ts`, `proxyRoute.ts`, `registry.ts` (route registration), `spa.ts` (static file serving)
 - **src/services/** — `proxy.ts` (proxy handler)
+- **src/utils/** — `secretCache.ts` (JWT secret caching for bearer auth)
 - **src/cli/** — CLI commands (`npx halide init`)
-- **src/utils/** — does not exist; JWT helpers are in `src/middleware/auth.ts`
 
 ## Testing
 

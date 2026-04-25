@@ -254,10 +254,26 @@ describe('createApp', () => {
   it('enables OpenAPI routes when openapi.enabled is true', async () => {
     const { app } = createApp({
       ...minimalConfig,
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: async () => ({ ok: true }),
+          method: 'get',
+          path: '/api/test',
+          type: 'api',
+        },
+      ],
       openapi: { enabled: true },
     });
-    const res = await app.request('/swagger');
-    expect(res.status).toBe(200);
+    const swaggerRes = await app.request('/swagger');
+    expect(swaggerRes.status).toBe(200);
+    const swaggerCsp = swaggerRes.headers.get('Content-Security-Policy') ?? '';
+    expect(swaggerCsp).toContain("'unsafe-inline'");
+    expect(swaggerCsp).toContain('https://cdn.jsdelivr.net');
+
+    const apiRes = await app.request('/api/test');
+    const apiCsp = apiRes.headers.get('Content-Security-Policy') ?? '';
+    expect(apiCsp).not.toContain('https://cdn.jsdelivr.net');
   });
 
   it('uses custom OpenAPI path', async () => {

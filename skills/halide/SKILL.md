@@ -17,6 +17,12 @@ Halide is a declarative BFF (Backend for Frontend) runtime built on Hono. It sta
 npm install halide
 ```
 
+Or use the CLI to scaffold a server:
+
+```bash
+npx halide init
+```
+
 Requires **Node.js >= 24.0.0**. This is an ESM project (`"type": "module"`).
 
 ## Quick Start
@@ -69,9 +75,11 @@ All imports come from `'halide'`:
 
 ```typescript
 const server = createServer(config);
-server.start((port) => { console.log(`Listening on ${port}`); });
+server.start((port) => {
+  console.log(`Listening on ${port}`);
+});
 await server.ready;
-await server.stop();  // graceful shutdown
+await server.stop(); // graceful shutdown
 ```
 
 - `createServer()` is **synchronous** — no `await` needed
@@ -94,6 +102,10 @@ All unhandled errors are caught and return `500 Internal Server Error` with `{ e
 - **Default port**: 3553 (from `PORT` env → `spa.port` → default)
 - **Proxy route methods required**: `methods` array is required and must have at least one method
 - **Route paths must start with /**: Validation throws otherwise
+- **Proxy host header**: The original `Host` header is NOT forwarded — it's derived from the target URL. Original host is preserved as `X-Forwarded-Host`
+- **Proxy readonly headers**: `host`, `connection`, `content-length`, `transfer-encoding`, `set-cookie` cannot be overridden by `identity` or `transform`
+- **Bearer secret caching**: `secretTtl` defaults to 60 seconds. Set to 0 to disable caching
+- **OpenAPI CSP warning**: When OpenAPI is enabled, Scalar UI routes use relaxed CSP; custom CSP does not apply to those routes. A warning is logged at startup
 
 ## Reference Files
 

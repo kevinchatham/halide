@@ -1,5 +1,9 @@
 import type { Logger } from '../types';
 
+/**
+ * Default configuration values used when options are omitted.
+ * These are applied during server creation in `createApp` and `createServer`.
+ */
 export const DEFAULTS = {
   auth: {
     secretTtl: 60,
@@ -23,6 +27,15 @@ export const DEFAULTS = {
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
       upgradeInsecureRequests: [],
+    },
+    openapiOverrides: {
+      connectSrc: ["'self'", 'https:'],
+      fontSrc: ["'self'", 'https:', 'data:'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net', "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+      styleSrcAttr: ["'unsafe-inline'"],
     },
   },
   openapi: {
@@ -48,8 +61,10 @@ export const DEFAULTS = {
   },
 } as const;
 
+/** Default authorization function that allows all requests. */
 export const defaultAuthorize = async (): Promise<boolean> => true;
 
+/** Create a noop logger that discards all log messages. */
 export function createNoopLogger(): Logger {
   return {
     debug: (..._args) => {},

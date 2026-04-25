@@ -46,4 +46,26 @@ describe('createSecurityMiddleware', () => {
 
     expect(res.status).toBe(200);
   });
+
+  it('merges overrides into CSP directives', async () => {
+    const app = new Hono();
+    app.use(
+      '*',
+      createSecurityMiddleware(
+        { directives: undefined },
+        {
+          connectSrc: ["'self'", 'https:'],
+          scriptSrc: ["'self'", 'https://cdn.jsdelivr.net', "'unsafe-inline'"],
+        },
+      ),
+    );
+    app.get('/test', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/test');
+    const csp = res.headers.get('Content-Security-Policy') ?? '';
+
+    expect(csp).toContain("'unsafe-inline'");
+    expect(csp).toContain('https://cdn.jsdelivr.net');
+    expect(csp).toContain('https:');
+  });
 });

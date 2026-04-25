@@ -17,7 +17,6 @@ const CreateUserSchema = z.object({
 const server = createServer<UserClaims>({
   spa: {
     name: 'dashboard',
-    port: 3553,
     root: './dist/browser',
   },
 

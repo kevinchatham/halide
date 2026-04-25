@@ -209,7 +209,7 @@ const security: SecurityConfig = {
 const spa: SpaConfig = {
   fallback: 'index.html',
   name: 'my-app',
-  root: '/var/www',
+  root: 'dist',
 };
 
 /**
@@ -251,5 +251,6 @@ const exampleConfig: ServerConfig<UserClaims> = {
 const server: Server = createServer(exampleConfig);
 
 server.start((port) => {
-  observability.logger?.info(`Server running on port ${port}`);
+  // biome-ignore lint/suspicious/noConsole: demo
+  console.log(`Server running on port ${port}`);
 });

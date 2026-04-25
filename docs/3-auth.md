@@ -4,7 +4,7 @@
 
 Verify JWTs using a shared secret or a remote key set. Auth is configured under `security.auth`. Halide supports two strategies:
 
-**Bearer (shared secret)**
+**Bearer (shared secret, HS256)**
 
 ```ts
 security: {
@@ -12,21 +12,21 @@ security: {
     strategy: 'bearer',
     secret: () => process.env.JWT_SECRET,
     audience: 'my-app',           // optional: validates the aud claim
-    secretTtl: 60,                // optional: cache secret for N seconds (default: 60, 0 to disable)
+    secretTtl: 60,                // optional: cache secret for N seconds (default: 60)
   },
 }
 ```
 
-Uses `hono/jwt` with HS256 algorithm. The `secret` can be a sync or async function returning the signing key. The resolved secret is cached for `secretTtl` seconds (default: 60) to avoid repeated network calls. Set `secretTtl: 0` to disable caching.
+Uses `hono/jwt` with HS256 algorithm. The `secret` can be a sync or async function returning the signing key. The resolved secret is cached for `secretTtl` seconds (default: 60) to avoid repeated calls. Set `secretTtl: 0` to disable caching and resolve on every request.
 
-**JWKS (remote key set)**
+**JWKS (remote key set, RS256)**
 
 ```ts
 security: {
   auth: {
     strategy: 'jwks',
     jwksUri: 'https://idp.example.com/.well-known/jwks.json',
-    audience: 'my-app',
+    audience: 'my-app',           // optional
   },
 }
 ```
@@ -44,13 +44,16 @@ Routes with `access: 'private'` require a valid JWT. If any private route exists
 Restrict route access with per-route logic beyond public/private. Every route accepts an optional `authorize` function for fine-grained access control:
 
 ```ts
-{
-  type: 'api',
-  path: '/admin/settings',
+import { apiRoute } from 'halide';
+
+apiRoute({
   access: 'private',
+  path: '/admin/settings',
   authorize: (ctx, claims, logger) => claims.role === 'admin',
   handler: async (ctx, claims, logger) => ({ settings: '...' }),
-}
+});
 ```
 
-The `authorize` function receives `(ctx, claims, logger)` and returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response.
+The `authorize` function receives `(ctx, claims, logger)` and returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
+
+The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.

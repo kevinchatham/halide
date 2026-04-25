@@ -2,29 +2,39 @@
 
 API routes are handler functions that compose and return data directly. They define the controlled API surface your frontend can call.
 
+Use the `apiRoute()` factory to create routes — it fills in the `type` field and provides a default `authorize` function:
+
 ```ts
-apiRoutes: [
-  {
-    type: 'api',
-    path: '/bff/config',
-    access: 'public',
-    method: 'get',
-    handler: async (ctx, claims, logger) => ({
-      environment: process.env.NODE_ENV,
-    }),
-  },
-  {
-    type: 'api',
-    path: '/users',
-    access: 'private',
-    method: 'post',
-    validationSchema: CreateUserSchema, // Zod schema: body is validated before handler runs
-    handler: async (ctx, claims, logger) => {
-      return { id: crypto.randomUUID(), ...ctx.body };
-    },
-  },
-];
+import { apiRoute } from 'halide';
+
+apiRoute({
+  access: 'public',
+  path: '/bff/config',
+  method: 'get',
+  handler: async (ctx, claims, logger) => ({
+    environment: process.env.NODE_ENV,
+  }),
+});
 ```
+
+With body validation:
+
+```ts
+import { apiRoute } from 'halide';
+import { z } from 'zod';
+
+apiRoute({
+  access: 'private',
+  path: '/users',
+  method: 'post',
+  validationSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
+  handler: async (ctx, claims, logger) => {
+    return { id: crypto.randomUUID(), ...ctx.body };
+  },
+});
+```
+
+## Handler signature
 
 The handler receives three arguments:
 
@@ -38,30 +48,12 @@ The handler receives three arguments:
 
 Handler return values are JSON-serialized via `c.json(result)`.
 
-For routes without `validationSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.
+## Supported methods
 
-Use the `apiRoute()` factory to fill in the `type` field and default `authorize` function:
+`'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`.
 
-```ts
-import { apiRoute } from 'halide';
+## Body handling
 
-const healthRoute = apiRoute({
-  access: 'public',
-  path: '/health',
-  handler: async () => ({ status: 'ok' }),
-});
-```
+For routes **with** `validationSchema`, the body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
 
-## Validation
-
-Attach a Zod schema to an API route with `validationSchema`. The body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
-
-```ts
-apiRoute({
-  access: 'private',
-  path: '/users',
-  method: 'post',
-  validationSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
-  handler: async (ctx) => createUser(ctx.body),
-}),
-```
+For routes **without** `validationSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.

@@ -5,6 +5,11 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { DEFAULTS } from '../config/defaults';
 import type { SpaConfig } from '../types';
 
+/**
+ * Create SPA static file serving and fallback handlers.
+ * @param spaConfig - The SPA configuration.
+ * @returns Object containing static middleware and SPA fallback handler.
+ */
 export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): {
   staticMiddleware: MiddlewareHandler;
   spaFallback: (c: Context) => Promise<Response>;

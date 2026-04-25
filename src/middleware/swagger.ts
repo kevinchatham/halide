@@ -3,6 +3,12 @@ import type { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
 import type { ServerConfig } from '../types';
 
+/**
+ * Create OpenAPI/Scalar routes for API documentation.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param config - The server configuration containing OpenAPI settings.
+ * @param app - The Hono application to register routes on.
+ */
 export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app: Hono): void {
   const openapiConfig = config.openapi;
   if (!openapiConfig?.enabled) return;
@@ -24,5 +30,18 @@ export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app:
     }),
   );
 
-  app.get(swaggerPath, Scalar({ url: `${swaggerPath}/openapi.json` }));
+  app.get(
+    swaggerPath,
+    Scalar({
+      agent: {
+        disabled: true,
+      },
+      hideClientButton: true,
+      mcp: {
+        disabled: true,
+      },
+      showDeveloperTools: 'never',
+      url: `${swaggerPath}/openapi.json`,
+    }),
+  );
 }

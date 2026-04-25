@@ -19,6 +19,15 @@ security: {
 
 **Defaults:** `origin: ['*']`, `credentials: false`, `methods: ['get', 'post', 'put', 'delete', 'patch']`.
 
+| Field            | Default                                     | Description                              |
+| ---------------- | ------------------------------------------- | ---------------------------------------- |
+| `origin`         | `['*']`                                     | Allowed origins (string or string array) |
+| `credentials`    | `false`                                     | Include credentials in CORS requests     |
+| `methods`        | `['get', 'post', 'put', 'delete', 'patch']` | Allowed HTTP methods                     |
+| `allowedHeaders` | `undefined`                                 | Allowed request headers                  |
+| `exposedHeaders` | `undefined`                                 | Headers exposed to the client            |
+| `maxAge`         | `undefined`                                 | Preflight cache duration in seconds      |
+
 **Gotcha:** Wildcard origin (`'*'`) cannot be combined with `credentials: true` — the validator will throw.
 
 ## CSP
@@ -46,6 +55,10 @@ security: {
 ```
 
 **Gotcha:** CSP directive keys must use **camelCase** (`defaultSrc`), NOT kebab-case (`default-src`). The validator throws on kebab-case keys.
+
+### OpenAPI CSP Overrides
+
+When OpenAPI is enabled, the Swagger UI routes use relaxed CSP directives to allow Scalar UI to load external resources (scripts from `cdn.jsdelivr.net`, inline styles). A warning is logged at startup. Custom CSP settings do not apply to these routes.
 
 ### Available CSP Directives
 
@@ -110,3 +123,8 @@ security: {
 ```
 
 Client IP is determined from `x-forwarded-for` header (first value) or falls back to `'unknown'`. Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
+
+| Field         | Default  | Description                        |
+| ------------- | -------- | ---------------------------------- |
+| `maxRequests` | `100`    | Maximum requests per window        |
+| `windowMs`    | `900000` | Window duration in ms (15 minutes) |

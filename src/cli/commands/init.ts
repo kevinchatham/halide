@@ -1,9 +1,12 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { confirm, input } from '@inquirer/prompts';
 import stripJsonComments from 'strip-json-comments';
 
-const SERVER_TS = `import { createServer, apiRoute } from 'halide';
+/** Generate the server.ts content for a new Halide project. */
+function generateServerTs(spaName: string, port: number): string {
+  return `import { createServer, apiRoute } from 'halide';
 
 const server = createServer({
   apiRoutes: [
@@ -15,7 +18,8 @@ const server = createServer({
     }),
   ],
   spa: {
-    name: 'my-app',
+    name: '${spaName}',
+    port: ${port},
     root: 'dist',
   },
 });
@@ -24,7 +28,9 @@ server.start((port) => {
   console.log(\`Server running on port \${port}\`);
 });
 `;
+}
 
+/** TypeScript configuration for the server build. */
 const TSCONFIG_SERVER = `{
   "compilerOptions": {
     "module": "es2022",
@@ -39,10 +45,12 @@ const TSCONFIG_SERVER = `{
 }
 `;
 
+/** Output a message to stdout. */
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }
 
+/** Run a command silently, throwing if it fails. */
 function runQuietly(cmd: string, cwd: string): void {
   try {
     execSync(cmd, { cwd, stdio: 'pipe' });
@@ -54,6 +62,7 @@ function runQuietly(cmd: string, cwd: string): void {
   }
 }
 
+/** Write tsconfig.server.json if it doesn't exist. */
 function writeTsconfigServer(cwd: string): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
   if (fs.existsSync(tsconfigServerPath)) {
@@ -64,6 +73,7 @@ function writeTsconfigServer(cwd: string): void {
   log('✓ Created tsconfig.server.json');
 }
 
+/** Add tsconfig.server.json reference to tsconfig.json. */
 function addServerReference(cwd: string): void {
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
   if (!fs.existsSync(tsconfigPath)) return;
@@ -83,6 +93,7 @@ function addServerReference(cwd: string): void {
   log('✓ Added tsconfig.server.json reference to tsconfig.json');
 }
 
+/** Exclude server.ts from tsconfig.app.json. */
 function excludeServerFromApp(cwd: string): void {
   const appPath = path.join(cwd, 'tsconfig.app.json');
   if (!fs.existsSync(appPath)) return;
@@ -104,6 +115,7 @@ function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
+/** Add "type": "module" to package.json if not present. */
 function addTypeModuleToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -119,6 +131,7 @@ function addTypeModuleToPackageJson(cwd: string): void {
   log('✓ Added "type": "module" to package.json');
 }
 
+/** Add halide:start and halide:build scripts to package.json. */
 function addScriptsToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -148,8 +161,10 @@ function addScriptsToPackageJson(cwd: string): void {
   }
 }
 
+/** Supported package managers. */
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
+/** Detect which package manager is used in the project. */
 function detectPackageManager(cwd: string): PackageManager {
   if (fs.existsSync(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
   if (fs.existsSync(path.join(cwd, 'yarn.lock'))) return 'yarn';
@@ -158,6 +173,7 @@ function detectPackageManager(cwd: string): PackageManager {
   return 'npm';
 }
 
+/** Get the install command for a given package manager. */
 function getInstallCmd(pkgManager: PackageManager): string {
   const cmds: Record<PackageManager, string> = {
     bun: 'bun add halide && bun add -D @types/node',
@@ -168,6 +184,10 @@ function getInstallCmd(pkgManager: PackageManager): string {
   return cmds[pkgManager];
 }
 
+/**
+ * Initialize a new Halide project in the current directory.
+ * Prompts for project name and port, then sets up the project structure.
+ */
 export async function init(): Promise<undefined> {
   const cwd = process.cwd();
 
@@ -178,17 +198,46 @@ export async function init(): Promise<undefined> {
     process.exit(1);
   }
 
+  const spaName = await input({
+    default: 'my-app',
+    message: 'What is your SPA name?',
+    validate: (value: string) => {
+      if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
+      return 'SPA name must contain only letters, numbers, dashes, and underscores';
+    },
+  });
+
+  const port = Number(
+    await input({
+      default: '3553',
+      message: 'What port should the server listen on?',
+      validate: (value: string) => {
+        const portNum = Number.parseInt(value, 10);
+        if (Number.isNaN(portNum) || portNum < 1 || portNum > 65535) {
+          return 'Please enter a valid port number (1-65535)';
+        }
+        return true;
+      },
+    }),
+  );
+
+  const installSkills = await confirm({
+    default: true,
+    message: 'Install AI coding skills for halide?',
+  });
+
   const pkgManager = detectPackageManager(cwd);
   const installCmd = getInstallCmd(pkgManager);
 
+  log(`Installing halide via ${pkgManager}...`);
   runQuietly(installCmd, cwd);
-  log(`✓ Installing halide via ${pkgManager}`);
+  log(`✓ Installed halide via ${pkgManager}`);
 
   const serverPath = path.join(cwd, 'server.ts');
   if (fs.existsSync(serverPath)) {
     log('✓ server.ts already exists — skipping');
   } else {
-    fs.writeFileSync(serverPath, SERVER_TS, 'utf8');
+    fs.writeFileSync(serverPath, generateServerTs(spaName, port), 'utf8');
     log('✓ Created server.ts');
   }
 
@@ -198,7 +247,11 @@ export async function init(): Promise<undefined> {
   addTypeModuleToPackageJson(cwd);
   addScriptsToPackageJson(cwd);
 
-  execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
+  if (installSkills) {
+    execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
+  } else {
+    log('✓ Skipping skills installation');
+  }
 
   log('\nDone! Next steps:');
   log('  1. Edit server.ts to configure your routes and SPA');
@@ -209,8 +262,8 @@ export {
   addScriptsToPackageJson,
   addTypeModuleToPackageJson,
   detectPackageManager,
+  generateServerTs,
   getInstallCmd,
   runQuietly,
-  SERVER_TS,
   TSCONFIG_SERVER,
 };
