@@ -45,4 +45,4 @@ Set `observe: false` on a route to skip `onRequest`/`onResponse` hooks for that 
 
 ## Request ID Middleware
 
-When `observability.requestId` is `true`, every request gets an `x-request-id` header (from the incoming request or generated via `crypto.randomUUID()`).
+When `observability.requestId` is `true`, every request gets an `x-request-id` header. If the incoming request already has an `x-request-id` header, it is forwarded as-is. Otherwise, a new UUID is generated via `crypto.randomUUID()`.

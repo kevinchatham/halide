@@ -40,3 +40,9 @@ openapi: {
 Set `observe: false` on a route to hide it from OpenAPI docs.
 
 Zod schemas from `validationSchema` and `openapi.responseSchema` are automatically converted to JSON Schema in the generated spec.
+
+## Scalar UI
+
+The documentation UI uses [Scalar](https://github.com/scalar/scalar) (`@scalar/hono-api-reference`), not Swagger UI. The Scalar agent, MCP server, client button, and developer tools are all disabled by default.
+
+When OpenAPI is enabled, a warning is logged at startup: Swagger routes use relaxed CSP directives, and custom CSP settings do not apply to these routes. This should be disabled in production.

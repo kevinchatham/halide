@@ -64,9 +64,10 @@ function applyIdentityHeaders<TClaims>(
   const ctx = buildRequestContextFromHono(c, parsedBody);
   const identityHeaders = route.identity(ctx, claims);
   if (!identityHeaders) return;
+  const { multiValueKeys } = normalizeHeaders(c.req.header());
   for (const [key, value] of Object.entries(identityHeaders)) {
-    if (value !== undefined) {
-      headers[key] = value;
+    if (value !== undefined && isWritableHeader(key, multiValueKeys)) {
+      headers[key.toLowerCase()] = value;
     }
   }
 }

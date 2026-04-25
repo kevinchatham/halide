@@ -38,6 +38,14 @@ interface SecurityConfig {
   csp?: CspOptions;
   rateLimit?: { maxRequests?: number; windowMs?: number };
 }
+
+interface SecurityAuthConfig {
+  strategy?: 'bearer' | 'jwks';
+  secret?: () => string | Promise<string>; // required for bearer
+  secretTtl?: number; // default: 60 (seconds). 0 to disable caching
+  jwksUri?: string; // required for jwks
+  audience?: string; // optional: validates aud claim
+}
 ```
 
 ## Key Types
