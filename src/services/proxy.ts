@@ -3,6 +3,7 @@ import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
 import type { Logger, ProxyRoute, RequestContext } from '../types';
 
+/** Headers that cannot be modified by proxy transformations. */
 const READONLY_HEADERS: Set<string> = new Set([
   'host',
   'connection',
@@ -10,8 +11,10 @@ const READONLY_HEADERS: Set<string> = new Set([
   'transfer-encoding',
 ]);
 
+/** Headers that can have multiple values and need special handling. */
 const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
 
+/** Serialize a query parameter value to string or string array. */
 export function serializeQueryParam(v: unknown): string | string[] {
   if (Array.isArray(v)) {
     return v.map((item) => (typeof item === 'string' ? item : JSON.stringify(item)));
@@ -19,6 +22,12 @@ export function serializeQueryParam(v: unknown): string | string[] {
   return typeof v === 'string' ? v : JSON.stringify(v);
 }
 
+/**
+ * Build a RequestContext from a Hono context.
+ * @param c - The Hono context.
+ * @param body - Optional pre-parsed body.
+ * @returns A normalized RequestContext object.
+ */
 export function buildRequestContextFromHono(c: Context, body?: unknown): RequestContext {
   return {
     body,
@@ -32,6 +41,7 @@ export function buildRequestContextFromHono(c: Context, body?: unknown): Request
   };
 }
 
+/** Normalize headers to a consistent string format, handling multi-value headers. */
 function normalizeHeaders(headers: Record<string, unknown>): {
   headers: Record<string, string>;
   multiValueKeys: Set<string>;
@@ -53,6 +63,7 @@ function normalizeHeaders(headers: Record<string, unknown>): {
   return { headers: normalized, multiValueKeys };
 }
 
+/** Apply identity headers from JWT claims to the upstream request. */
 function applyIdentityHeaders<TClaims>(
   headers: Record<string, string | undefined>,
   route: ProxyRoute<TClaims>,
@@ -72,6 +83,7 @@ function applyIdentityHeaders<TClaims>(
   }
 }
 
+/** Check if a header can be modified (not in readonly or array headers). */
 function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   const lowerKey = key.toLowerCase();
   return (
@@ -79,6 +91,7 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   );
 }
 
+/** Apply request body transformation if configured. */
 function applyTransform<TClaims>(
   route: ProxyRoute<TClaims>,
   parsedBody: unknown,
@@ -104,6 +117,15 @@ function applyTransform<TClaims>(
   }
 }
 
+/**
+ * Create a proxy handler function that forwards requests to an upstream target.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param route - The proxy route configuration.
+ * @param claims - JWT claims from the request (if authenticated).
+ * @param logger - Logger instance.
+ * @param parsedBody - Optional pre-parsed request body.
+ * @returns A function that handles the proxy request.
+ */
 export function createProxyService<TClaims = unknown>(
   route: ProxyRoute<TClaims>,
   claims: TClaims | undefined,

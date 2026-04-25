@@ -12,19 +12,44 @@ import type { ServerConfig } from '../types.js';
 import { createNoopLogger, DEFAULTS } from './defaults.js';
 import { validateServerConfig } from './validate.js';
 
+/** Hono context variables used internally by Halide middleware. */
 type HalideVariables = { rawBody?: unknown };
 
+/**
+ * Halide HTTP server with lifecycle management.
+ */
 export interface Server {
+  /** Promise that resolves when the server is ready to accept connections. */
   ready: Promise<void>;
+  /**
+   * Start the server and begin listening on the configured port.
+   * @param onReady - Optional callback invoked with the port when the server starts.
+   */
   start: (onReady?: (port: number) => void) => void;
+  /** Stop the server and close all connections. */
   stop: () => Promise<void>;
 }
 
+/**
+ * Result of createApp, containing the Hono app and cleanup functions.
+ */
 export interface CreateAppResult {
+  /** The configured Hono application. */
   app: Hono<{ Variables: HalideVariables }>;
+  /** Function to dispose of rate limit resources. */
   rateLimitDispose: (() => void) | undefined;
 }
 
+/**
+ * Create a configured Hono application with all middleware, routes, and handlers.
+ *
+ * This is the core function that builds the server. It validates the config,
+ * applies middleware, registers routes, and sets up the SPA fallback handler.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param configInput - The server configuration.
+ * @returns An object containing the Hono app and cleanup functions.
+ */
 export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>): CreateAppResult {
   validateServerConfig(configInput);
 
@@ -96,6 +121,35 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
   return { app, rateLimitDispose };
 }
 
+/**
+ * Create a fully-configured Halide server with lifecycle management.
+ *
+ * The server is synchronous to create. Call `server.start()` to listen.
+ * Graceful shutdown is handled automatically on SIGINT/SIGTERM.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param configInput - The server configuration.
+ * @returns A `Server` object with `ready`, `start`, and `stop` methods.
+ * @example
+ * ```ts
+ * import { createServer, apiRoute } from 'halide';
+ *
+ * const server = createServer({
+ *   spa: { root: 'dist', port: 3000 },
+ *   apiRoutes: [
+ *     apiRoute({
+ *       access: 'public',
+ *       handler: async () => ({ status: 'ok' }),
+ *       path: '/health',
+ *     }),
+ *   ],
+ * });
+ *
+ * server.start((port) => {
+ *   console.log(`Server running on port ${port}`);
+ * });
+ * ```
+ */
 export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaims>): Server {
   const { app, rateLimitDispose } = createApp<TClaims>(configInput);
 

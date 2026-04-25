@@ -1,5 +1,9 @@
 import type { Logger } from '../types';
 
+/**
+ * Default configuration values used when options are omitted.
+ * These are applied during server creation in `createApp` and `createServer`.
+ */
 export const DEFAULTS = {
   auth: {
     secretTtl: 60,
@@ -57,8 +61,10 @@ export const DEFAULTS = {
   },
 } as const;
 
+/** Default authorization function that allows all requests. */
 export const defaultAuthorize = async (): Promise<boolean> => true;
 
+/** Create a noop logger that discards all log messages. */
 export function createNoopLogger(): Logger {
   return {
     debug: (..._args) => {},

@@ -1,17 +1,28 @@
 import type { CorsConfig, CspOptions, Route, SecurityConfig, SpaConfig } from '../types';
 
+/** Input type for route validation. */
 type RouteInput<TClaims = unknown> =
   | Partial<Extract<Route<TClaims>, { type: 'api' }>>
   | Partial<Extract<Route<TClaims>, { type: 'proxy' }>>;
+
+/** Input type for SPA config validation. */
 type SpaInput = Partial<SpaConfig>;
+
+/** Input type for CORS config validation. */
 type CorsInput = Partial<CorsConfig>;
+
+/** Input type for auth config validation. */
 type AuthInput = Partial<NonNullable<SecurityConfig['auth']>>;
+
+/** Input type for security config validation. */
 type SecurityInput = {
   cors?: CorsInput;
   csp?: CspOptions;
   auth?: AuthInput;
   rateLimit?: { windowMs?: number; maxRequests?: number };
 };
+
+/** Input type for server config validation. */
 type ServerConfigInput<TClaims = unknown> = {
   spa?: SpaInput;
   apiRoutes?: RouteInput<TClaims>[];
@@ -20,6 +31,7 @@ type ServerConfigInput<TClaims = unknown> = {
   security?: SecurityInput;
 };
 
+/** Validate that SPA config is valid. */
 function validateSpaConfig(spa?: SpaInput): void {
   if (!spa?.root) {
     throw new Error('spa.root is required');
@@ -31,6 +43,7 @@ function validateSpaConfig(spa?: SpaInput): void {
   }
 }
 
+/** Validate a single route configuration. */
 function validateRoute<TClaims = unknown>(route: RouteInput<TClaims>): void {
   if (!route.path?.startsWith('/')) {
     throw new Error(`Route path must start with / (${route.type ?? 'api'}): ${route.path}`);
@@ -52,6 +65,7 @@ function validateRoute<TClaims = unknown>(route: RouteInput<TClaims>): void {
   }
 }
 
+/** Validate an array of routes. */
 function validateRoutes<TClaims = unknown>(routes?: RouteInput<TClaims>[]): void {
   if (!routes) return;
   for (const route of routes) {
@@ -59,6 +73,7 @@ function validateRoutes<TClaims = unknown>(routes?: RouteInput<TClaims>[]): void
   }
 }
 
+/** Validate that auth config exists if any routes require authentication. */
 function validateSecurityForRoutes<TClaims = unknown>(
   routes?: RouteInput<TClaims>[],
   security?: SecurityInput,
@@ -69,6 +84,7 @@ function validateSecurityForRoutes<TClaims = unknown>(
   }
 }
 
+/** Validate CORS configuration (wildcard origin cannot be used with credentials). */
 function validateCors(cors?: CorsInput): void {
   if (!cors?.credentials) return;
   if (cors.origin === '*' || (Array.isArray(cors.origin) && cors.origin.includes('*'))) {
@@ -76,6 +92,7 @@ function validateCors(cors?: CorsInput): void {
   }
 }
 
+/** Validate authentication configuration. */
 function validateAuth(auth?: AuthInput): void {
   if (auth?.strategy === 'bearer' && !auth.secret) {
     throw new Error('auth.secret is required when strategy is bearer');
@@ -90,6 +107,7 @@ function validateAuth(auth?: AuthInput): void {
   }
 }
 
+/** Validate CSP directives (must use camelCase, not kebab-case). */
 function validateCspDirectives(csp?: CspOptions): void {
   if (!csp?.directives) return;
   const kebabPattern = /^[a-z]+-[a-z]/;
@@ -102,6 +120,12 @@ function validateCspDirectives(csp?: CspOptions): void {
   }
 }
 
+/**
+ * Validate a server configuration object.
+ * Throws descriptive errors for invalid configurations.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param config - The server configuration to validate.
+ */
 export function validateServerConfig<TClaims = unknown>(config: ServerConfigInput<TClaims>): void {
   validateSpaConfig(config.spa);
   validateRoutes(config.apiRoutes);

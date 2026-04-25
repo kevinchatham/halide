@@ -4,6 +4,7 @@ import path from 'node:path';
 import { confirm, input } from '@inquirer/prompts';
 import stripJsonComments from 'strip-json-comments';
 
+/** Generate the server.ts content for a new Halide project. */
 function generateServerTs(spaName: string, port: number): string {
   return `import { createServer, apiRoute } from 'halide';
 
@@ -29,6 +30,7 @@ server.start((port) => {
 `;
 }
 
+/** TypeScript configuration for the server build. */
 const TSCONFIG_SERVER = `{
   "compilerOptions": {
     "module": "es2022",
@@ -43,10 +45,12 @@ const TSCONFIG_SERVER = `{
 }
 `;
 
+/** Output a message to stdout. */
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }
 
+/** Run a command silently, throwing if it fails. */
 function runQuietly(cmd: string, cwd: string): void {
   try {
     execSync(cmd, { cwd, stdio: 'pipe' });
@@ -58,6 +62,7 @@ function runQuietly(cmd: string, cwd: string): void {
   }
 }
 
+/** Write tsconfig.server.json if it doesn't exist. */
 function writeTsconfigServer(cwd: string): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
   if (fs.existsSync(tsconfigServerPath)) {
@@ -68,6 +73,7 @@ function writeTsconfigServer(cwd: string): void {
   log('✓ Created tsconfig.server.json');
 }
 
+/** Add tsconfig.server.json reference to tsconfig.json. */
 function addServerReference(cwd: string): void {
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
   if (!fs.existsSync(tsconfigPath)) return;
@@ -87,6 +93,7 @@ function addServerReference(cwd: string): void {
   log('✓ Added tsconfig.server.json reference to tsconfig.json');
 }
 
+/** Exclude server.ts from tsconfig.app.json. */
 function excludeServerFromApp(cwd: string): void {
   const appPath = path.join(cwd, 'tsconfig.app.json');
   if (!fs.existsSync(appPath)) return;
@@ -108,6 +115,7 @@ function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
+/** Add "type": "module" to package.json if not present. */
 function addTypeModuleToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -123,6 +131,7 @@ function addTypeModuleToPackageJson(cwd: string): void {
   log('✓ Added "type": "module" to package.json');
 }
 
+/** Add halide:start and halide:build scripts to package.json. */
 function addScriptsToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -152,8 +161,10 @@ function addScriptsToPackageJson(cwd: string): void {
   }
 }
 
+/** Supported package managers. */
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
+/** Detect which package manager is used in the project. */
 function detectPackageManager(cwd: string): PackageManager {
   if (fs.existsSync(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
   if (fs.existsSync(path.join(cwd, 'yarn.lock'))) return 'yarn';
@@ -162,6 +173,7 @@ function detectPackageManager(cwd: string): PackageManager {
   return 'npm';
 }
 
+/** Get the install command for a given package manager. */
 function getInstallCmd(pkgManager: PackageManager): string {
   const cmds: Record<PackageManager, string> = {
     bun: 'bun add halide && bun add -D @types/node',
@@ -172,6 +184,10 @@ function getInstallCmd(pkgManager: PackageManager): string {
   return cmds[pkgManager];
 }
 
+/**
+ * Initialize a new Halide project in the current directory.
+ * Prompts for project name and port, then sets up the project structure.
+ */
 export async function init(): Promise<undefined> {
   const cwd = process.cwd();
 

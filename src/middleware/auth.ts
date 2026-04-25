@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 
+/** Check whether the JWT audience claim matches the expected value. */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
   const aud = payload.aud;
   if (aud === undefined) return false;
@@ -9,6 +10,14 @@ function matchesAudience(payload: Record<string, unknown>, audience: string): bo
   return false;
 }
 
+/**
+ * Extract JWT claims from a Bearer token using HS256 verification.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param c - The Hono context.
+ * @param secret - The JWT signing secret.
+ * @param audience - Optional expected audience claim.
+ * @returns The decoded claims or null if extraction fails.
+ */
 export async function extractBearerClaims<TClaims = unknown>(
   c: Context,
   secret: string,
@@ -30,6 +39,14 @@ export async function extractBearerClaims<TClaims = unknown>(
   }
 }
 
+/**
+ * Extract JWT claims from a Bearer token using JWKS verification.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param c - The Hono context.
+ * @param jwksUri - The JWKS endpoint URL.
+ * @param audience - Optional expected audience claim.
+ * @returns The decoded claims or null if extraction fails.
+ */
 export async function extractJwksClaims<TClaims = unknown>(
   c: Context,
   jwksUri: string,

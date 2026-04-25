@@ -15,8 +15,10 @@ import type {
 } from '../types';
 import { createSecretCache } from '../utils/secretCache';
 
+/** Internal Hono variables type. */
 type HalideVariables = { rawBody?: unknown };
 
+/** Create a claim extractor based on auth strategy configuration. */
 function createClaimExtractor<TClaims = unknown>(
   config: ServerConfig<TClaims>,
   logger: Logger,
@@ -42,6 +44,7 @@ function createClaimExtractor<TClaims = unknown>(
   return undefined;
 }
 
+/** Build OpenAPI describeRoute options from route metadata. */
 function buildDescribeRouteOptions<TClaims>(
   route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
 ): DescribeRouteOptions {
@@ -59,6 +62,7 @@ function buildDescribeRouteOptions<TClaims>(
   return options;
 }
 
+/** Build OpenAPI responses object from route metadata. */
 function buildResponses(meta: ApiRoute['openapi']): ResponsesWithResolver {
   const responses: ResponsesWithResolver = {};
 
@@ -82,6 +86,7 @@ function buildResponses(meta: ApiRoute['openapi']): ResponsesWithResolver {
   return responses;
 }
 
+/** Extract JWT claims from request using the claim extractor. */
 async function extractClaims<TClaims>(
   c: Context,
   route: { access: string },
@@ -103,6 +108,7 @@ async function extractClaims<TClaims>(
   return { claims: extracted, response: null };
 }
 
+/** Check if the request is authorized using the route's authorize function. */
 async function checkAuthorization<TClaims>(
   c: Context,
   route: { authorize?: ApiRoute<TClaims>['authorize'] },
@@ -129,6 +135,7 @@ async function checkAuthorization<TClaims>(
   }
 }
 
+/** Emit the onRequest observability hook if configured. */
 function emitOnRequest<TClaims>(
   c: Context,
   body: unknown,
@@ -143,12 +150,14 @@ function emitOnRequest<TClaims>(
   }
 }
 
+/** Context for response emission timing. */
 interface ResponseEmitContext {
   handlerError: Error | undefined;
   start: number;
   statusCode: number;
 }
 
+/** Emit the onResponse observability hook if configured. */
 function emitOnResponse<TClaims>(
   c: Context,
   body: unknown,
@@ -169,10 +178,12 @@ function emitOnResponse<TClaims>(
   }
 }
 
+/** Get validated JSON from request using Zod validation schema. */
 function getValidJson(c: Context): unknown {
   return (c.req as unknown as { valid: (t: string) => unknown }).valid('json');
 }
 
+/** Resolve request body, using validation schema if available. */
 function resolveBody<TClaims>(c: Context, route: ApiRoute<TClaims>): unknown {
   if (route.validationSchema) return getValidJson(c);
   const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
@@ -181,6 +192,7 @@ function resolveBody<TClaims>(c: Context, route: ApiRoute<TClaims>): unknown {
     : undefined;
 }
 
+/** Register a route handler on the Hono app using the appropriate HTTP method. */
 function registerRouteOnApp(
   app: Hono<{ Variables: HalideVariables }>,
   method: string,
@@ -197,6 +209,7 @@ function registerRouteOnApp(
   }
 }
 
+/** Register an API route with all middleware, auth, and handler. */
 function registerApiRoute<TClaims = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ApiRoute<TClaims>,
@@ -256,6 +269,7 @@ function registerApiRoute<TClaims = unknown>(
   registerRouteOnApp(app, method, route.path, ...middlewares);
 }
 
+/** Register a proxy route with all middleware, auth, and forwarding. */
 function registerProxyRoute<TClaims = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ProxyRoute<TClaims>,
@@ -315,6 +329,13 @@ function registerProxyRoute<TClaims = unknown>(
   }
 }
 
+/**
+ * Register all API and proxy routes on the Hono application.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @param app - The Hono application to register routes on.
+ * @param config - The server configuration containing routes.
+ * @param logger - Logger instance for observability.
+ */
 export function registerRoutes<TClaims = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims>,
