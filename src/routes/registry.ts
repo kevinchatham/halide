@@ -57,9 +57,29 @@ function buildDescribeRouteOptions<TClaims>(
 
   if (route.observe === false) options.hide = true;
 
+  options.requestBody = buildRequestBody(route);
   options.responses = buildResponses(meta);
 
   return options;
+}
+
+/** Build OpenAPI request body from route validation schema or explicit requestSchema. */
+function buildRequestBody<TClaims>(
+  route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
+): DescribeRouteOptions['requestBody'] {
+  const meta = route.openapi;
+  const schema = meta?.requestSchema ?? (route.type === 'api' ? route.validationSchema : undefined);
+  if (!schema) return undefined;
+
+  const typeName = (schema as { _def?: { typeName?: string } })._def?.typeName;
+  const isOptional = typeName === 'ZodOptional' || typeName === 'ZodNullable';
+
+  return {
+    content: {
+      'application/json': { schema: resolver(schema) as unknown as Record<string, unknown> },
+    },
+    required: !isOptional,
+  };
 }
 
 /** Build OpenAPI responses object from route metadata. */
@@ -152,8 +172,11 @@ function emitOnRequest<TClaims>(
 
 /** Context for response emission timing. */
 interface ResponseEmitContext {
+  /** Error thrown by the handler, if any. */
   handlerError: Error | undefined;
+  /** Timestamp (Date.now()) when request processing started. */
   start: number;
+  /** HTTP status code of the response. */
   statusCode: number;
 }
 
@@ -220,11 +243,11 @@ function registerApiRoute<TClaims = unknown>(
   const method = route.method ?? DEFAULTS.route.method;
   const middlewares: MiddlewareHandler[] = [];
 
-  middlewares.push(describeRoute(buildDescribeRouteOptions(route)));
-
   if (route.validationSchema) {
     middlewares.push(validator('json', route.validationSchema));
   }
+
+  middlewares.push(describeRoute(buildDescribeRouteOptions(route)));
 
   middlewares.push(async (c: Context) => {
     const start = Date.now();

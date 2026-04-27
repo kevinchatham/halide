@@ -34,14 +34,23 @@ apiRoute({
     description: 'Creates a new user with the given name and email.',
     tags: ['Users'],
     responseSchema: UserResponseSchema,
-    requestSchemaName: 'CreateUserRequest',
-    schemaName: 'UserResponse',
   },
   handler: async (ctx) => createUser(ctx.body),
 });
 ```
 
-Zod schemas (both `validationSchema` and `openapi.responseSchema`) are automatically converted to JSON Schema in the generated spec.
+Zod schemas from `validationSchema` are automatically used for the OpenAPI request body. `openapi.requestSchema` overrides `validationSchema` for documentation purposes if both are present. `openapi.responseSchema` defines the 200 response body. All Zod schemas are automatically converted to JSON Schema in the generated spec.
+
+### Per-route `openapi` fields
+
+| Field            | Type                                                          | Description                                         |
+| ---------------- | ------------------------------------------------------------- | --------------------------------------------------- |
+| `summary`        | `string`                                                      | Short summary of what the route does                |
+| `description`    | `string`                                                      | Detailed description of the route                   |
+| `tags`           | `string[]`                                                    | Tags for grouping routes in the UI                  |
+| `requestSchema`  | `ZodSchema`                                                   | Overrides `validationSchema` for documentation only |
+| `responseSchema` | `ZodSchema`                                                   | Zod schema for the 200 response body                |
+| `responses`      | `Record<number, { description: string; schema?: ZodSchema }>` | Map of status codes to response definitions         |
 
 ## Alternative: `openapi.responses`
 
@@ -70,6 +79,28 @@ When `responses` is present, `responseSchema` is ignored. When neither is presen
 ## Hiding routes
 
 Set `observe: false` on a route to hide it from the OpenAPI documentation.
+
+## DRY schema with `inferSchema`
+
+The `inferSchema` helper eliminates duplication when you want the same Zod schema for both validation and documentation:
+
+```ts
+import { apiRoute, inferSchema } from 'halide';
+import { z } from 'zod';
+
+const CreateUserSchema = z.object({ email: z.string().email(), name: z.string().min(1) });
+const UserResponseSchema = z.object({ id: z.string(), email: z.string(), name: z.string() });
+
+apiRoute({
+  access: 'public',
+  path: '/users',
+  method: 'post',
+  ...inferSchema(CreateUserSchema, UserResponseSchema),
+  handler: async (ctx) => createUser(ctx.body),
+});
+```
+
+When `request` is provided, `inferSchema` sets both `validationSchema` and `openapi.requestSchema`. When `response` is provided, it sets `openapi.responseSchema`. Either argument can be omitted.
 
 ## Scalar UI
 

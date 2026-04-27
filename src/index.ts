@@ -21,3 +21,4 @@ export type {
   SpaConfig,
   TransformFn,
 } from './types';
+export { inferSchema } from './utils/schema';

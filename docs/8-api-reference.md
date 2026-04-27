@@ -18,6 +18,20 @@ Factory that fills in `type: 'api'` and a default `authorize` function (always r
 
 Factory that fills in `type: 'proxy'` and a default `authorize` function (always returns `true`).
 
+### `inferSchema<TRequest, TResponse>(request?, response?): InferSchemaResult`
+
+Helper that eliminates duplication between `validationSchema` and `openapi` schemas. When a request schema is provided, it sets both `validationSchema` and `openapi.requestSchema`. When a response schema is provided, it sets `openapi.responseSchema`. Spread the result into an `apiRoute` call:
+
+```ts
+apiRoute({
+  access: 'public',
+  path: '/users',
+  method: 'post',
+  ...inferSchema(CreateUserSchema, UserResponseSchema),
+  handler: async (ctx) => createUser(ctx.body),
+});
+```
+
 ## Interfaces
 
 ### `Server`
@@ -62,6 +76,7 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 
 ## Not exported but referenced
 
-| Type              | Description                                                          |
-| ----------------- | -------------------------------------------------------------------- |
-| `ResponseContext` | `{ statusCode, durationMs, error? }` — used by `onResponse` hook arg |
+| Type              | Description                                                                    |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `ResponseContext` | `{ statusCode, durationMs, error? }` — used by `onResponse` hook arg           |
+| `OpenApiOptions`  | `{ title, version, description, servers }` — nested in `OpenApiConfig.options` |

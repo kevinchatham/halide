@@ -64,7 +64,10 @@ export const DEFAULTS = {
 /** Default authorization function that allows all requests. */
 export const defaultAuthorize = async (): Promise<boolean> => true;
 
-/** Create a noop logger that discards all log messages. */
+/**
+ * Create a noop logger that discards all log messages.
+ * @returns A {@link Logger} implementation where all methods are no-ops.
+ */
 export function createNoopLogger(): Logger {
   return {
     debug: (..._args) => {},

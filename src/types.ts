@@ -80,10 +80,8 @@ export type OpenApiRouteMeta = {
   description?: string;
   /** Tags for grouping routes in the OpenAPI UI. */
   tags?: string[];
-  /** Name of the schema representing this route's input. */
-  schemaName?: string;
-  /** Name of the schema representing the request body. */
-  requestSchemaName?: string;
+  /** Zod schema for the request body. Overrides validationSchema for documentation purposes. */
+  requestSchema?: ZodSchema;
   /** Zod schema for the response body. */
   responseSchema?: ZodSchema;
   /** Map of HTTP status codes to response definitions. */
@@ -109,7 +107,7 @@ export type RequestContext = {
 };
 
 /**
- * Context about the response, passed to the onResponse observability hook.
+ * Context about the response, passed to the {@link ObservabilityConfig.onResponse} hook.
  */
 export type ResponseContext = {
   /** HTTP status code of the response. */
@@ -249,7 +247,7 @@ export type ObservabilityConfig<TClaims = unknown> = {
 };
 
 /**
- * OpenAPI/Scalar UI configuration options.
+ * OpenAPI/Scalar UI specification options for customizing the generated documentation.
  */
 export type OpenApiOptions = {
   /** Title shown in the OpenAPI UI. Defaults to 'Halide API'. */
@@ -258,7 +256,7 @@ export type OpenApiOptions = {
   version?: string;
   /** Description shown in the OpenAPI UI. */
   description?: string;
-  /** Array of server URLs to show in the OpenAPI UI. */
+  /** Server URLs and optional descriptions to display in the OpenAPI UI for try-it-out requests. */
   servers?: Array<{ url: string; description?: string }>;
 };
 

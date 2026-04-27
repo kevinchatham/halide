@@ -23,9 +23,9 @@ export function serializeQueryParam(v: unknown): string | string[] {
 }
 
 /**
- * Build a RequestContext from a Hono context.
- * @param c - The Hono context.
- * @param body - Optional pre-parsed body.
+ * Build a {@link RequestContext} from a Hono context object.
+ * @param c - The Hono request context.
+ * @param body - Optional pre-parsed request body to include.
  * @returns A normalized RequestContext object.
  */
 export function buildRequestContextFromHono(c: Context, body?: unknown): RequestContext {

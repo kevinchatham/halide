@@ -161,7 +161,7 @@ function addScriptsToPackageJson(cwd: string): void {
   }
 }
 
-/** Supported package managers. */
+/** Supported package managers for dependency installation. */
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
 /** Detect which package manager is used in the project. */

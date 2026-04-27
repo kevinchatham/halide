@@ -29,7 +29,9 @@ import type {
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {
+  /** User role, e.g. 'admin' or 'user'. */
   role: string;
+  /** Subject identifier (typically a user ID). */
   sub: string;
 }
 
