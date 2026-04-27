@@ -247,9 +247,7 @@ function registerApiRoute<TClaims = unknown>(
     middlewares.push(validator('json', route.validationSchema));
   }
 
-  middlewares.push(describeRoute(buildDescribeRouteOptions(route)));
-
-  middlewares.push(async (c: Context) => {
+  middlewares.push(describeRoute(buildDescribeRouteOptions(route)), async (c: Context) => {
     const start = Date.now();
     let handlerError: Error | undefined;
     let statusCode = 200;
