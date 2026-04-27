@@ -167,6 +167,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
 
   void ready.catch(() => {});
 
+  /** Gracefully shut down the server on SIGINT/SIGTERM. */
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;

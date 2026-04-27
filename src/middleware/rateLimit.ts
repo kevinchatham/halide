@@ -37,6 +37,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
 } {
   const store = new Map<string, WindowEntry>();
 
+  /** Remove expired entries from the rate limit store. */
   const sweep = (): void => {
     const now = Date.now();
     for (const ip of store.keys()) {
@@ -51,6 +52,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
   const timer = setInterval(sweep, sweepInterval);
   timer.unref();
 
+  /** Per-request rate limit check: returns 429 if the client IP has exceeded its window quota. */
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
     const clientIp = getClientIp(c);
     const now = Date.now();

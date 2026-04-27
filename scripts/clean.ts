@@ -3,11 +3,9 @@ import { glob } from 'glob';
 
 const patterns: string[] = [
   '.scannerwork',
-  '**/.angular',
   '**/dist',
   '**/package-lock.json',
   'coverage',
-  'demo/**/node_modules',
   'node_modules',
 ];
 

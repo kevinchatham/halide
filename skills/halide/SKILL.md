@@ -64,12 +64,13 @@ Run with: `npx tsx server.ts`
 
 All imports come from `'halide'`:
 
-| Export                            | Description                                                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `createServer<TClaims>(config)`   | Creates a server instance. Returns `{ ready, start, stop }`. Synchronous.                                    |
-| `createApp<TClaims>(config)`      | Creates a Hono app without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing. |
-| `apiRoute<TClaims, TBody>(input)` | Factory that fills in `type: 'api'` and default `authorize`.                                                 |
-| `proxyRoute<TClaims>(input)`      | Factory that fills in `type: 'proxy'` and default `authorize`.                                               |
+| Export                                                  | Description                                                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `createServer<TClaims>(config)`                         | Creates a server instance. Returns `{ ready, start, stop }`. Synchronous.                                    |
+| `createApp<TClaims>(config)`                            | Creates a Hono app without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing. |
+| `apiRoute<TClaims, TBody>(input)`                       | Factory that fills in `type: 'api'` and default `authorize`.                                                 |
+| `proxyRoute<TClaims>(input)`                            | Factory that fills in `type: 'proxy'` and default `authorize`.                                               |
+| `inferSchema<TRequest, TResponse>(request?, response?)` | Helper that sets both `validationSchema` and `openapi` schemas from Zod schemas, eliminating duplication.    |
 
 ## Server Lifecycle
 

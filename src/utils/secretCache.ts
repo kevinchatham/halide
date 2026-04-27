@@ -1,8 +1,10 @@
 import type { Logger } from '../types';
 
-/** Internal cache entry for a resolved secret. */
+/** Internal cache entry for a resolved JWT secret. */
 interface CachedSecret {
+  /** Timestamp (Date.now()) when this cache entry expires. */
   expiresAt: number;
+  /** The resolved secret string. */
   value: string;
 }
 
@@ -10,7 +12,7 @@ interface CachedSecret {
  * Create a caching resolver for JWT secrets.
  * @param ttlSeconds - Time-to-live for cached secrets in seconds.
  * @param logger - Logger instance.
- * @returns A function that resolves secrets with caching.
+ * @returns An async function that resolves secrets with caching, accepting a fetcher callback.
  */
 export function createSecretCache(
   ttlSeconds: number,
@@ -18,6 +20,7 @@ export function createSecretCache(
 ): (fetcher: () => string | Promise<string>) => Promise<string> {
   let cache: CachedSecret | null = null;
 
+  /** Resolve a JWT secret, using the cache when TTL has not expired. */
   return async function resolveSecret(fetcher: () => string | Promise<string>): Promise<string> {
     if (ttlSeconds <= 0) return fetcher();
 
