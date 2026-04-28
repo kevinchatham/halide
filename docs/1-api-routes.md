@@ -54,6 +54,6 @@ Handler return values are JSON-serialized via `c.json(result)`.
 
 ## Body handling
 
-For routes **with** `validationSchema`, the body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
+For routes **with** `requestSchema`, the body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
 
-For routes **without** `validationSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.
+For routes **without** `requestSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.

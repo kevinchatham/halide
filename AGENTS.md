@@ -37,7 +37,7 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 ## Architecture
 
 - **Framework**: Hono (not Express). All HTTP types come from `hono`, not `express`
-- **Entry**: `src/index.ts` → re-exports `createServer<TClaims>`, `createApp<TClaims>`, `apiRoute`, `proxyRoute`, and `inferSchema`
+- **Entry**: `src/index.ts` → re-exports `createServer<TClaims>`, `createApp<TClaims>`, `apiRoute`, `proxyRoute`, and type exports
 - `ServerConfig` uses **separate arrays**: `apiRoutes` (type `'api'`) + `proxyRoutes` (type `'proxy'`), not a single `routes` array
 - Auth config is nested: `security.auth.strategy` (`'bearer'` | `'jwks'`), not a top-level `auth` key
 - API route handler signature is `(ctx, claims, logger)` — 3 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context), `claims` is `TClaims | undefined`, `logger` is `Logger`

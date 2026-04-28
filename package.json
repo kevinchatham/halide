@@ -53,6 +53,8 @@
   },
   "files": [
     "dist",
+    "skill",
+    "docs",
     "LICENSE",
     "package.json",
     "README.md"

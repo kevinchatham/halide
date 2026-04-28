@@ -30,18 +30,19 @@ describe('CLI entry point', () => {
   });
 
   it('calls init when command is init', async () => {
-    mockParseArgs.mockReturnValue({ positionals: ['init'] });
+    mockParseArgs.mockReturnValue({ positionals: ['init'], values: { 'skills-only': false } });
     mockInit.mockResolvedValue(undefined);
 
     await import('./index.js');
 
     expect(mockInit).toHaveBeenCalledTimes(1);
+    expect(mockInit).toHaveBeenCalledWith({ skillsOnly: false });
     expect(stderrSpy).not.toHaveBeenCalled();
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
   it('writes usage and exits with 1 when command is not init', async () => {
-    mockParseArgs.mockReturnValue({ positionals: ['unknown'] });
+    mockParseArgs.mockReturnValue({ positionals: ['unknown'], values: {} });
 
     await import('./index.js');
 
@@ -51,7 +52,7 @@ describe('CLI entry point', () => {
   });
 
   it('writes usage and exits with 1 when no command is provided', async () => {
-    mockParseArgs.mockReturnValue({ positionals: [] });
+    mockParseArgs.mockReturnValue({ positionals: [], values: {} });
 
     await import('./index.js');
 

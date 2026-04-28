@@ -21,11 +21,6 @@ Documentation lives in `docs/`. The files below are the starting point — creat
 - `docs/7-full-example.md` — complete working example
 - `docs/8-api-reference.md` — all exported functions and types from index.ts
 
-Also update if source architecture changed:
-- `README.md` — project overview, quick start, when not to use
-- `skills/halide/SKILL.md` — agent skill documentation
-- `AGENTS.md` — developer guide
-
 ## Steps
 
 ### Phase 1: Gather Source Truth
@@ -151,15 +146,6 @@ For obsolete doc files:
 2. Verify `docs/7-full-example.md` uses patterns consistent with individual docs
 3. Verify `docs/8-api-reference.md` matches `src/index.ts` exports exactly
 4. Check that `README.md` quick start example works as-is
-5. Ensure `skills/halide/SKILL.md` contains the most complete reference
-
-### Phase 5: Update AGENTS.md if Needed
-
-If source architecture changed (new directories, moved files, changed patterns):
-
-1. Update "Architecture" section with current directory structure
-2. Update "Gotchas" section with any new Biome rules or patterns
-3. Update file path references if modules moved
 
 ## Important Rules
 

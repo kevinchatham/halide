@@ -44,7 +44,7 @@ This automatically:
 3. Scaffolds a `server.ts` entry point with a health route
 4. Creates `tsconfig.server.json` and updates project references
 5. Adds `halide:start` and `halide:build` scripts to `package.json`
-6. Installs agent skill via `npx skills add kevinchatham/halide`
+6. Installs agent skill via native copy from node_modules/halide/skill/
 
 ### Manual Installation
 

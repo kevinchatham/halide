@@ -185,10 +185,31 @@ function getInstallCmd(pkgManager: PackageManager): string {
 }
 
 /**
- * Initialize a new Halide project in the current directory.
- * Prompts for project name and port, then sets up the project structure.
+ * Copy skill directory from the installed halide package
+ * to .agents/skills/halide/ in the consumer project.
+ * Docs are NOT copied — agents are directed to read them from node_modules/halide/docs/.
  */
-export async function init(): Promise<undefined> {
+export function installSkillsFromHalide(cwd: string): void {
+  try {
+    const halidePath = require.resolve('halide', { paths: [cwd] });
+    const halideDir = path.dirname(halidePath);
+
+    const skillSrc = path.join(halideDir, 'skill');
+    const agentsDir = path.join(cwd, '.agents');
+    const skillsDest = path.join(agentsDir, 'skills', 'halide');
+
+    fs.mkdirSync(path.join(agentsDir, 'skills'), { recursive: true });
+    fs.cpSync(skillSrc, skillsDest, { recursive: true });
+    log('✓ Installed halide skills to .agents/skills/halide/');
+  } catch {
+    log(
+      '⚠ Warning: Could not install skills (halide not found in node_modules). Run npm install halide first.',
+    );
+  }
+}
+
+export async function init(options?: { skillsOnly?: boolean }): Promise<undefined> {
+  const { skillsOnly = false } = options ?? {};
   const cwd = process.cwd();
 
   if (!fs.existsSync(path.join(cwd, 'package.json'))) {
@@ -196,6 +217,11 @@ export async function init(): Promise<undefined> {
       'Error: No package.json found in current directory. Run this in a Node.js project.\n',
     );
     process.exit(1);
+  }
+
+  if (skillsOnly) {
+    installSkillsFromHalide(cwd);
+    return;
   }
 
   const appName = await input({
@@ -248,7 +274,7 @@ export async function init(): Promise<undefined> {
   addScriptsToPackageJson(cwd);
 
   if (installSkills) {
-    execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
+    installSkillsFromHalide(cwd);
   } else {
     log('✓ Skipping skills installation');
   }

@@ -12,7 +12,7 @@ Interactively scaffolds a Halide server in the current project. It prompts for:
 
 1. **App name** — used in log output (default: `my-app`)
 2. **Port** — server listen port (default: `3553`)
-3. **Install AI coding skills** — optionally runs `npx skills add kevinchatham/halide` (default: yes)
+3. **Install AI coding skills** — optionally copies halide skill from node_modules (default: yes)
 
 Then it:
 
