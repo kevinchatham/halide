@@ -11,7 +11,7 @@ This command audits the `docs/` directory against the actual source code and upd
 
 Documentation lives in `docs/`. The files below are the starting point — create or remove files as the codebase requires:
 
-- `docs/0-spa.md` — SPA hosting configuration (root, port, fallback, apiPrefix)
+- `docs/0-app.md` — App hosting configuration (root optional for pure backend, port, fallback, apiPrefix)
 - `docs/1-api-routes.md` — API routes, handler signatures, body validation
 - `docs/2-proxy-routes.md` — proxy routes, path rewriting, identity, transform
 - `docs/3-auth.md` — authentication (bearer/JWKS) and authorization (authorize fn)
@@ -46,10 +46,10 @@ Read these source files to establish what is actually exported and how it works:
 
 First, scan all source files under `src/` to identify concepts that may lack documentation. Then for each existing file in `docs/`, verify against source truth:
 
-#### docs/0-spa.md
-- `spa.root` is the only required field
+#### docs/0-app.md
+- `app.root` is optional — server can run as pure backend when omitted
 - `apiPrefix` defaults to `'/api'`, set to `''` to disable
-- Port resolution: `PORT` env → `spa.port` → default `3553`
+- Port resolution: `PORT` env → `app.port` → default `3553`
 - `fallback` defaults to `'index.html'`
 - `name` defaults to `'app'` (used in log output)
 
@@ -116,7 +116,7 @@ First, scan all source files under `src/` to identify concepts that may lack doc
 #### docs/8-api-reference.md
 - Must list ALL exports from `src/index.ts`:
   - Functions: `createServer`, `createApp`, `apiRoute`, `proxyRoute`
-  - Types: `ServerConfig`, `Server`, `CreateAppResult`, `ApiRoute`, `ApiRouteHandler`, `ProxyRoute`, `AuthorizeFn`, `TransformFn`, `RequestContext`, `SecurityConfig`, `SecurityAuthConfig`, `CorsConfig`, `CspOptions`, `CspDirectives`, `SpaConfig`, `ObservabilityConfig`, `OpenApiConfig`, `OpenApiRouteMeta`, `Logger`, `ClaimExtractor`
+  - Types: `ServerConfig`, `Server`, `CreateAppResult`, `ApiRoute`, `ApiRouteHandler`, `ProxyRoute`, `AuthorizeFn`, `TransformFn`, `RequestContext`, `SecurityConfig`, `SecurityAuthConfig`, `CorsConfig`, `CspOptions`, `CspDirectives`, `AppConfig`, `ObservabilityConfig`, `OpenApiConfig`, `OpenApiRouteMeta`, `Logger`, `ClaimExtractor`
 - `createServer` is synchronous (no await)
 - `createApp` returns `{ app, rateLimitDispose }` — useful for testing
 

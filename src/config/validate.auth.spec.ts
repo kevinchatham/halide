@@ -4,10 +4,10 @@ describe('validateServerConfig — auth', () => {
   it('rejects bearer strategy without secret', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).toThrow('auth.secret is required when strategy is bearer');
   });
@@ -15,10 +15,10 @@ describe('validateServerConfig — auth', () => {
   it('accepts bearer strategy with secret', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { secret: () => 'secret', strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -26,10 +26,10 @@ describe('validateServerConfig — auth', () => {
   it('rejects jwks strategy without jwksUri', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { strategy: 'jwks' },
         },
-        spa: { root: '/var/www' },
       }),
     ).toThrow('auth.jwksUri is required when strategy is jwks');
   });
@@ -37,13 +37,13 @@ describe('validateServerConfig — auth', () => {
   it('accepts jwks strategy with jwksUri', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: {
             jwksUri: 'https://auth.example.com/.well-known/jwks.json',
             strategy: 'jwks',
           },
         },
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -59,7 +59,7 @@ describe('validateServerConfig — auth', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       }),
     ).toThrow("security.auth is required when routes have access: 'private'");
   });
@@ -75,10 +75,10 @@ describe('validateServerConfig — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: {
           auth: { secret: () => 'secret', strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -94,7 +94,7 @@ describe('validateServerConfig — auth', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -102,6 +102,7 @@ describe('validateServerConfig — auth', () => {
   it('rejects private proxy route without auth config', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'private',
@@ -111,7 +112,6 @@ describe('validateServerConfig — auth', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       }),
     ).toThrow("security.auth is required when routes have access: 'private'");
   });
@@ -119,6 +119,7 @@ describe('validateServerConfig — auth', () => {
   it('accepts private proxy route with auth config', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'private',
@@ -131,7 +132,6 @@ describe('validateServerConfig — auth', () => {
         security: {
           auth: { secret: () => 'secret', strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -139,10 +139,10 @@ describe('validateServerConfig — auth', () => {
   it('rejects negative secretTtl', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { secret: () => 'secret', secretTtl: -1, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).toThrow('auth.secretTtl must be a non-negative integer (seconds)');
   });
@@ -150,10 +150,10 @@ describe('validateServerConfig — auth', () => {
   it('rejects non-integer secretTtl', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { secret: () => 'secret', secretTtl: 1.5, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).toThrow('auth.secretTtl must be a non-negative integer (seconds)');
   });
@@ -161,10 +161,10 @@ describe('validateServerConfig — auth', () => {
   it('accepts secretTtl of 0', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { secret: () => 'secret', secretTtl: 0, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -172,10 +172,10 @@ describe('validateServerConfig — auth', () => {
   it('accepts secretTtl of 60', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         security: {
           auth: { secret: () => 'secret', secretTtl: 60, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });

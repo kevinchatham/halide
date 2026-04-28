@@ -35,7 +35,7 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -57,7 +57,7 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/test');
@@ -77,8 +77,8 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         openapi: { enabled: true },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/users', {
@@ -112,8 +112,8 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         openapi: { enabled: true },
-        spa: { root: '/var/www' },
       });
 
       const specRes = await app.request('/swagger/openapi.json');
@@ -138,8 +138,8 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         openapi: { enabled: true },
-        spa: { root: '/var/www' },
       });
 
       const specRes = await app.request('/swagger/openapi.json');
@@ -164,8 +164,8 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         openapi: { enabled: true },
-        spa: { root: '/var/www' },
       });
 
       const specRes = await app.request('/swagger/openapi.json');
@@ -190,8 +190,8 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         openapi: { enabled: true },
-        spa: { root: '/var/www' },
       });
 
       const specRes = await app.request('/swagger/openapi.json');
@@ -219,8 +219,8 @@ describe('registerRoutes — openapi', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         openapi: { enabled: true },
-        spa: { root: '/var/www' },
       });
 
       const specRes = await app.request('/swagger/openapi.json');

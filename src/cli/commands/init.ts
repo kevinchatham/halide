@@ -5,7 +5,7 @@ import { confirm, input } from '@inquirer/prompts';
 import stripJsonComments from 'strip-json-comments';
 
 /** Generate the server.ts content for a new Halide project. */
-function generateServerTs(spaName: string, port: number): string {
+function generateServerTs(appName: string, port: number): string {
   return `import { createServer, apiRoute } from 'halide';
 
 const server = createServer({
@@ -17,8 +17,8 @@ const server = createServer({
       path: '/health',
     }),
   ],
-  spa: {
-    name: '${spaName}',
+  app: {
+    name: '${appName}',
     port: ${port},
     root: 'dist',
   },
@@ -198,12 +198,12 @@ export async function init(): Promise<undefined> {
     process.exit(1);
   }
 
-  const spaName = await input({
+  const appName = await input({
     default: 'my-app',
-    message: 'What is your SPA name?',
+    message: 'What is your app name?',
     validate: (value: string) => {
       if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
-      return 'SPA name must contain only letters, numbers, dashes, and underscores';
+      return 'App name must contain only letters, numbers, dashes, and underscores';
     },
   });
 
@@ -237,7 +237,7 @@ export async function init(): Promise<undefined> {
   if (fs.existsSync(serverPath)) {
     log('✓ server.ts already exists — skipping');
   } else {
-    fs.writeFileSync(serverPath, generateServerTs(spaName, port), 'utf8');
+    fs.writeFileSync(serverPath, generateServerTs(appName, port), 'utf8');
     log('✓ Created server.ts');
   }
 
@@ -254,7 +254,7 @@ export async function init(): Promise<undefined> {
   }
 
   log('\nDone! Next steps:');
-  log('  1. Edit server.ts to configure your routes and SPA');
+  log('  1. Edit server.ts to configure your routes and app hosting');
   log('  2. Run your server with: npm run halide:start');
 }
 

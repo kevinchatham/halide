@@ -3,24 +3,24 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { Context, MiddlewareHandler } from 'hono';
 import { DEFAULTS } from '../config/defaults';
-import type { SpaConfig } from '../types';
+import type { AppConfig } from '../types';
 
 /**
- * Create SPA static file serving and fallback handlers.
- * @param spaConfig - The SPA configuration.
- * @returns Object containing static middleware and SPA fallback handler.
+ * Create app static file serving and fallback handlers.
+ * @param appConfig - The app configuration (must have root defined).
+ * @returns Object containing static middleware and app fallback handler.
  */
-export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): {
+export function createAppHandler(appConfig: AppConfig & { root: string }): {
   staticMiddleware: MiddlewareHandler;
-  spaFallback: (c: Context) => Promise<Response>;
+  appFallback: (c: Context) => Promise<Response>;
 } {
-  const { apiPrefix = DEFAULTS.spa.apiPrefix, root, fallback = DEFAULTS.spa.fallback } = spaConfig;
+  const { apiPrefix = DEFAULTS.app.apiPrefix, root, fallback = DEFAULTS.app.fallback } = appConfig;
 
   const resolvedRoot = path.resolve(root);
 
   const staticMiddleware = serveStatic({ root: resolvedRoot });
 
-  const spaFallback = async (c: Context): Promise<Response> => {
+  const appFallback = async (c: Context): Promise<Response> => {
     if (apiPrefix && c.req.path.startsWith(apiPrefix)) {
       return c.json({ error: 'Not Found' }, 404);
     }
@@ -32,5 +32,5 @@ export function createSpaHandler(spaConfig: NonNullable<SpaConfig>): {
     }
   };
 
-  return { spaFallback, staticMiddleware };
+  return { appFallback, staticMiddleware };
 }

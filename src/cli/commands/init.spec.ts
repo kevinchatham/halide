@@ -85,7 +85,7 @@ describe('init', () => {
     );
   });
 
-  it('creates server.ts with user-provided spa name', async () => {
+  it('creates server.ts with user-provided app name', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
@@ -104,7 +104,7 @@ describe('init', () => {
     );
   });
 
-  it('rejects spa names with invalid characters', async () => {
+  it('rejects app names with invalid characters', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       return false;

@@ -34,7 +34,7 @@ Write `skills/halide/SKILL.md` with these sections:
 8. **Auth** — bearer and JWKS strategies, audience validation
 9. **Authorization** — `authorize` functions, `access` field
 10. **Security** — CORS, CSP (camelCase!), rate limiting
-11. **SPA** — static serving, apiPrefix, fallback
+11. **App** — static serving, apiPrefix, fallback, root optional for pure backend mode
 12. **Observability** — logger, requestId, onRequest/onResponse hooks, per-route observe
 13. **OpenAPI** — Scalar UI, per-route metadata, response schemas
 14. **createApp** — testing/custom server usage

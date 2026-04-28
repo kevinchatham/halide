@@ -30,8 +30,8 @@ describe('registerRoutes — observability', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         observability: { onRequest, onResponse },
-        spa: { root: '/var/www' },
       });
 
       await app.request('/items');
@@ -54,8 +54,8 @@ describe('registerRoutes — observability', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         observability: { onRequest, onResponse },
-        spa: { root: '/var/www' },
       });
 
       await app.request('/items');
@@ -74,8 +74,8 @@ describe('registerRoutes — observability', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         observability: {},
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -100,8 +100,8 @@ describe('registerRoutes — observability', () => {
               type: 'api',
             },
           ],
+          app: { root: '/var/www' },
           observability: { onResponse },
-          spa: { root: '/var/www' },
         },
         noopLogger,
       );

@@ -10,7 +10,7 @@ npx halide init
 
 Interactively scaffolds a Halide server in the current project. It prompts for:
 
-1. **SPA name** — used in log output (default: `my-app`)
+1. **App name** — used in log output (default: `my-app`)
 2. **Port** — server listen port (default: `3553`)
 3. **Install AI coding skills** — optionally runs `npx skills add kevinchatham/halide` (default: yes)
 
@@ -39,7 +39,7 @@ const server = createServer({
       path: '/health',
     }),
   ],
-  spa: {
+  app: {
     name: 'my-app',
     port: 3553,
     root: 'dist',

@@ -19,8 +19,8 @@ function createTestApp(config: ServerConfig): Hono<{ Variables: HalideVariables 
 describe('registerRoutes', () => {
   it('does nothing when routes is missing', async () => {
     const app = createTestApp({
+      app: { root: '/var/www' },
       security: { auth: { secret: () => 'test-secret', strategy: 'bearer' } },
-      spa: { root: '/var/www' },
     });
 
     const res = await app.request('/nonexistent');
@@ -38,7 +38,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -57,7 +57,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/data');
@@ -75,7 +75,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items', { method: 'POST' });
@@ -93,7 +93,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items/123', { method: 'PUT' });
@@ -111,7 +111,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items/123', { method: 'DELETE' });
@@ -134,7 +134,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res1 = await app.request('/public');
@@ -158,7 +158,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items', {
@@ -181,7 +181,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items', {

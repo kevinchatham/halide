@@ -6,9 +6,9 @@ import { createRateLimitMiddleware } from '../middleware/rateLimit.js';
 import { createRequestIdMiddleware } from '../middleware/requestId.js';
 import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
+import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
-import { createSpaHandler } from '../routes/spa.js';
-import type { ServerConfig } from '../types.js';
+import type { AppConfig, ServerConfig } from '../types.js';
 import { createNoopLogger, DEFAULTS } from './defaults.js';
 import { validateServerConfig } from './validate.js';
 
@@ -91,7 +91,7 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
   if (openapiEnabled) {
     logger.warn(
       `[${
-        configInput.spa.name ?? DEFAULTS.spa.name
+        configInput.app?.name ?? DEFAULTS.app.name
       }] OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
     );
     const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<
@@ -112,9 +112,13 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
 
   createOpenApiRoutes(configInput, app as unknown as Hono);
 
-  const { staticMiddleware, spaFallback } = createSpaHandler(configInput.spa);
-  app.get('/*', staticMiddleware);
-  app.all('/*', spaFallback);
+  if (configInput.app?.root) {
+    const { staticMiddleware, appFallback } = createAppHandler(
+      configInput.app as AppConfig & { root: string },
+    );
+    app.get('/*', staticMiddleware);
+    app.all('/*', appFallback);
+  }
 
   app.onError(createErrorHandler(logger));
 
@@ -135,7 +139,6 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
  * import { createServer, apiRoute } from 'halide';
  *
  * const server = createServer({
- *   spa: { root: 'dist', port: 3000 },
  *   apiRoutes: [
  *     apiRoute({
  *       access: 'public',
@@ -172,7 +175,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
     if (isShuttingDown) return;
     isShuttingDown = true;
     logger.info(
-      `[${configInput.spa.name ?? DEFAULTS.spa.name}] Received ${signal}, shutting down...`,
+      `[${configInput.app?.name ?? DEFAULTS.app.name}] Received ${signal}, shutting down...`,
     );
     rateLimitDispose?.();
     const server = httpServer;
@@ -196,8 +199,10 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
     start: (onReady?: (port: number) => void) => {
       if (httpServer) return;
       const port =
-        Number.parseInt(process.env.PORT || '', 10) || (configInput.spa.port ?? DEFAULTS.spa.port);
-      logger.info(`[${configInput.spa.name ?? DEFAULTS.spa.name}] Server starting on port ${port}`);
+        Number.parseInt(process.env.PORT || '', 10) || (configInput.app?.port ?? DEFAULTS.app.port);
+      logger.info(
+        `[${configInput.app?.name ?? DEFAULTS.app.name}] Server starting on port ${port}`,
+      );
       httpServer = serve(
         {
           fetch: app.fetch,
@@ -211,7 +216,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
       httpServer.on('error', (err: Error) => {
         readyReject(err);
         logger.error(
-          `[${configInput.spa.name ?? DEFAULTS.spa.name}] Failed to start: ${err.message}`,
+          `[${configInput.app?.name ?? DEFAULTS.app.name}] Failed to start: ${err.message}`,
         );
         process.exit(1);
       });

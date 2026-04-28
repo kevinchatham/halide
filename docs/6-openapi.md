@@ -43,13 +43,13 @@ Zod schemas from `requestSchema` are automatically used for the OpenAPI request 
 
 ### Per-route `openapi` fields
 
-| Field            | Type                                                          | Description                                         |
-| ---------------- | ------------------------------------------------------------- | --------------------------------------------------- |
-| `summary`        | `string`                                                      | Short summary of what the route does                |
-| `description`    | `string`                                                      | Detailed description of the route                   |
-| `tags`           | `string[]`                                                    | Tags for grouping routes in the UI                  |
-| `responseSchema` | `ZodSchema`                                                   | Zod schema for the 200 response body                |
-| `responses`      | `Record<number, { description: string; schema?: ZodSchema }>` | Map of status codes to response definitions         |
+| Field            | Type                                                          | Description                                 |
+| ---------------- | ------------------------------------------------------------- | ------------------------------------------- |
+| `summary`        | `string`                                                      | Short summary of what the route does        |
+| `description`    | `string`                                                      | Detailed description of the route           |
+| `tags`           | `string[]`                                                    | Tags for grouping routes in the UI          |
+| `responseSchema` | `ZodSchema`                                                   | Zod schema for the 200 response body        |
+| `responses`      | `Record<number, { description: string; schema?: ZodSchema }>` | Map of status codes to response definitions |
 
 ## Alternative: `openapi.responses`
 

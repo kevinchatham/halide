@@ -4,15 +4,15 @@ import { createOpenApiRoutes } from './swagger';
 
 function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerConfig {
   return {
+    app: { root: '.' },
     openapi: { enabled: true, ...overrides },
-    spa: { root: '.' },
   };
 }
 
 describe('createOpenApiRoutes', () => {
   it('does not register routes when openapi is disabled', async () => {
     const app = new Hono();
-    const config: ServerConfig = { spa: { root: '.' } };
+    const config: ServerConfig = { app: { root: '.' } };
     createOpenApiRoutes(config, app);
 
     const res = await app.request('/swagger');
@@ -21,7 +21,7 @@ describe('createOpenApiRoutes', () => {
 
   it('does not register routes when openapi.enabled is false', async () => {
     const app = new Hono();
-    const config: ServerConfig = { openapi: { enabled: false }, spa: { root: '.' } };
+    const config: ServerConfig = { app: { root: '.' }, openapi: { enabled: false } };
     createOpenApiRoutes(config, app);
 
     const res = await app.request('/swagger');

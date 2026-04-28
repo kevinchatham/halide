@@ -10,6 +10,7 @@ description: Declarative BFF runtime for SPAs with auth, proxy, CSP, rate limiti
 Halide is a declarative BFF (Backend for Frontend) runtime built on [Hono](https://hono.dev). It standardizes SPA communication by providing JWT authentication (bearer/JWKS), upstream proxying with path rewriting, Content Security Policy (CSP), rate limiting, and OpenAPI/Scalar documentation.
 
 Use Halide when you need to:
+
 - Host a static SPA (React, Vue, Svelte, Angular) with a production-ready server
 - Protect API routes with JWT authentication
 - Proxy requests to upstream APIs with identity injection and request transformation
@@ -22,7 +23,7 @@ Use Halide when you need to:
 import { createServer, apiRoute } from 'halide';
 
 const server = createServer({
-  spa: { root: 'dist', port: 3000 },
+  app: { root: 'dist', port: 3000 },
   apiRoutes: [
     apiRoute({
       access: 'public',
@@ -39,10 +40,10 @@ server.start((port) => console.log(`Server running on port ${port}`));
 
 ```ts
 import {
-  createApp,          // Create configured Hono app (for testing/custom servers)
-  createServer,       // Create server with lifecycle management
-  apiRoute,           // Factory for API routes
-  proxyRoute,         // Factory for proxy routes
+  createApp, // Create configured Hono app (for testing/custom servers)
+  createServer, // Create server with lifecycle management
+  apiRoute, // Factory for API routes
+  proxyRoute, // Factory for proxy routes
   // Types:
   type ApiRoute,
   type ApiRouteHandler,
@@ -60,7 +61,7 @@ import {
   type SecurityAuthConfig,
   type SecurityConfig,
   type ServerConfig,
-  type SpaConfig,
+  type AppConfig,
   type TransformFn,
 } from 'halide';
 ```
@@ -69,14 +70,14 @@ import {
 
 Detailed documentation for each topic:
 
-| Document | Description |
-|----------|-------------|
-| [references/config.md](./references/config.md) | ServerConfig, SpaConfig, all type definitions |
-| [references/routes.md](./references/routes.md) | apiRoute(), proxyRoute(), handler signatures, path rewriting |
-| [references/auth.md](./references/auth.md) | Bearer/JWKS strategies, authorization functions |
-| [references/security.md](./references/security.md) | CORS, CSP (camelCase), rate limiting |
-| [references/observability.md](./references/observability.md) | Logger, requestId, onRequest/onResponse hooks |
-| [references/openapi.md](./references/openapi.md) | Scalar UI, response schemas, per-route metadata |
+| Document                                                     | Description                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [references/config.md](./references/config.md)               | ServerConfig, AppConfig, all type definitions                |
+| [references/routes.md](./references/routes.md)               | apiRoute(), proxyRoute(), handler signatures, path rewriting |
+| [references/auth.md](./references/auth.md)                   | Bearer/JWKS strategies, authorization functions              |
+| [references/security.md](./references/security.md)           | CORS, CSP (camelCase), rate limiting                         |
+| [references/observability.md](./references/observability.md) | Logger, requestId, onRequest/onResponse hooks                |
+| [references/openapi.md](./references/openapi.md)             | Scalar UI, response schemas, per-route metadata              |
 
 ## Type Reference
 
@@ -93,7 +94,7 @@ cat node_modules/halide/dist/index.js
 
 ```ts
 createServer({
-  spa: { root: 'dist' },
+  app: { root: 'dist' },
   security: {
     auth: {
       strategy: 'bearer',
@@ -123,10 +124,10 @@ proxyRoute({
 });
 ```
 
-### SPA with API Prefix
+### App with API Prefix
 
 ```ts
-spa: {
+app: {
   root: 'dist',
   apiPrefix: '/api',  // Default — paths starting with /api get 404
 }

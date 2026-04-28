@@ -1,12 +1,12 @@
-import type { CorsConfig, CspOptions, Route, SecurityConfig, SpaConfig } from '../types';
+import type { AppConfig, CorsConfig, CspOptions, Route, SecurityConfig } from '../types';
 
 /** Input type for route validation. */
 type RouteInput<TClaims = unknown> =
   | Partial<Extract<Route<TClaims>, { type: 'api' }>>
   | Partial<Extract<Route<TClaims>, { type: 'proxy' }>>;
 
-/** Input type for SPA config validation. */
-type SpaInput = Partial<SpaConfig>;
+/** Input type for app config validation. */
+type AppInput = Partial<AppConfig>;
 
 /** Input type for CORS config validation. */
 type CorsInput = Partial<CorsConfig>;
@@ -24,21 +24,18 @@ type SecurityInput = {
 
 /** Input type for server config validation. */
 type ServerConfigInput<TClaims = unknown> = {
-  spa?: SpaInput;
+  app?: AppInput;
   apiRoutes?: RouteInput<TClaims>[];
   proxyRoutes?: RouteInput<TClaims>[];
   observability?: unknown;
   security?: SecurityInput;
 };
 
-/** Validate that SPA config is valid. */
-function validateSpaConfig(spa?: SpaInput): void {
-  if (!spa?.root) {
-    throw new Error('spa.root is required');
-  }
-  if (spa.port !== undefined) {
-    if (!Number.isInteger(spa.port) || spa.port < 1 || spa.port > 65535) {
-      throw new Error('spa.port must be an integer between 1 and 65535');
+/** Validate that app config is valid (only validates port if app is provided). */
+function validateAppConfig(app?: AppInput): void {
+  if (app?.port !== undefined) {
+    if (!Number.isInteger(app.port) || app.port < 1 || app.port > 65535) {
+      throw new Error('app.port must be an integer between 1 and 65535');
     }
   }
 }
@@ -127,7 +124,7 @@ function validateCspDirectives(csp?: CspOptions): void {
  * @param config - The server configuration to validate.
  */
 export function validateServerConfig<TClaims = unknown>(config: ServerConfigInput<TClaims>): void {
-  validateSpaConfig(config.spa);
+  validateAppConfig(config.app);
   validateRoutes(config.apiRoutes);
   validateRoutes(config.proxyRoutes);
   validateSecurityForRoutes(

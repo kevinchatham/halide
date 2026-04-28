@@ -34,14 +34,14 @@ vi.mock('@inquirer/prompts', () => ({
 const _originalCwd: () => string = process.cwd;
 
 describe('generateServerTs', () => {
-  it('generates server.ts with given spa name and port', () => {
+  it('generates server.ts with given app name and port', () => {
     const result = generateServerTs('my-custom-app', 8080);
     expect(result).toContain("name: 'my-custom-app'");
     expect(result).toContain('port: 8080');
     expect(result).toContain("import { createServer, apiRoute } from 'halide'");
   });
 
-  it('generates server.ts with default spa name', () => {
+  it('generates server.ts with default app name', () => {
     const result = generateServerTs('my-app', 3553);
     expect(result).toContain("name: 'my-app'");
     expect(result).toContain('port: 3553');

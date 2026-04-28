@@ -6,7 +6,7 @@
  * - Proxy routes with request transformation
  * - Observability hooks for request/response logging
  * - Security configuration (CORS, CSP, JWT auth, rate limiting)
- * - SPA serving configuration
+ * - App serving configuration
  *
  * Used for development and API design validation only.
  */
@@ -16,6 +16,7 @@ import { createServer, type Server } from './config/runtime'; // from 'halide';
 import { apiRoute, proxyRoute } from './index';
 import type {
   ApiRoute,
+  AppConfig,
   Logger,
   ObservabilityConfig,
   OpenApiConfig,
@@ -24,7 +25,6 @@ import type {
   ResponseContext,
   SecurityConfig,
   ServerConfig,
-  SpaConfig,
 } from './types'; // from 'halide'
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
@@ -203,12 +203,12 @@ const security: SecurityConfig = {
 };
 
 /**
- * SPA serving configuration.
+ * App serving configuration.
  * - `name`: application identifier used for logging
  * - `root`: absolute path to the directory containing static assets
  * - `fallback`: file served for unmatched routes to support client-side routing
  */
-const spa: SpaConfig = {
+const app: AppConfig = {
   fallback: 'index.html',
   name: 'my-app',
   root: 'dist',
@@ -232,7 +232,7 @@ const openapi: OpenApiConfig = {
 
 /**
  * Complete server configuration combining all settings.
- * - `spa`: static file serving and client-side routing fallback
+ * - `app`: static file serving and client-side routing fallback
  * - `security`: CORS, CSP, authentication, and rate limiting
  * - `observability`: request/response lifecycle hooks
  * - `apiRoutes`: direct API endpoint handlers (public and private)
@@ -243,11 +243,11 @@ const openapi: OpenApiConfig = {
  */
 const exampleConfig: ServerConfig<UserClaims> = {
   apiRoutes: [profileRoute, userRoute as unknown as ApiRoute<UserClaims>, healthRoute],
+  app,
   observability,
   openapi,
   proxyRoutes: [usersProxyRoute, ordersProxyRoute],
   security,
-  spa,
 };
 
 const server: Server = createServer(exampleConfig);

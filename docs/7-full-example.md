@@ -15,7 +15,7 @@ const CreateUserSchema = z.object({
 });
 
 const server = createServer<UserClaims>({
-  spa: {
+  app: {
     name: 'dashboard',
     root: './dist/browser',
   },

@@ -44,11 +44,11 @@ Do not run Prettier on `.ts` files. Do not run Biome on `.html` (formatter disab
 - Auth uses `hono/jwt` (bearer) and `hono/jwk` (JWKS) — not `jose`
 - Validation is imperative (`validateServerConfig` in `src/config/validate.ts`), not Zod — Zod is only used for route body validation and OpenAPI schema generation
 - CSP directives must use camelCase (`defaultSrc`), not kebab-case (`default-src`) — validator throws on kebab
-- SPA `apiPrefix` defaults to `'/api'` — paths starting with that prefix get 404 instead of SPA fallback (set `apiPrefix: ''` to disable)
+- App `apiPrefix` defaults to `'/api'` — paths starting with that prefix get 404 instead of app fallback (set `apiPrefix: ''` to disable)
 - `src/demo.ts` exists but is **not exported** — used by demo apps only
 - **src/config/** — types, defaults, validation
 - **src/middleware/** — auth (bearer + JWKS via hono/jwt + hono/jwk), CORS, CSP, rate limit, request ID, error handler, OpenAPI (Scalar UI)
-- **src/routes/** — `apiRoute.ts`, `proxyRoute.ts`, `registry.ts` (route registration), `spa.ts` (static file serving)
+- **src/routes/** — `apiRoute.ts`, `proxyRoute.ts`, `registry.ts` (route registration), `app.ts` (static file serving)
 - **src/services/** — `proxy.ts` (proxy handler)
 - **src/utils/** — `secretCache.ts` (JWT secret caching for bearer auth)
 - **src/cli/** — CLI commands (`npx halide init`)

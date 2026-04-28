@@ -5,6 +5,12 @@ import type { Logger } from '../types';
  * These are applied during server creation in `createApp` and `createServer`.
  */
 export const DEFAULTS = {
+  app: {
+    apiPrefix: '/api',
+    fallback: 'index.html',
+    name: 'app',
+    port: 3553,
+  },
   auth: {
     secretTtl: 60,
   },
@@ -52,12 +58,6 @@ export const DEFAULTS = {
   },
   route: {
     method: 'get' as const,
-  },
-  spa: {
-    apiPrefix: '/api',
-    fallback: 'index.html',
-    name: 'app',
-    port: 3553,
   },
 } as const;
 

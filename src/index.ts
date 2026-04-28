@@ -4,6 +4,7 @@ export { proxyRoute } from './routes/proxyRoute';
 export type {
   ApiRoute,
   ApiRouteHandler,
+  AppConfig,
   AuthorizeFn,
   ClaimExtractor,
   CorsConfig,
@@ -18,6 +19,5 @@ export type {
   SecurityAuthConfig,
   SecurityConfig,
   ServerConfig,
-  SpaConfig,
   TransformFn,
 } from './types';

@@ -173,17 +173,17 @@ export type TransformFn = (request: {
 };
 
 /**
- * Configuration for SPA (Single Page Application) hosting.
- * The spa.root property is required; all other properties have sensible defaults.
+ * Configuration for app hosting (static files and/or API backend).
+ * The app.root property is not required when using as a pure backend.
  */
-export type SpaConfig = {
+export type AppConfig = {
   /**
-   * URL prefix that should return 404 instead of the SPA fallback.
+   * URL prefix that should return 404 instead of the app fallback.
    * Defaults to '/api'.
    */
   apiPrefix?: string;
   /**
-   * Fallback file to serve when no route matches (for SPA client-side routing).
+   * Fallback file to serve when no route matches (for app client-side routing).
    * Defaults to 'index.html'.
    */
   fallback?: string;
@@ -197,9 +197,9 @@ export type SpaConfig = {
    */
   port?: number;
   /**
-   * Root directory containing the SPA static files. This is required.
+   * Root directory containing the app static files. Optional when not serving static files.
    */
-  root: string;
+  root?: string;
 };
 
 /**
@@ -349,8 +349,8 @@ export type ServerConfig<TClaims = unknown> = {
   proxyRoutes?: ProxyRoute<TClaims>[];
   /** Security configuration: auth, CORS, CSP, rate limiting. */
   security?: SecurityConfig;
-  /** SPA hosting configuration. This is the only required config section. */
-  spa: SpaConfig;
+  /** App hosting configuration (static files and/or API backend). Optional when not serving static files. */
+  app?: AppConfig;
   /** OpenAPI/Scalar documentation UI configuration. */
   openapi?: OpenApiConfig;
 };

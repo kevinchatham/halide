@@ -19,6 +19,7 @@ describe('registerRoutes — proxy', () => {
   describe('Proxy routes', () => {
     it('registers public proxy routes', async () => {
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -28,7 +29,6 @@ describe('registerRoutes — proxy', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/users');
@@ -37,6 +37,7 @@ describe('registerRoutes — proxy', () => {
 
     it('returns 401 for private proxy routes without token', async () => {
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'private',
@@ -47,7 +48,6 @@ describe('registerRoutes — proxy', () => {
           },
         ],
         security: { auth: { secret: () => 'test-secret', strategy: 'bearer' } },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/admin');
@@ -58,6 +58,7 @@ describe('registerRoutes — proxy', () => {
       const transformFn = vi.fn().mockReturnValue({ body: {}, headers: {} });
 
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -68,7 +69,6 @@ describe('registerRoutes — proxy', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       await app.request('/api', {
@@ -82,6 +82,7 @@ describe('registerRoutes — proxy', () => {
 
     it('registers multiple proxy routes', async () => {
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -98,7 +99,6 @@ describe('registerRoutes — proxy', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       const res1 = await app.request('/users');
@@ -109,6 +109,7 @@ describe('registerRoutes — proxy', () => {
 
     it('registers wildcard proxy route and matches sub-paths', async () => {
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -119,7 +120,6 @@ describe('registerRoutes — proxy', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/api/users/123');
@@ -133,6 +133,7 @@ describe('registerRoutes — proxy', () => {
       const onResponse = vi.fn();
 
       const app = await createTestApp({
+        app: { root: '/var/www' },
         observability: { onRequest, onResponse },
         proxyRoutes: [
           {
@@ -143,7 +144,6 @@ describe('registerRoutes — proxy', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       await app.request('/users');
@@ -155,6 +155,7 @@ describe('registerRoutes — proxy', () => {
       const onResponse = vi.fn();
 
       const app = await createTestApp({
+        app: { root: '/var/www' },
         observability: { onRequest, onResponse },
         proxyRoutes: [
           {
@@ -166,7 +167,6 @@ describe('registerRoutes — proxy', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       await app.request('/users');

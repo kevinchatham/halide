@@ -77,7 +77,7 @@ import { healthRoute, userProxyRoute } from './routes';
 import { createServer, type ServerConfig } from 'halide';
 
 const config: ServerConfig = {
-  spa: {
+  app: {
     root: './browser',
   },
   security: {
@@ -100,7 +100,7 @@ server.start((port) => console.log(`Serving on ${port}`));
 npx tsx server.ts
 ```
 
-> The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
+> The server starts on port 3553. Override with `app.port` or the `PORT` environment variable.
 
 ## Why Halide?
 
