@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { confirm, input } from '@inquirer/prompts';
 import stripJsonComments from 'strip-json-comments';
@@ -191,20 +192,24 @@ function getInstallCmd(pkgManager: PackageManager): string {
  */
 export function installSkillsFromHalide(cwd: string): void {
   try {
+    const require = createRequire(import.meta.url);
     const halidePath = require.resolve('halide', { paths: [cwd] });
     const halideDir = path.dirname(halidePath);
-
     const skillSrc = path.join(halideDir, 'skill');
+
     const agentsDir = path.join(cwd, '.agents');
     const skillsDest = path.join(agentsDir, 'skills', 'halide');
 
     fs.mkdirSync(path.join(agentsDir, 'skills'), { recursive: true });
-    fs.cpSync(skillSrc, skillsDest, { recursive: true });
+    const entries = fs.readdirSync(skillSrc, { withFileTypes: true });
+    for (const entry of entries) {
+      fs.cpSync(path.join(skillSrc, entry.name), path.join(skillsDest, entry.name), {
+        recursive: entry.isDirectory(),
+      });
+    }
     log('✓ Installed halide skills to .agents/skills/halide/');
   } catch {
-    log(
-      '⚠ Warning: Could not install skills (halide not found in node_modules). Run npm install halide first.',
-    );
+    log(`⚠ Warning: Could not install skills`);
   }
 }
 

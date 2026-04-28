@@ -37,28 +37,28 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 
 ## Exported types
 
-| Type                              | Description                                                             |
-| --------------------------------- | ----------------------------------------------------------------------- |
-| `ServerConfig<TClaims>`           | Top-level configuration object                                          |
-| `Server`                          | Running server instance (`ready`, `start`, `stop`)                      |
-| `CreateAppResult`                 | Return type of `createApp()` — `{ app, rateLimitDispose }`              |
+| Type                                         | Description                                                             |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| `ServerConfig<TClaims>`                      | Top-level configuration object                                          |
+| `Server`                                     | Running server instance (`ready`, `start`, `stop`)                      |
+| `CreateAppResult`                            | Return type of `createApp()` — `{ app, rateLimitDispose }`              |
 | `ApiRoute<TClaims, TBody, TResponse>`        | API route definition                                                    |
-| `ApiRouteHandler<TClaims, TBody, TResponse>` | `(ctx, claims, logger) => Promise<TResponse>`                        |
-| `ProxyRoute<TClaims>`             | Proxy route definition                                                  |
-| `AuthorizeFn<TClaims>`            | `(ctx, claims, logger) => boolean \| Promise<boolean>`                  |
-| `TransformFn`                     | `({ body, headers }) => { body, headers }`                              |
-| `RequestContext`                  | Normalized request context (method, path, headers, params, query, body) |
-| `SecurityConfig`                  | CORS, CSP, auth, rate limit configuration                               |
-| `SecurityAuthConfig`              | Auth strategy, secret/JWKS, audience, secretTtl                         |
-| `CorsConfig`                      | Origin, methods, credentials, allowedHeaders, exposedHeaders, maxAge    |
-| `CspOptions`                      | Content Security Policy directives container                            |
-| `CspDirectives`                   | CSP directive map (camelCase keys)                                      |
-| `AppConfig`                       | Static file serving and port configuration                              |
-| `ObservabilityConfig<TClaims>`    | Logger, request ID, lifecycle hooks                                     |
-| `OpenApiConfig`                   | OpenAPI toggle, path, and options                                       |
-| `OpenApiRouteMeta`                | Per-route OpenAPI metadata (summary, tags, schemas)                     |
-| `Logger`                          | `{ debug, error, info, warn }` interface                                |
-| `ClaimExtractor<TClaims>`         | Function to extract claims from a Hono Context                          |
+| `ApiRouteHandler<TClaims, TBody, TResponse>` | `(ctx, claims, logger) => Promise<TResponse>`                           |
+| `ProxyRoute<TClaims>`                        | Proxy route definition                                                  |
+| `AuthorizeFn<TClaims>`                       | `(ctx, claims, logger) => boolean \| Promise<boolean>`                  |
+| `TransformFn`                                | `({ body, headers }) => { body, headers }`                              |
+| `RequestContext`                             | Normalized request context (method, path, headers, params, query, body) |
+| `SecurityConfig`                             | CORS, CSP, auth, rate limit configuration                               |
+| `SecurityAuthConfig`                         | Auth strategy, secret/JWKS, audience, secretTtl                         |
+| `CorsConfig`                                 | Origin, methods, credentials, allowedHeaders, exposedHeaders, maxAge    |
+| `CspOptions`                                 | Content Security Policy directives container                            |
+| `CspDirectives`                              | CSP directive map (camelCase keys)                                      |
+| `AppConfig`                                  | Static file serving and port configuration                              |
+| `ObservabilityConfig<TClaims>`               | Logger, request ID, lifecycle hooks                                     |
+| `OpenApiConfig`                              | OpenAPI toggle, path, and options                                       |
+| `OpenApiRouteMeta`                           | Per-route OpenAPI metadata (summary, tags, schemas)                     |
+| `Logger`                                     | `{ debug, error, info, warn }` interface                                |
+| `ClaimExtractor<TClaims>`                    | Function to extract claims from a Hono Context                          |
 
 ## Not exported but referenced
 

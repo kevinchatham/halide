@@ -53,8 +53,6 @@
   },
   "files": [
     "dist",
-    "skill",
-    "docs",
     "LICENSE",
     "package.json",
     "README.md"
@@ -65,6 +63,7 @@
   "scripts": {
     "prebuild": "npx tsx scripts/update-readme.ts && npm run typecheck",
     "build": "tsup",
+    "postbuild": "cp -rf skill/ dist/skill/ && cp -rf docs/ dist/docs",
     "clean": "npx tsx scripts/clean.ts",
     "cli": "node dist/cli/index.js",
     "halide:link": "npm link halide",

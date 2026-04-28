@@ -12,6 +12,7 @@ const mockConfirm: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockCpSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockMkdirSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockResolve: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockReaddirSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', () => ({
   execSync: mockExecSync,
@@ -23,6 +24,7 @@ vi.mock('node:fs', () => {
     cpSync: mockCpSync,
     existsSync: mockExistsSync,
     mkdirSync: mockMkdirSync,
+    readdirSync: mockReaddirSync,
     readFileSync: mockReadFileSync,
     writeFileSync: mockWriteFileSync,
   };
@@ -47,10 +49,8 @@ vi.mock('node:module', async (importOriginal) => {
   const typedActual = actual as Record<string, unknown>;
   return {
     ...typedActual,
+    createRequire: vi.fn(() => ({ resolve: mockResolve })),
     default: actual,
-    require: {
-      resolve: mockResolve,
-    },
   };
 });
 
@@ -174,6 +174,10 @@ describe('init', () => {
     });
 
     mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([
+      { isDirectory: () => false, name: 'SKILL.md' },
+      { isDirectory: () => true, name: 'subdir' },
+    ]);
 
     await init();
 
@@ -205,6 +209,7 @@ describe('init', () => {
     });
 
     mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([{ isDirectory: () => false, name: 'SKILL.md' }]);
 
     await init({ skillsOnly: true });
 

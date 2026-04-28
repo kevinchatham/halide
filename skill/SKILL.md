@@ -9,45 +9,45 @@ A consuming agent should load this skill to build Halide servers.
 
 ## Primary Resources
 
-| Topic | Guide |
-|-------|-------|
-| Quick start, full examples | `docs/7-full-example.md` |
-| API route factory, handler signature | `docs/1-api-routes.md` |
-| Proxy routing, path rewriting, transform | `docs/2-proxy-routes.md` |
-| Auth strategies (bearer/JWKS), audience | `docs/3-auth.md` |
-| CORS, CSP (camelCase), rate limiting | `docs/4-security.md` |
-| Logger, requestId, onRequest/onResponse | `docs/5-observability.md` |
-| OpenAPI/Scalar UI, per-route metadata | `docs/6-openapi.md` |
-| Static serving, apiPrefix, fallback | `docs/0-app.md` |
-| CLI commands | `docs/9-cli.md` |
+| Topic                                    | Guide                     |
+| ---------------------------------------- | ------------------------- |
+| Quick start, full examples               | `docs/7-full-example.md`  |
+| API route factory, handler signature     | `docs/1-api-routes.md`    |
+| Proxy routing, path rewriting, transform | `docs/2-proxy-routes.md`  |
+| Auth strategies (bearer/JWKS), audience  | `docs/3-auth.md`          |
+| CORS, CSP (camelCase), rate limiting     | `docs/4-security.md`      |
+| Logger, requestId, onRequest/onResponse  | `docs/5-observability.md` |
+| OpenAPI/Scalar UI, per-route metadata    | `docs/6-openapi.md`       |
+| Static serving, apiPrefix, fallback      | `docs/0-app.md`           |
+| CLI commands                             | `docs/9-cli.md`           |
 
 ## Detailed References
 
-| Topic | Reference |
-|-------|-----------|
-| Complete ServerConfig, all types | `skill/references/config.md` |
-| Auth config, bearer/JWKS extraction | `skill/references/auth.md` |
-| Security middleware, CSP directives | `skill/references/security.md` |
-| Observability hooks | `skill/references/observability.md` |
-| OpenAPI route metadata | `skill/references/openapi.md` |
-| Route factories, path patterns | `skill/references/routes.md` |
+| Topic                               | Reference                           |
+| ----------------------------------- | ----------------------------------- |
+| Complete ServerConfig, all types    | `skill/references/config.md`        |
+| Auth config, bearer/JWKS extraction | `skill/references/auth.md`          |
+| Security middleware, CSP directives | `skill/references/security.md`      |
+| Observability hooks                 | `skill/references/observability.md` |
+| OpenAPI route metadata              | `skill/references/openapi.md`       |
+| Route factories, path patterns      | `skill/references/routes.md`        |
 
 ## Complete Type Reference
 
 ```ts
 import {
-  createApp,        // Returns { app, rateLimitDispose }
-  createServer,     // Returns Server with start/stop
-  apiRoute,         // Factory for API routes (type: 'api')
-  proxyRoute,       // Factory for proxy routes (type: 'proxy')
-  type ServerConfig,     // Root config type
-  type ApiRoute,        // API route definition
+  createApp, // Returns { app, rateLimitDispose }
+  createServer, // Returns Server with start/stop
+  apiRoute, // Factory for API routes (type: 'api')
+  proxyRoute, // Factory for proxy routes (type: 'proxy')
+  type ServerConfig, // Root config type
+  type ApiRoute, // API route definition
   type ApiRouteHandler, // (ctx, claims, logger) => Promise<T>
-  type ProxyRoute,      // Proxy route definition
-  type RequestContext,  // Normalized context for handlers
-  type AuthorizeFn,     // (ctx, claims, logger) => boolean
-  type TransformFn,     // Transform request body/headers
-  type SecurityConfig,   // auth + cors + csp + rateLimit
+  type ProxyRoute, // Proxy route definition
+  type RequestContext, // Normalized context for handlers
+  type AuthorizeFn, // (ctx, claims, logger) => boolean
+  type TransformFn, // Transform request body/headers
+  type SecurityConfig, // auth + cors + csp + rateLimit
   type CorsConfig,
   type CspDirectives,
   type Logger,
@@ -85,5 +85,7 @@ createServer({
 ## Fallback Reference
 
 For complete type information, read:
+
 - `node_modules/halide/dist/index.d.ts` — Type definitions
 - `node_modules/halide/dist/index.js` — Implementation
+- `node_modules/halide/dist/docs/*.md` — Documentation
