@@ -80,10 +80,6 @@ export type OpenApiRouteMeta = {
   description?: string;
   /** Tags for grouping routes in the OpenAPI UI. */
   tags?: string[];
-  /** Zod schema for the request body. Overrides validationSchema for documentation purposes. */
-  requestSchema?: ZodSchema;
-  /** Zod schema for the response body. */
-  responseSchema?: ZodSchema;
   /** Map of HTTP status codes to response definitions. */
   responses?: Record<number, { description: string; schema?: ZodSchema }>;
 };
@@ -136,15 +132,16 @@ export type Logger = {
  * Handler function for API routes.
  * @typeParam TClaims - The type of the decoded JWT claims object.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteHandler<TClaims, TBody = unknown> = (
+export type ApiRouteHandler<TClaims, TBody = unknown, TResponse = unknown> = (
   /** Request context including path, method, headers, params, query, and body. */
   ctx: RequestContext & { body: TBody },
   /** Decoded JWT claims from the request (undefined if not authenticated). */
   claims: TClaims | undefined,
   /** Logger instance for recording observability events. */
   logger: Logger,
-) => Promise<unknown>;
+) => Promise<TResponse>;
 
 /**
  * Authorization function that determines if a request should be allowed.
@@ -363,8 +360,9 @@ export type ServerConfig<TClaims = unknown> = {
  * Created via the {@link apiRoute} factory function.
  * @typeParam TClaims - The type of the decoded JWT claims object.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  */
-export type ApiRoute<TClaims = unknown, TBody = unknown> = {
+export type ApiRoute<TClaims = unknown, TBody = unknown, TResponse = unknown> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP method for this route. Defaults to GET. */
@@ -378,9 +376,11 @@ export type ApiRoute<TClaims = unknown, TBody = unknown> = {
   /** Authorization function called after JWT validation. */
   authorize?: AuthorizeFn<TClaims>;
   /** Handler function that processes the request and returns a response. */
-  handler: ApiRouteHandler<TClaims, TBody>;
-  /** Zod schema for validating the request body. */
-  validationSchema?: ZodSchema<TBody>;
+  handler: ApiRouteHandler<TClaims, TBody, TResponse>;
+  /** Zod schema for validating the request body and documenting it in OpenAPI. */
+  requestSchema?: ZodSchema<TBody>;
+  /** Zod schema for documenting the response body in OpenAPI. */
+  responseSchema?: ZodSchema<TResponse>;
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
 };
@@ -421,26 +421,18 @@ export type ProxyRoute<TClaims = unknown> = {
 };
 
 /**
- * Union type for any route (API or proxy).
- * @typeParam TClaims - The type of the decoded JWT claims object.
- * @typeParam TBody - The type of the request body (for API routes).
- */
-export type Route<TClaims = unknown, TBody = unknown> =
-  | ApiRoute<TClaims, TBody>
-  | ProxyRoute<TClaims>;
-
-/**
  * Input type for creating an API route via the factory function.
  * Omits 'type', 'authorize' (has default), and 'handler' (required).
  * @typeParam TClaims - The type of the decoded JWT claims object.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteInput<TClaims, TBody = unknown> = Omit<
-  ApiRoute<TClaims, TBody>,
+export type ApiRouteInput<TClaims, TBody = unknown, TResponse = unknown> = Omit<
+  ApiRoute<TClaims, TBody, TResponse>,
   'type' | 'authorize' | 'handler'
 > & {
   /** Handler function that processes the request and returns a response. */
-  handler: ApiRouteHandler<TClaims, TBody>;
+  handler: ApiRouteHandler<TClaims, TBody, TResponse>;
   /** Authorization function called after JWT validation. */
   authorize?: AuthorizeFn<TClaims>;
 };
@@ -451,3 +443,13 @@ export type ApiRouteInput<TClaims, TBody = unknown> = Omit<
  * @typeParam TClaims - The type of the decoded JWT claims object.
  */
 export type ProxyRouteInput<TClaims> = Omit<ProxyRoute<TClaims>, 'type'>;
+
+/**
+ * Union of all route types.
+ * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
+ */
+export type Route<TClaims = unknown, TBody = unknown, TResponse = unknown> =
+  | ApiRoute<TClaims, TBody, TResponse>
+  | ProxyRoute<TClaims>;

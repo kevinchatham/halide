@@ -6,6 +6,7 @@ import type { ApiRoute, ApiRouteInput } from '../types';
  * Sets `type: 'api'` and provides a default authorize function.
  * @typeParam TClaims - The type of the decoded JWT claims object.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  * @param route - The route input configuration.
  * @returns A complete ApiRoute object.
  * @example
@@ -18,9 +19,9 @@ import type { ApiRoute, ApiRouteInput } from '../types';
  * })
  * ```
  */
-export function apiRoute<TClaims, TBody = unknown>(
-  route: ApiRouteInput<TClaims, TBody>,
-): ApiRoute<TClaims, TBody> {
+export function apiRoute<TClaims, TBody = unknown, TResponse = unknown>(
+  route: ApiRouteInput<TClaims, TBody, TResponse>,
+): ApiRoute<TClaims, TBody, TResponse> {
   return {
     ...route,
     authorize: route.authorize ?? defaultAuthorize,

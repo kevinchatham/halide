@@ -33,15 +33,21 @@ describe('apiRoute', () => {
     expect(route.observe).toBe(false);
   });
 
-  it('preserves validationSchema', () => {
+  it('preserves requestSchema', () => {
     const schema = { parse: (v: unknown): unknown => v } as never;
-    const route = apiRoute({ access: 'public', handler, path: '/items', validationSchema: schema });
-    expect(route.validationSchema).toBe(schema);
+    const route = apiRoute({ access: 'public', handler, path: '/items', requestSchema: schema });
+    expect(route.requestSchema).toBe(schema);
+  });
+
+  it('preserves responseSchema', () => {
+    const schema = { parse: (v: unknown): unknown => v } as never;
+    const route = apiRoute({ access: 'public', handler, path: '/items', responseSchema: schema });
+    expect(route.responseSchema).toBe(schema);
   });
 
   it('works with typed claims', () => {
     type MyClaims = { role: string };
-    const route = apiRoute<MyClaims, { name: string }>({
+    const route = apiRoute<MyClaims, { name: string }, { ok: boolean }>({
       access: 'private',
       handler: async (_ctx: unknown, _claims: unknown): Promise<{ ok: boolean }> => ({ ok: true }),
       path: '/items',

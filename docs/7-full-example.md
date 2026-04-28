@@ -68,7 +68,7 @@ const server = createServer<UserClaims>({
       access: 'private',
       path: '/users',
       method: 'post',
-      validationSchema: CreateUserSchema,
+      requestSchema: CreateUserSchema,
       openapi: {
         summary: 'Create a user',
         tags: ['Users'],

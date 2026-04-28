@@ -27,7 +27,7 @@ apiRoute({
   access: 'private',
   path: '/users',
   method: 'post',
-  validationSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
+  requestSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
   handler: async (ctx, claims, logger) => {
     return { id: crypto.randomUUID(), ...ctx.body };
   },

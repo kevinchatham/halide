@@ -27,8 +27,6 @@ openapi: {
   description: 'Creates a new user',
   tags: ['Users'],
   responseSchema: UserResponseSchema,           // Zod schema for 200 response
-  requestSchemaName: 'CreateUserRequest',       // name for request schema
-  schemaName: 'UserResponse',                   // name for response schema
   responses: {                                  // alternative: map of status codes
     200: { description: 'Success', schema: UserSchema },
     400: { description: 'Bad Request' },
@@ -39,7 +37,7 @@ openapi: {
 
 Set `observe: false` on a route to hide it from OpenAPI docs.
 
-Zod schemas from `validationSchema` and `openapi.responseSchema` are automatically converted to JSON Schema in the generated spec.
+Zod schemas from `requestSchema` and `openapi.responseSchema` are automatically converted to JSON Schema in the generated spec.
 
 ## Scalar UI
 

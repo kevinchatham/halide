@@ -69,7 +69,7 @@ const profileRoute: ApiRoute<UserClaims> = apiRoute<UserClaims>({
 /**
  * Public POST /users route.
  * - `access: 'public'`: no authentication required
- * - `validationSchema`: Zod schema validating that body contains a valid email and non-empty name
+ * - `requestSchema`: Zod schema validating that body contains a valid email and non-empty name
  * - `handler`: creates a user with a generated UUID, timestamp, and the validated body fields
  */
 const userRoute: ApiRoute<UserClaims, CreateUserSchema> = apiRoute<UserClaims, CreateUserSchema>({
@@ -88,7 +88,7 @@ const userRoute: ApiRoute<UserClaims, CreateUserSchema> = apiRoute<UserClaims, C
   },
   method: 'post',
   path: '/users',
-  validationSchema: CreateUserSchema,
+  requestSchema: CreateUserSchema,
 });
 
 /**

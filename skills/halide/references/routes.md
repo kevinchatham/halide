@@ -10,7 +10,7 @@ apiRoute({
   path: '/api/health',             // REQUIRED — must start with /
   method: 'get',                   // default: 'get'
   handler: async (ctx, claims, logger) => ({ status: 'ok' }),  // REQUIRED
-  validationSchema: MyZodSchema,   // optional — Zod schema for body validation
+  requestSchema: MyZodSchema,   // optional — Zod schema for body validation
   authorize: (ctx, claims, logger) => true,  // auto-filled by factory
   observe: true,                   // optional — set false to skip observability hooks
   openapi: { ... },                // optional — OpenAPI metadata
@@ -31,7 +31,7 @@ handler: (ctx: RequestContext & { body: TBody }, claims: TClaims | undefined, lo
 
 ### Body Validation
 
-Attach a Zod schema with `validationSchema`. The body is parsed and validated before the handler runs. Failed validation returns `400 Bad Request`.
+Attach a Zod schema with `requestSchema`. The body is parsed and validated before the handler runs. Failed validation returns `400 Bad Request`.
 
 ```typescript
 import { z } from 'zod';
@@ -45,12 +45,12 @@ apiRoute({
   access: 'private',
   path: '/users',
   method: 'post',
-  validationSchema: CreateUserSchema,
+  requestSchema: CreateUserSchema,
   handler: async (ctx) => createUser(ctx.body),
 });
 ```
 
-For routes without `validationSchema`, the body is parsed from JSON for POST/PUT/PATCH requests (returns `undefined` if parsing fails).
+For routes without `requestSchema`, the body is parsed from JSON for POST/PUT/PATCH requests (returns `undefined` if parsing fails).
 
 ### Supported Methods
 

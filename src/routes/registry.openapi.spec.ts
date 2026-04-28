@@ -42,27 +42,6 @@ describe('registerRoutes — openapi', () => {
       expect(res.status).toBe(200);
     });
 
-    it('registers route with openapi responseSchema', async () => {
-      const app = createTestApp({
-        apiRoutes: [
-          {
-            access: 'public',
-            handler: async () => ({ id: 1 }),
-            openapi: {
-              responseSchema: z.object({ id: z.number() }),
-              summary: 'Get item',
-            },
-            path: '/items',
-            type: 'api',
-          },
-        ],
-        spa: { root: '/var/www' },
-      });
-
-      const res = await app.request('/items');
-      expect(res.status).toBe(200);
-    });
-
     it('registers route with openapi description and tags', async () => {
       const app = createTestApp({
         apiRoutes: [
@@ -85,7 +64,7 @@ describe('registerRoutes — openapi', () => {
       expect(res.status).toBe(200);
     });
 
-    it('auto-documents request body from validationSchema', async () => {
+    it('auto-documents request body from requestSchema', async () => {
       const schema = z.object({ email: z.string().email(), name: z.string() });
       const app = createTestApp({
         apiRoutes: [
@@ -94,8 +73,8 @@ describe('registerRoutes — openapi', () => {
             handler: async () => ({ ok: true }),
             method: 'post',
             path: '/users',
+            requestSchema: schema,
             type: 'api',
-            validationSchema: schema,
           },
         ],
         openapi: { enabled: true },
@@ -120,48 +99,6 @@ describe('registerRoutes — openapi', () => {
       expect(bodySchema.vendor).toBe('zod');
     });
 
-    it('uses openapi.requestSchema over validationSchema for request body docs', async () => {
-      const validationSchema = z.object({ name: z.string() });
-      const requestSchema = z.object({ email: z.string().email(), name: z.string() });
-      const app = createTestApp({
-        apiRoutes: [
-          {
-            access: 'public',
-            handler: async () => ({ ok: true }),
-            method: 'post',
-            openapi: {
-              requestSchema,
-            },
-            path: '/users',
-            type: 'api',
-            validationSchema,
-          },
-        ],
-        openapi: { enabled: true },
-        spa: { root: '/var/www' },
-      });
-
-      const res = await app.request('/users', {
-        body: JSON.stringify({ name: 'test' }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      });
-      expect(res.status).toBe(200);
-
-      const specRes = await app.request('/swagger/openapi.json');
-      expect(specRes.status).toBe(200);
-      const spec = await specRes.json();
-      const postUsers = spec.paths['/users']?.post;
-      expect(postUsers?.requestBody).toBeDefined();
-      expect(postUsers.requestBody.required).toBe(true);
-      const bodySchema = postUsers.requestBody.content['application/json'].schema;
-      expect(bodySchema).toBeDefined();
-      expect(bodySchema).toEqual({ vendor: 'zod' });
-
-      const getUsers = spec.paths['/users']?.get;
-      expect(getUsers).toBeUndefined();
-    });
-
     it('marks request body as not required when schema is optional', async () => {
       const schema = z.object({ name: z.string() }).optional();
       const app = createTestApp({
@@ -171,8 +108,8 @@ describe('registerRoutes — openapi', () => {
             handler: async () => ({ ok: true }),
             method: 'post',
             path: '/users',
+            requestSchema: schema,
             type: 'api',
-            validationSchema: schema,
           },
         ],
         openapi: { enabled: true },
@@ -197,8 +134,8 @@ describe('registerRoutes — openapi', () => {
             handler: async () => ({ ok: true }),
             method: 'post',
             path: '/items',
+            requestSchema: schema,
             type: 'api',
-            validationSchema: schema,
           },
         ],
         openapi: { enabled: true },
@@ -214,7 +151,7 @@ describe('registerRoutes — openapi', () => {
       expect(postItems.requestBody.content['application/json'].schema).toBeDefined();
     });
 
-    it('populates requestBody from validationSchema in generated spec', async () => {
+    it('populates requestBody from requestSchema in generated spec', async () => {
       const schema = z.object({ email: z.string().email(), name: z.string() });
       const app = createTestApp({
         apiRoutes: [
@@ -223,8 +160,8 @@ describe('registerRoutes — openapi', () => {
             handler: async () => ({ ok: true }),
             method: 'post',
             path: '/submit',
+            requestSchema: schema,
             type: 'api',
-            validationSchema: schema,
           },
         ],
         openapi: { enabled: true },
@@ -240,6 +177,57 @@ describe('registerRoutes — openapi', () => {
       const bodySchema = postSubmit.requestBody.content['application/json'].schema;
       expect(bodySchema).toBeDefined();
       expect(bodySchema.vendor).toBe('zod');
+    });
+
+    it('documents responseSchema in OpenAPI output', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ id: 1, name: 'test' }),
+            path: '/items',
+            responseSchema: z.object({ id: z.number(), name: z.string() }),
+            type: 'api',
+          },
+        ],
+        openapi: { enabled: true },
+        spa: { root: '/var/www' },
+      });
+
+      const specRes = await app.request('/swagger/openapi.json');
+      expect(specRes.status).toBe(200);
+      const spec = await specRes.json();
+      const getItems = spec.paths['/items']?.get;
+      expect(getItems?.responses['200']).toBeDefined();
+      expect(getItems.responses['200'].content).toBeDefined();
+      expect(getItems.responses['200'].content['application/json'].schema).toBeDefined();
+    });
+
+    it('uses openapi.responses over responseSchema for response docs', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ id: 1 }),
+            openapi: {
+              responses: {
+                '200': { description: 'Custom OK', schema: z.object({ custom: z.boolean() }) },
+              },
+            },
+            path: '/items',
+            responseSchema: z.object({ id: z.number() }),
+            type: 'api',
+          },
+        ],
+        openapi: { enabled: true },
+        spa: { root: '/var/www' },
+      });
+
+      const specRes = await app.request('/swagger/openapi.json');
+      expect(specRes.status).toBe(200);
+      const spec = await specRes.json();
+      const getItems = spec.paths['/items']?.get;
+      expect(getItems?.responses['200'].description).toBe('Custom OK');
     });
   });
 });

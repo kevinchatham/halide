@@ -1,126 +1,143 @@
 ---
 name: halide
-description: Build Hono-based BFF (Backend for Frontend) servers with Halide — routing, auth, proxying, SPA serving, middleware, OpenAPI, and observability
+description: Declarative BFF runtime for SPAs with auth, proxy, CSP, rate limiting, and OpenAPI support
 ---
+
+# Halide Skill
 
 ## Overview
 
-Halide is a declarative BFF (Backend for Frontend) runtime built on Hono. It standardizes how SPAs communicate with backend services by providing a shared, predictable structure for auth, routing, proxying, and security.
+Halide is a declarative BFF (Backend for Frontend) runtime built on [Hono](https://hono.dev). It standardizes SPA communication by providing JWT authentication (bearer/JWKS), upstream proxying with path rewriting, Content Security Policy (CSP), rate limiting, and OpenAPI/Scalar documentation.
 
-**When to use:** You have a SPA (Angular, React, Vue, Svelte) and need a BFF layer between it and your backend services.
-
-**When not to use:** You need direct HTTP layer control, multi-service routing, circuit breakers, load balancing, or TLS termination — use an API gateway or service mesh instead.
-
-## Installation
-
-```bash
-npm install halide
-```
-
-Or use the CLI to scaffold a server:
-
-```bash
-npx halide init
-```
-
-Requires **Node.js >= 24.0.0**. This is an ESM project (`"type": "module"`).
+Use Halide when you need to:
+- Host a static SPA (React, Vue, Svelte, Angular) with a production-ready server
+- Protect API routes with JWT authentication
+- Proxy requests to upstream APIs with identity injection and request transformation
+- Apply security headers (CSP, CORS) with minimal configuration
+- Generate OpenAPI documentation automatically from route schemas
 
 ## Quick Start
 
-```typescript
-import { createServer, apiRoute, proxyRoute } from 'halide';
+```ts
+import { createServer, apiRoute } from 'halide';
 
 const server = createServer({
-  spa: {
-    name: 'my-app',
-    root: 'dist',
-  },
+  spa: { root: 'dist', port: 3000 },
   apiRoutes: [
     apiRoute({
       access: 'public',
-      method: 'get',
-      path: '/api/health',
-      handler: async () => ({ status: 'ok' }),
-    }),
-  ],
-  proxyRoutes: [
-    proxyRoute({
-      access: 'private',
-      methods: ['get'],
-      path: '/api/users',
-      target: 'http://user-svc:3000',
+      handler: async (ctx) => ({ status: 'ok' }),
+      path: '/health',
     }),
   ],
 });
 
-server.start((port) => {
-  console.log(`Server running on port ${port}`);
-});
+server.start((port) => console.log(`Server running on port ${port}`));
 ```
-
-Run with: `npx tsx server.ts`
 
 ## Exports
 
-All imports come from `'halide'`:
-
-| Export                                                  | Description                                                                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `createServer<TClaims>(config)`                         | Creates a server instance. Returns `{ ready, start, stop }`. Synchronous.                                    |
-| `createApp<TClaims>(config)`                            | Creates a Hono app without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing. |
-| `apiRoute<TClaims, TBody>(input)`                       | Factory that fills in `type: 'api'` and default `authorize`.                                                 |
-| `proxyRoute<TClaims>(input)`                            | Factory that fills in `type: 'proxy'` and default `authorize`.                                               |
-| `inferSchema<TRequest, TResponse>(request?, response?)` | Helper that sets both `validationSchema` and `openapi` schemas from Zod schemas, eliminating duplication.    |
-
-## Server Lifecycle
-
-```typescript
-const server = createServer(config);
-server.start((port) => {
-  console.log(`Listening on ${port}`);
-});
-await server.ready;
-await server.stop(); // graceful shutdown
+```ts
+import {
+  createApp,          // Create configured Hono app (for testing/custom servers)
+  createServer,       // Create server with lifecycle management
+  apiRoute,           // Factory for API routes
+  proxyRoute,         // Factory for proxy routes
+  // Types:
+  type ApiRoute,
+  type ApiRouteHandler,
+  type AuthorizeFn,
+  type ClaimExtractor,
+  type CorsConfig,
+  type CspDirectives,
+  type CspOptions,
+  type Logger,
+  type ObservabilityConfig,
+  type OpenApiConfig,
+  type OpenApiRouteMeta,
+  type ProxyRoute,
+  type RequestContext,
+  type SecurityAuthConfig,
+  type SecurityConfig,
+  type ServerConfig,
+  type SpaConfig,
+  type TransformFn,
+} from 'halide';
 ```
 
-- `createServer()` is **synchronous** — no `await` needed
-- SIGINT/SIGTERM are handled automatically
+## Reference Documents
 
-## Error Handling
+Detailed documentation for each topic:
 
-All unhandled errors are caught and return `500 Internal Server Error` with `{ error: 'Internal Server Error' }`. Errors are logged via the configured logger.
+| Document | Description |
+|----------|-------------|
+| [references/config.md](./references/config.md) | ServerConfig, SpaConfig, all type definitions |
+| [references/routes.md](./references/routes.md) | apiRoute(), proxyRoute(), handler signatures, path rewriting |
+| [references/auth.md](./references/auth.md) | Bearer/JWKS strategies, authorization functions |
+| [references/security.md](./references/security.md) | CORS, CSP (camelCase), rate limiting |
+| [references/observability.md](./references/observability.md) | Logger, requestId, onRequest/onResponse hooks |
+| [references/openapi.md](./references/openapi.md) | Scalar UI, response schemas, per-route metadata |
 
-## Gotchas
+## Type Reference
 
-- **Framework**: Hono (not Express). All HTTP types come from `hono`
-- **Config shape**: `ServerConfig` uses separate arrays: `apiRoutes` + `proxyRoutes`, NOT a single `routes` array
-- **Auth config is nested**: `security.auth.strategy` — not a top-level `auth` key
-- **Handler signature**: `(ctx, claims, logger)` — 3 parameters. `ctx` is a plain object, NOT a Hono Context
-- **CSP directives**: Must use camelCase (`defaultSrc`), NOT kebab-case (`default-src`) — validator throws on kebab-case
-- **Private routes require auth**: If any route has `access: 'private'`, `security.auth` must be configured
-- **CORS wildcard**: `origin: '*'` cannot be combined with `credentials: true` — validator throws
-- **apiPrefix**: Defaults to `'/api'` — paths starting with this prefix get 404 instead of SPA fallback. Set `apiPrefix: ''` to disable
-- **Default port**: 3553 (from `PORT` env → `spa.port` → default)
-- **Proxy route methods required**: `methods` array is required and must have at least one method
-- **Route paths must start with /**: Validation throws otherwise
-- **Proxy host header**: The original `Host` header is NOT forwarded — it's derived from the target URL. Original host is preserved as `X-Forwarded-Host`
-- **Proxy readonly headers**: `host`, `connection`, `content-length`, `transfer-encoding`, `set-cookie` cannot be overridden by `identity` or `transform`
-- **Bearer secret caching**: `secretTtl` defaults to 60 seconds. Set to 0 to disable caching
-- **OpenAPI CSP warning**: When OpenAPI is enabled, Scalar UI routes use relaxed CSP; custom CSP does not apply to those routes. A warning is logged at startup
+**Primary source of truth**: `node_modules/halide/dist/index.d.ts`
 
-## Reference Files
+```bash
+cat node_modules/halide/dist/index.d.ts
+cat node_modules/halide/dist/index.js
+```
 
-- [Configuration](references/config.md) — ServerConfig, SpaConfig, SecurityConfig, types
-- [Authentication](references/auth.md) — Bearer, JWKS, authorization functions, claims
-- [Routes](references/routes.md) — API routes, proxy routes, path rewriting, identity, transform
-- [Security](references/security.md) — CORS, CSP (directives table), rate limiting
-- [Observability](references/observability.md) — Logger, lifecycle hooks, request ID
-- [OpenAPI](references/openapi.md) — OpenAPI configuration, per-route metadata
+## Key Patterns
 
-## Fallback: Reading Installed Package
+### Private Route with JWT Auth
 
-If you need to verify types or behavior beyond what this skill covers, look in the consuming project's `node_modules/halide/`:
+```ts
+createServer({
+  spa: { root: 'dist' },
+  security: {
+    auth: {
+      strategy: 'bearer',
+      secret: () => process.env.JWT_SECRET!,
+      audience: 'my-app',
+    },
+  },
+  apiRoutes: [
+    apiRoute({
+      access: 'private',
+      path: '/profile',
+      handler: async (ctx, claims) => ({ userId: claims?.sub }),
+    }),
+  ],
+});
+```
 
-- `node_modules/halide/dist/index.d.ts` — all exported types and function signatures
-- `node_modules/halide/dist/index.js` — ESM entry point
-- `node_modules/halide/package.json` — version, dependencies, exports map
+### Proxy with Identity Injection
+
+```ts
+proxyRoute({
+  access: 'private',
+  path: '/api/*',
+  methods: ['get', 'post'],
+  target: 'https://backend.example.com',
+  identity: (ctx, claims) => ({ 'x-user-id': claims.sub }),
+});
+```
+
+### SPA with API Prefix
+
+```ts
+spa: {
+  root: 'dist',
+  apiPrefix: '/api',  // Default — paths starting with /api get 404
+}
+```
+
+## Common Gotchas
+
+1. **Route paths must start with `/`** — validator throws otherwise
+2. **Private routes require `security.auth`** — validator throws if missing
+3. **Bearer strategy requires `secret`** — JWKS requires `jwksUri`
+4. **Wildcard origin + `credentials: true`** — CORS validator throws
+5. **CSP directives must use camelCase** — `defaultSrc`, not `default-src`
+6. **Proxy routes require `methods` array** — at least one required
+7. **OpenAPI UI uses relaxed CSP** — should be disabled in production

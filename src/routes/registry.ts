@@ -58,17 +58,16 @@ function buildDescribeRouteOptions<TClaims>(
   if (route.observe === false) options.hide = true;
 
   options.requestBody = buildRequestBody(route);
-  options.responses = buildResponses(meta);
+  options.responses = buildResponses(route);
 
   return options;
 }
 
-/** Build OpenAPI request body from route validation schema or explicit requestSchema. */
+/** Build OpenAPI request body from route request schema. */
 function buildRequestBody<TClaims>(
   route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
 ): DescribeRouteOptions['requestBody'] {
-  const meta = route.openapi;
-  const schema = meta?.requestSchema ?? (route.type === 'api' ? route.validationSchema : undefined);
+  const schema = route.type === 'api' ? route.requestSchema : undefined;
   if (!schema) return undefined;
 
   const typeName = (schema as { _def?: { typeName?: string } })._def?.typeName;
@@ -83,7 +82,10 @@ function buildRequestBody<TClaims>(
 }
 
 /** Build OpenAPI responses object from route metadata. */
-function buildResponses(meta: ApiRoute['openapi']): ResponsesWithResolver {
+function buildResponses<TClaims>(
+  route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
+): ResponsesWithResolver {
+  const meta = route.openapi;
   const responses: ResponsesWithResolver = {};
 
   if (meta?.responses) {
@@ -94,9 +96,9 @@ function buildResponses(meta: ApiRoute['openapi']): ResponsesWithResolver {
       }
       responses[status] = response as ResponsesWithResolver[string];
     }
-  } else if (meta?.responseSchema) {
+  } else if (route.type === 'api' && route.responseSchema) {
     responses['200'] = {
-      content: { 'application/json': { schema: resolver(meta.responseSchema) } },
+      content: { 'application/json': { schema: resolver(route.responseSchema) } },
       description: 'Successful response',
     } as ResponsesWithResolver[string];
   } else {
@@ -206,9 +208,9 @@ function getValidJson(c: Context): unknown {
   return (c.req as unknown as { valid: (t: string) => unknown }).valid('json');
 }
 
-/** Resolve request body, using validation schema if available. */
+/** Resolve request body, using request schema if available. */
 function resolveBody<TClaims>(c: Context, route: ApiRoute<TClaims>): unknown {
-  if (route.validationSchema) return getValidJson(c);
+  if (route.requestSchema) return getValidJson(c);
   const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
   return methodsWithBody.has(c.req.method.toUpperCase())
     ? c.req.json().catch(() => undefined)
@@ -243,8 +245,8 @@ function registerApiRoute<TClaims = unknown>(
   const method = route.method ?? DEFAULTS.route.method;
   const middlewares: MiddlewareHandler[] = [];
 
-  if (route.validationSchema) {
-    middlewares.push(validator('json', route.validationSchema));
+  if (route.requestSchema) {
+    middlewares.push(validator('json', route.requestSchema));
   }
 
   middlewares.push(describeRoute(buildDescribeRouteOptions(route)), async (c: Context) => {
@@ -255,7 +257,7 @@ function registerApiRoute<TClaims = unknown>(
     const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
     if (authResponse) return authResponse;
 
-    const authBody = route.validationSchema ? getValidJson(c) : undefined;
+    const authBody = route.requestSchema ? getValidJson(c) : undefined;
     const forbidResponse = await checkAuthorization(c, route, claims, authBody, logger);
     if (forbidResponse) return forbidResponse;
 
