@@ -37,7 +37,6 @@ const TSCONFIG_SERVER = `{
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "module": "commonjs",
-    "moduleResolution": "node",
     "outDir": "./dist",
     "resolveJsonModule": true,
     "strict": true,
