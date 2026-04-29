@@ -9,15 +9,15 @@ import stripJsonComments from 'strip-json-comments';
 function generateServerTs(appName: string, port: number): string {
   return `import { createServer, apiRoute } from 'halide';
 
+const healthRoute = apiRoute({
+  access: 'public',
+  handler: async () => ({ status: 'ok' }),
+  method: 'get',
+  path: '/health',
+});
+
 const server = createServer({
-  apiRoutes: [
-    apiRoute({
-      access: 'public',
-      handler: async () => ({ status: 'ok' }),
-      method: 'get',
-      path: '/health',
-    }),
-  ],
+  apiRoutes: [healthRoute],
   app: {
     name: '${appName}',
     port: ${port},
@@ -34,11 +34,13 @@ server.start((port) => {
 /** TypeScript configuration for the server build. */
 const TSCONFIG_SERVER = `{
   "compilerOptions": {
-    "module": "es2022",
-    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
     "outDir": "./dist",
-    "rootDirs": ["."],
-    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "strict": true,
     "target": "es2022",
     "types": ["node"]
   },
@@ -116,22 +118,6 @@ function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
-/** Add "type": "module" to package.json if not present. */
-function addTypeModuleToPackageJson(cwd: string): void {
-  const pkgPath = path.join(cwd, 'package.json');
-  const raw = fs.readFileSync(pkgPath, 'utf8');
-  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
-
-  if (parsed.type === 'module') {
-    log('✓ "type": "module" already exists in package.json — skipping');
-    return;
-  }
-
-  parsed.type = 'module';
-  fs.writeFileSync(pkgPath, JSON.stringify(parsed, null, 2), 'utf8');
-  log('✓ Added "type": "module" to package.json');
-}
-
 /** Add halide:start and halide:build scripts to package.json. */
 function addScriptsToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
@@ -195,7 +181,7 @@ export function installSkillsFromHalide(cwd: string): void {
     const require = createRequire(import.meta.url);
     const halidePath = require.resolve('halide', { paths: [cwd] });
     const halideDir = path.dirname(halidePath);
-    const skillSrc = path.join(halideDir, 'skill');
+    const skillSrc = path.join(halideDir, '..', 'skill');
 
     const agentsDir = path.join(cwd, '.agents');
     const skillsDest = path.join(agentsDir, 'skills', 'halide');
@@ -275,7 +261,6 @@ export async function init(options?: { skillsOnly?: boolean }): Promise<undefine
   writeTsconfigServer(cwd);
   addServerReference(cwd);
   excludeServerFromApp(cwd);
-  addTypeModuleToPackageJson(cwd);
   addScriptsToPackageJson(cwd);
 
   if (installSkills) {
@@ -291,7 +276,6 @@ export async function init(options?: { skillsOnly?: boolean }): Promise<undefine
 
 export {
   addScriptsToPackageJson,
-  addTypeModuleToPackageJson,
   detectPackageManager,
   generateServerTs,
   getInstallCmd,
