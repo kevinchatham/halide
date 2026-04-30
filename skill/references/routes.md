@@ -69,7 +69,7 @@ proxyRoute({
   proxyPath: '/products',          // optional — rewrites path prefix (defaults to path)
   timeout: 5000,                   // optional — ms, default: 60000
   identity: (ctx, claims) => ({ 'x-user-id': claims.sub }),  // optional
-  transform: ({ body, headers }) => ({ body, headers }),     // optional
+  transform: ({ method, body, headers }) => ({ body, headers }), // optional
   authorize: (ctx, claims, logger) => true,  // auto-filled by factory
   observe: true,                   // optional
   openapi: { ... },                // optional
@@ -126,10 +126,10 @@ identity: (ctx, claims) => ({
 
 ### Transform
 
-The `transform` function receives `{ body, headers }` and returns `{ body, headers }` to modify the request before proxying. The body is JSON-stringified. Headers are normalized to lowercase keys.
+The `transform` function receives `{ method, body, headers }` and returns `{ body, headers }` to modify the request before proxying. `method` is the lowercase HTTP method. The body is JSON-stringified. Headers are normalized to lowercase keys.
 
 ```typescript
-transform: ({ body, headers }) => ({
+transform: ({ method, body, headers }) => ({
   body: { ...body, source: 'halide' },
   headers: { ...headers, 'x-proxy': 'true' },
 });

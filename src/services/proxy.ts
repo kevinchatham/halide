@@ -103,7 +103,18 @@ function applyTransform<TClaims>(
   try {
     const jsonBody = parsedBody ?? {};
     const { headers: normalizedHeaders, multiValueKeys } = normalizeHeaders(c.req.header());
-    const transformed = route.transform({ body: jsonBody, headers: normalizedHeaders });
+    const transformed = route.transform({
+      body: jsonBody,
+      headers: normalizedHeaders,
+      method: c.req.method.toLowerCase() as
+        | 'get'
+        | 'post'
+        | 'put'
+        | 'patch'
+        | 'delete'
+        | 'head'
+        | 'options',
+    });
     const body = JSON.stringify(transformed.body);
     for (const [key, value] of Object.entries(transformed.headers)) {
       if (isWritableHeader(key, multiValueKeys)) {
@@ -141,7 +152,9 @@ export function createProxyService<TClaims = unknown>(
     const isWildcard = routePath.endsWith('/*');
     const prefix = isWildcard ? routePath.slice(0, -2) : routePath;
     const rewritePrefix =
-      isWildcard && rewritePath.endsWith('/*') ? rewritePath.slice(0, -2) : rewritePath;
+      isWildcard && rewritePath.endsWith('/*')
+        ? rewritePath.slice(0, -2)
+        : rewritePath.replace(/\/+$/, '');
 
     let rewrittenPath: string;
     if (isWildcard) {
@@ -150,7 +163,7 @@ export function createProxyService<TClaims = unknown>(
     } else {
       rewrittenPath = c.req.path.replace(new RegExp(`^${routePath}`), rewritePath);
     }
-    const targetUrl = new URL(rewrittenPath + c.req.url.replace(c.req.path, ''), target).toString();
+    const targetUrl = new URL(rewrittenPath, target).toString();
 
     const headers: Record<string, string | undefined> = { ...c.req.header() };
     delete headers['host'];

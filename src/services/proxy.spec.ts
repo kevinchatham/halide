@@ -113,6 +113,7 @@ describe('createProxyService', () => {
     });
 
     expect(transformFn).toHaveBeenCalled();
+    expect(transformFn.mock.calls[0]![0].method).toBe('post');
     expect(transformFn.mock.calls[0]![0].body).toEqual({ original: true });
   });
 });

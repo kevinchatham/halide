@@ -22,8 +22,7 @@ Then it:
 4. Creates `tsconfig.server.json` for the server entry point
 5. Updates `tsconfig.json` references to include `tsconfig.server.json`
 6. Excludes `server.ts` from `tsconfig.app.json`
-7. Adds `"type": "module"` to `package.json` if not present
-8. Adds `halide:start` and `halide:build` scripts to `package.json`
+7. Adds `halide:start` and `halide:build` scripts to `package.json`
 
 ### Generated `server.ts`
 

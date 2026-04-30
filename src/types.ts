@@ -161,6 +161,8 @@ export type AuthorizeFn<TClaims> = (
  * Allows transforming the request body and headers before forwarding.
  */
 export type TransformFn = (request: {
+  /** HTTP method in lowercase. */
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
   /** Request body to transform. */
   body: unknown;
   /** Request headers to transform. */
@@ -198,6 +200,7 @@ export type AppConfig = {
   port?: number;
   /**
    * Root directory containing the app static files. Optional when not serving static files.
+   * Can be an absolute path (e.g. '/var/www/app') or a relative path from the current working directory.
    */
   root?: string;
 };

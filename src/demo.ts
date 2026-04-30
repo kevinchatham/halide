@@ -118,7 +118,15 @@ const usersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
   proxyPath: '/users',
   target: 'https://api.example.com',
   timeout: 5000,
-  transform: ({ body, headers }: { body: unknown; headers: Record<string, string> }) => ({
+  transform: ({
+    method: _method,
+    body,
+    headers,
+  }: {
+    method: 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
+    body: unknown;
+    headers: Record<string, string>;
+  }) => ({
     body: {
       ...(typeof body === 'object' && body ? body : {}),
       transformed: true,

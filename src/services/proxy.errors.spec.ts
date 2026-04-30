@@ -98,7 +98,7 @@ describe('createProxyService — errors', () => {
   });
 
   it('transform receives normalized headers with array values joined', async () => {
-    const transformFn = vi.fn().mockImplementation(({ headers }) => {
+    const transformFn = vi.fn().mockImplementation(({ method: _method, headers }) => {
       expect(headers['x-multi']).toBe('a, b');
       return { body: { ok: true }, headers: {} };
     });
