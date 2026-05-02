@@ -6,12 +6,13 @@ import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
 import type {
   ApiRoute,
+  AuthorizeFn,
   ClaimExtractor,
-  Logger,
   ObservabilityConfig,
   ProxyRoute,
   RequestContext,
   ServerConfig,
+  THalideApp,
 } from '../types';
 import { createSecretCache } from '../utils/secretCache';
 
@@ -19,16 +20,16 @@ import { createSecretCache } from '../utils/secretCache';
 type HalideVariables = { rawBody?: unknown };
 
 /** Create a claim extractor based on auth strategy configuration. */
-function createClaimExtractor<TClaims = unknown>(
-  config: ServerConfig<TClaims>,
-  logger: Logger,
-): ClaimExtractor<TClaims> | undefined {
+function createClaimExtractor<TApp = unknown>(
+  config: ServerConfig<TApp>,
+  logger: THalideApp['logger'],
+): ClaimExtractor<THalideApp<TApp>['claims']> | undefined {
   const auth = config.security?.auth;
   if (!auth) return undefined;
 
   if (auth.strategy === 'jwks' && auth.jwksUri) {
     const { jwksUri, audience } = auth;
-    return (c: Context) => extractJwksClaims<TClaims>(c, jwksUri, audience);
+    return (c: Context) => extractJwksClaims<THalideApp<TApp>['claims']>(c, jwksUri, audience);
   }
 
   if (auth.secret) {
@@ -37,7 +38,7 @@ function createClaimExtractor<TClaims = unknown>(
     const cachedResolver = createSecretCache(ttl, logger);
     return async (c: Context) => {
       const resolvedSecret = await cachedResolver(secret);
-      return extractBearerClaims<TClaims>(c, resolvedSecret, audience);
+      return extractBearerClaims<THalideApp<TApp>['claims']>(c, resolvedSecret, audience);
     };
   }
 
@@ -45,8 +46,8 @@ function createClaimExtractor<TClaims = unknown>(
 }
 
 /** Build OpenAPI describeRoute options from route metadata. */
-function buildDescribeRouteOptions<TClaims>(
-  route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
+function buildDescribeRouteOptions<TApp>(
+  route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): DescribeRouteOptions {
   const meta = route.openapi;
   const options: DescribeRouteOptions = {};
@@ -64,8 +65,8 @@ function buildDescribeRouteOptions<TClaims>(
 }
 
 /** Build OpenAPI request body from route request schema. */
-function buildRequestBody<TClaims>(
-  route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
+function buildRequestBody<TApp>(
+  route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): DescribeRouteOptions['requestBody'] {
   const schema = route.type === 'api' ? route.requestSchema : undefined;
   if (!schema) return undefined;
@@ -82,9 +83,7 @@ function buildRequestBody<TClaims>(
 }
 
 /** Build OpenAPI responses object from route metadata. */
-function buildResponses<TClaims>(
-  route: ApiRoute<TClaims> | ProxyRoute<TClaims>,
-): ResponsesWithResolver {
+function buildResponses<TApp>(route: ApiRoute<TApp> | ProxyRoute<TApp>): ResponsesWithResolver {
   const meta = route.openapi;
   const responses: ResponsesWithResolver = {};
 
@@ -109,11 +108,11 @@ function buildResponses<TClaims>(
 }
 
 /** Extract JWT claims from request using the claim extractor. */
-async function extractClaims<TClaims>(
+async function extractClaims<TApp>(
   c: Context,
   route: { access: string },
-  claimExtractor: ClaimExtractor<TClaims> | undefined,
-): Promise<{ claims: TClaims | undefined; response: Response | null }> {
+  claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
+): Promise<{ claims: THalideApp<TApp>['claims'] | undefined; response: Response | null }> {
   if (route.access === 'public' || !claimExtractor) {
     return { claims: undefined, response: null };
   }
@@ -131,17 +130,16 @@ async function extractClaims<TClaims>(
 }
 
 /** Check if the request is authorized using the route's authorize function. */
-async function checkAuthorization<TClaims>(
+async function checkAuthorization<TApp>(
   c: Context,
-  route: { authorize?: ApiRoute<TClaims>['authorize'] },
-  claims: TClaims | undefined,
+  route: { authorize?: AuthorizeFn<TApp> },
+  app: TApp,
   body: unknown,
-  logger: Logger,
 ): Promise<Response | null> {
   if (!route.authorize) return null;
   try {
     const ctx = buildRequestContextFromHono(c, body);
-    const allowed = await route.authorize(ctx, claims, logger);
+    const allowed = await route.authorize(ctx, app);
     if (!allowed) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         headers: { 'Content-Type': 'application/json' },
@@ -158,17 +156,16 @@ async function checkAuthorization<TClaims>(
 }
 
 /** Emit the onRequest observability hook if configured. */
-function emitOnRequest<TClaims>(
+function emitOnRequest<TApp>(
   c: Context,
   body: unknown,
-  claims: TClaims | undefined,
-  observability: ObservabilityConfig<TClaims> | undefined,
+  app: TApp,
+  observability: ObservabilityConfig<TApp> | undefined,
   observe: boolean | undefined,
-  logger: Logger,
 ): void {
   if (observability?.onRequest && observe !== false) {
     const ctx = buildRequestContextFromHono(c, body);
-    observability.onRequest(ctx, claims, logger);
+    observability.onRequest(ctx, app);
   }
 }
 
@@ -183,23 +180,23 @@ interface ResponseEmitContext {
 }
 
 /** Emit the onResponse observability hook if configured. */
-function emitOnResponse<TClaims>(
+function emitOnResponse<TApp>(
   c: Context,
   body: unknown,
-  claims: TClaims | undefined,
-  observability: ObservabilityConfig<TClaims> | undefined,
+  app: TApp,
+  observability: ObservabilityConfig<TApp> | undefined,
   observe: boolean | undefined,
   ctx: ResponseEmitContext,
-  logger: Logger,
+  responseBody?: unknown,
 ): void {
   if (observability?.onResponse && observe !== false) {
     const reqCtx = buildRequestContextFromHono(c, body);
-    observability.onResponse(
-      reqCtx,
-      claims,
-      { durationMs: Date.now() - ctx.start, error: ctx.handlerError, statusCode: ctx.statusCode },
-      logger,
-    );
+    observability.onResponse(reqCtx, app, {
+      body: responseBody,
+      durationMs: Date.now() - ctx.start,
+      error: ctx.handlerError,
+      statusCode: ctx.statusCode,
+    });
   }
 }
 
@@ -209,7 +206,7 @@ function getValidJson(c: Context): unknown {
 }
 
 /** Resolve request body, using request schema if available. */
-function resolveBody<TClaims>(c: Context, route: ApiRoute<TClaims>): unknown {
+function resolveBody<TApp>(c: Context, route: ApiRoute<TApp>): unknown {
   if (route.requestSchema) return getValidJson(c);
   const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
   return methodsWithBody.has(c.req.method.toUpperCase())
@@ -235,12 +232,12 @@ function registerRouteOnApp(
 }
 
 /** Register an API route with all middleware, auth, and handler. */
-function registerApiRoute<TClaims = unknown>(
+function registerApiRoute<TApp = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
-  route: ApiRoute<TClaims>,
-  claimExtractor: ClaimExtractor<TClaims> | undefined,
-  observability: ObservabilityConfig<TClaims> | undefined,
-  logger: Logger,
+  route: ApiRoute<TApp>,
+  claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
+  observability: ObservabilityConfig<TApp> | undefined,
+  logger: THalideApp['logger'],
 ): void {
   const method = route.method ?? DEFAULTS.route.method;
   const middlewares: MiddlewareHandler[] = [];
@@ -258,10 +255,11 @@ function registerApiRoute<TClaims = unknown>(
     if (authResponse) return authResponse;
 
     const authBody = route.requestSchema ? getValidJson(c) : undefined;
-    const forbidResponse = await checkAuthorization(c, route, claims, authBody, logger);
+    const app: TApp = { claims, logger } as TApp;
+    const forbidResponse = await checkAuthorization(c, route, app, authBody);
     if (forbidResponse) return forbidResponse;
 
-    emitOnRequest(c, authBody, claims, observability, route.observe, logger);
+    emitOnRequest(c, authBody, app, observability, route.observe);
 
     const body = await resolveBody(c, route);
 
@@ -269,7 +267,7 @@ function registerApiRoute<TClaims = unknown>(
     try {
       const ctx = buildRequestContextFromHono(c, body) as RequestContext & { body: unknown };
       ctx.body = body;
-      result = await route.handler(ctx, claims, logger);
+      result = await route.handler(ctx, app);
     } catch (err) {
       handlerError = err instanceof Error ? err : new Error(String(err));
       statusCode = 500;
@@ -278,11 +276,11 @@ function registerApiRoute<TClaims = unknown>(
       emitOnResponse(
         c,
         body,
-        claims,
+        app,
         observability,
         route.observe,
         { handlerError, start, statusCode },
-        logger,
+        result,
       );
     }
 
@@ -293,18 +291,19 @@ function registerApiRoute<TClaims = unknown>(
 }
 
 /** Register a proxy route with all middleware, auth, and forwarding. */
-function registerProxyRoute<TClaims = unknown>(
+function registerProxyRoute<TApp = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
-  route: ProxyRoute<TClaims>,
-  claimExtractor: ClaimExtractor<TClaims> | undefined,
-  observability: ObservabilityConfig<TClaims> | undefined,
-  logger: Logger,
+  route: ProxyRoute<TApp>,
+  claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
+  observability: ObservabilityConfig<TApp> | undefined,
+  logger: THalideApp['logger'],
 ): void {
   for (const method of route.methods) {
     app[method](route.path, describeRoute(buildDescribeRouteOptions(route)), async (c: Context) => {
       const start = Date.now();
       let handlerError: Error | undefined;
       let statusCode = 200;
+      let proxyResponseBody: unknown;
 
       let parsedBody: unknown;
       if (route.transform) {
@@ -320,7 +319,8 @@ function registerProxyRoute<TClaims = unknown>(
         });
       }
 
-      const forbidResponse = await checkAuthorization(c, route, claims, parsedBody, logger);
+      const app: TApp = { claims, logger } as TApp;
+      const forbidResponse = await checkAuthorization(c, route, app, parsedBody);
       if (forbidResponse) {
         return new Response(forbidResponse.body, {
           headers: forbidResponse.headers,
@@ -328,11 +328,17 @@ function registerProxyRoute<TClaims = unknown>(
         });
       }
 
-      emitOnRequest(c, parsedBody, claims, observability, route.observe, logger);
+      emitOnRequest(c, parsedBody, app, observability, route.observe);
 
       try {
-        const proxyHandler = createProxyService(route, claims, logger, parsedBody);
-        return await proxyHandler(c);
+        const proxyHandler = createProxyService(route, app, parsedBody);
+        const response = await proxyHandler(c);
+        statusCode = response.status;
+        proxyResponseBody = await response
+          .clone()
+          .text()
+          .catch(() => undefined);
+        return response;
       } catch (err) {
         handlerError = err instanceof Error ? err : new Error(String(err));
         statusCode = 500;
@@ -341,11 +347,11 @@ function registerProxyRoute<TClaims = unknown>(
         emitOnResponse(
           c,
           parsedBody,
-          claims,
+          app,
           observability,
           route.observe,
           { handlerError, start, statusCode },
-          logger,
+          proxyResponseBody,
         );
       }
     });
@@ -354,17 +360,17 @@ function registerProxyRoute<TClaims = unknown>(
 
 /**
  * Register all API and proxy routes on the Hono application.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param app - The Hono application to register routes on.
  * @param config - The server configuration containing routes.
  * @param logger - Logger instance for observability.
  */
-export function registerRoutes<TClaims = unknown>(
+export function registerRoutes<TApp = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
-  config: ServerConfig<TClaims>,
-  logger: Logger,
+  config: ServerConfig<TApp>,
+  logger: THalideApp['logger'],
 ): void {
-  const claimExtractor = createClaimExtractor<TClaims>(config, logger);
+  const claimExtractor = createClaimExtractor<TApp>(config, logger);
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {

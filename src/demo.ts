@@ -17,7 +17,6 @@ import { apiRoute, proxyRoute } from './index';
 import type {
   ApiRoute,
   AppConfig,
-  Logger,
   ObservabilityConfig,
   OpenApiConfig,
   ProxyRoute,
@@ -25,6 +24,7 @@ import type {
   ResponseContext,
   SecurityConfig,
   ServerConfig,
+  THalideApp,
 } from './types'; // from 'halide'
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
@@ -34,6 +34,9 @@ interface UserClaims {
   /** Subject identifier (typically a user ID). */
   sub: string;
 }
+
+/** Bundled app context for this demo. */
+type DemoApp = THalideApp<UserClaims>;
 
 /** Zod schema validating the request body for creating a new user. */
 const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> = z.object({
@@ -50,17 +53,13 @@ type CreateUserSchema = z.infer<typeof CreateUserSchema>;
  * - `authorize`: restricts access to users with the 'admin' role
  * - `handler`: returns the request context and authenticated user subject
  */
-const profileRoute: ApiRoute<UserClaims> = apiRoute<UserClaims>({
+const profileRoute: ApiRoute<DemoApp> = apiRoute<DemoApp>({
   access: 'private',
-  authorize: (_ctx: RequestContext, claims: UserClaims | undefined, _logger: Logger) =>
-    !!claims?.role && claims.role === 'admin',
-  handler: async (
-    ctx: RequestContext & { body: unknown },
-    claims: UserClaims | undefined,
-    _logger: Logger,
-  ) => ({
+  authorize: (_ctx: RequestContext, app: DemoApp) =>
+    !!app.claims?.role && app.claims.role === 'admin',
+  handler: async (ctx: RequestContext & { body: unknown }, app: DemoApp) => ({
     ctx: JSON.stringify(ctx),
-    user: claims?.sub,
+    user: app.claims?.sub,
   }),
   method: 'get',
   path: '/profile',
@@ -72,13 +71,9 @@ const profileRoute: ApiRoute<UserClaims> = apiRoute<UserClaims>({
  * - `requestSchema`: Zod schema validating that body contains a valid email and non-empty name
  * - `handler`: creates a user with a generated UUID, timestamp, and the validated body fields
  */
-const userRoute: ApiRoute<UserClaims, CreateUserSchema> = apiRoute<UserClaims, CreateUserSchema>({
+const userRoute: ApiRoute<DemoApp, CreateUserSchema> = apiRoute<DemoApp, CreateUserSchema>({
   access: 'public',
-  handler: async (
-    ctx: RequestContext & { body: CreateUserSchema },
-    _claims: UserClaims | undefined,
-    _logger: Logger,
-  ) => {
+  handler: async (ctx: RequestContext & { body: CreateUserSchema }, _app: DemoApp) => {
     return {
       createdAt: new Date().toISOString(),
       email: ctx.body.email,
@@ -96,9 +91,9 @@ const userRoute: ApiRoute<UserClaims, CreateUserSchema> = apiRoute<UserClaims, C
  * - `access: 'public'`: no authentication required
  * - `handler`: returns `{ status: 'ok' }`, useful for load balancer health checks
  */
-const healthRoute: ApiRoute<unknown> = apiRoute({
+const healthRoute: ApiRoute<DemoApp> = apiRoute({
   access: 'public',
-  handler: async () => ({ status: 'ok' }),
+  handler: async (_ctx: RequestContext & { body: unknown }, _app: DemoApp) => ({ status: 'ok' }),
   method: 'get',
   path: '/health',
 });
@@ -111,7 +106,7 @@ const healthRoute: ApiRoute<unknown> = apiRoute({
  * - `timeout`: aborts the proxy request after 5000ms
  * - `transform`: merges a `transformed: true` flag into the request body before forwarding
  */
-const usersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
+const usersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
   access: 'private',
   methods: ['get', 'post'],
   path: '/api/users',
@@ -142,10 +137,10 @@ const usersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
  * - `proxyPath`: omitted, so '/api/orders' is forwarded as-is to the target
  * - `authorize`: allows both 'admin' and 'user' roles
  */
-const ordersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
+const ordersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
   access: 'private',
-  authorize: (_ctx: RequestContext, claims: UserClaims | undefined, _logger: Logger) =>
-    !!claims?.role && (claims.role === 'admin' || claims.role === 'user'),
+  authorize: (_ctx: RequestContext, app: DemoApp) =>
+    !!app.claims?.role && (app.claims.role === 'admin' || app.claims.role === 'user'),
   methods: ['get'],
   path: '/api/orders',
   target: 'https://api.example.com',
@@ -153,27 +148,26 @@ const ordersProxyRoute: ProxyRoute<UserClaims> = proxyRoute<UserClaims>({
 
 /**
  * Observability hooks for request/response lifecycle logging.
- * - `onRequest`: called on every incoming request with the request context and decoded JWT claims
+ * - `onRequest`: called on every incoming request with the request context and app
  * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
  */
-const observability: ObservabilityConfig<UserClaims> = {
+const observability: ObservabilityConfig<DemoApp> = {
   logger: {
-    debug: (..._args: unknown[]) => {},
-    error: (..._args: unknown[]) => {},
-    info: (..._args: unknown[]) => {},
-    warn: (..._args: unknown[]) => {},
+    debug: (_scope: unknown, ..._args: unknown[]) => {},
+    error: (_scope: unknown, ..._args: unknown[]) => {},
+    info: (_scope: unknown, ..._args: unknown[]) => {},
+    warn: (_scope: unknown, ..._args: unknown[]) => {},
   },
-  onRequest: (ctx: RequestContext, claims: UserClaims | undefined, logger: Logger) => {
-    logger.info(`[Request] ${ctx.method} ${ctx.path} (user: ${claims?.sub ?? 'anonymous'})`);
+  onRequest: (ctx: RequestContext, app: DemoApp) => {
+    app.logger.info(
+      ctx,
+      `[Request] ${ctx.method} ${ctx.path} (user: ${app.claims?.sub ?? 'anonymous'})`,
+    );
   },
-  onResponse: (
-    ctx: RequestContext,
-    claims: UserClaims | undefined,
-    { statusCode, durationMs }: ResponseContext,
-    logger: Logger,
-  ) => {
-    logger.info(
-      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${claims?.sub ?? 'anonymous'})`,
+  onResponse: (ctx: RequestContext, app: DemoApp, { statusCode, durationMs }: ResponseContext) => {
+    app.logger.info(
+      ctx,
+      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${app.claims?.sub ?? 'anonymous'})`,
     );
   },
 };
@@ -249,8 +243,8 @@ const openapi: OpenApiConfig = {
  *
  * Passed to `createServer()` to bootstrap the halide BFF server.
  */
-const exampleConfig: ServerConfig<UserClaims> = {
-  apiRoutes: [profileRoute, userRoute as unknown as ApiRoute<UserClaims>, healthRoute],
+const exampleConfig: ServerConfig<DemoApp> = {
+  apiRoutes: [profileRoute, userRoute as unknown as ApiRoute<DemoApp>, healthRoute],
   app,
   observability,
   openapi,

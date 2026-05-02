@@ -49,11 +49,11 @@ import { apiRoute } from 'halide';
 apiRoute({
   access: 'private',
   path: '/admin/settings',
-  authorize: (ctx, claims, logger) => claims.role === 'admin',
-  handler: async (ctx, claims, logger) => ({ settings: '...' }),
+  authorize: (ctx, app) => app.claims?.role === 'admin',
+  handler: async (ctx, app) => ({ settings: '...' }),
 });
 ```
 
-The `authorize` function receives `(ctx, claims, logger)` and returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
+The `authorize` function receives `(ctx, app)` and returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
 
 The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.

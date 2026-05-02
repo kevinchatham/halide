@@ -1,5 +1,5 @@
 {
-  "exec": "npm run build",
+  "exec": "npm run build && npm run halide:link",
   "ext": "ts,json",
   "ignore": ["dist", "node_modules"],
   "watch": ["src"]

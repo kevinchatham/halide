@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
-import type { Logger, ProxyRoute, RequestContext } from '../types';
+import type { Logger, ProxyRoute, RequestContext, THalideApp } from '../types';
 
 /** Headers that cannot be modified by proxy transformations. */
 const READONLY_HEADERS: Set<string> = new Set([
@@ -64,16 +64,17 @@ function normalizeHeaders(headers: Record<string, unknown>): {
 }
 
 /** Apply identity headers from JWT claims to the upstream request. */
-function applyIdentityHeaders<TClaims>(
+function applyIdentityHeaders<TApp>(
   headers: Record<string, string | undefined>,
-  route: ProxyRoute<TClaims>,
-  claims: TClaims | undefined,
+  route: ProxyRoute<TApp>,
+  app: TApp,
   c: Context,
   parsedBody: unknown,
 ): void {
+  const claims = (app as THalideApp).claims;
   if (!route.identity || !claims) return;
   const ctx = buildRequestContextFromHono(c, parsedBody);
-  const identityHeaders = route.identity(ctx, claims);
+  const identityHeaders = route.identity(ctx, app);
   if (!identityHeaders) return;
   const { multiValueKeys } = normalizeHeaders(c.req.header());
   for (const [key, value] of Object.entries(identityHeaders)) {
@@ -92,12 +93,12 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
 }
 
 /** Apply request body transformation if configured. */
-function applyTransform<TClaims>(
-  route: ProxyRoute<TClaims>,
+function applyTransform<TApp>(
+  route: ProxyRoute<TApp>,
   parsedBody: unknown,
   c: Context,
   headers: Record<string, string | undefined>,
-  logger?: Logger,
+  logger?: Logger<unknown>,
 ): BodyInit | null {
   if (!route.transform) return c.req.raw.body;
   try {
@@ -123,26 +124,25 @@ function applyTransform<TClaims>(
     }
     return body;
   } catch (err) {
-    logger?.error('[halide] Transform error:', err);
+    logger?.error({} as unknown, err instanceof Error ? err.message : String(err));
     throw err;
   }
 }
 
 /**
  * Create a proxy handler function that forwards requests to an upstream target.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param route - The proxy route configuration.
- * @param claims - JWT claims from the request (if authenticated).
- * @param logger - Logger instance.
+ * @param app - Bundled app context with claims and logger.
  * @param parsedBody - Optional pre-parsed request body.
  * @returns A function that handles the proxy request.
  */
-export function createProxyService<TClaims = unknown>(
-  route: ProxyRoute<TClaims>,
-  claims: TClaims | undefined,
-  logger?: Logger,
+export function createProxyService<TApp = unknown>(
+  route: ProxyRoute<TApp>,
+  app: TApp,
   parsedBody?: unknown,
 ): (c: Context) => Promise<Response> {
+  const logger = (app as THalideApp).logger;
   const target = route.target;
   const routePath = route.path;
   const rewritePath = route.proxyPath ?? routePath;
@@ -170,7 +170,7 @@ export function createProxyService<TClaims = unknown>(
     delete headers['Host'];
     headers['x-forwarded-host'] = c.req.header('host') ?? '';
 
-    applyIdentityHeaders(headers, route, claims, c, parsedBody);
+    applyIdentityHeaders(headers, route, app, c, parsedBody);
 
     const body = applyTransform(route, parsedBody, c, headers, logger);
 

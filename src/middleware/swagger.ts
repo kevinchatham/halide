@@ -9,11 +9,11 @@ import type { ServerConfig } from '../types';
  * Registers the OpenAPI spec JSON endpoint and the Scalar UI page
  * on the provided Hono app. Does nothing if `config.openapi.enabled` is false.
  *
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration containing OpenAPI settings.
  * @param app - The Hono application to register documentation routes on.
  */
-export function createOpenApiRoutes<TClaims>(config: ServerConfig<TClaims>, app: Hono): void {
+export function createOpenApiRoutes<TApp = unknown>(config: ServerConfig<TApp>, app: Hono): void {
   const openapiConfig = config.openapi;
   if (!openapiConfig?.enabled) return;
 

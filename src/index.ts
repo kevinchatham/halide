@@ -19,5 +19,6 @@ export type {
   SecurityAuthConfig,
   SecurityConfig,
   ServerConfig,
+  THalideApp,
   TransformFn,
 } from './types';

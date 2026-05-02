@@ -1,13 +1,18 @@
 import { Hono } from 'hono';
-import type { Logger, ProxyRoute } from '../types';
+import type { Logger, ProxyRoute, THalideApp } from '../types';
 import { createProxyService } from './proxy';
 
-const noopLogger: Logger = {
-  debug: vi.fn(),
-  error: vi.fn(),
-  info: vi.fn(),
-  warn: vi.fn(),
+const noopLogger: Logger<unknown> = {
+  debug: (_scope: unknown) => {},
+  error: (_scope: unknown) => {},
+  info: (_scope: unknown) => {},
+  warn: (_scope: unknown) => {},
 };
+
+const createApp = (claims?: unknown): THalideApp => ({
+  claims,
+  logger: noopLogger,
+});
 
 describe('createProxyService — errors', () => {
   it('handles proxy errors gracefully', async () => {
@@ -20,7 +25,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
 
     const app = new Hono();
     app.get('/api/fail', handler);
@@ -44,14 +49,15 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const errorLogger: Logger = {
-      debug: vi.fn(),
+    const errorLogger: Logger<unknown> = {
+      debug: (_scope: unknown) => {},
       error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
+      info: (_scope: unknown) => {},
+      warn: (_scope: unknown) => {},
     };
 
-    const handler = createProxyService(route, undefined, errorLogger, { original: true });
+    const appWithErrorLogger: THalideApp = { claims: undefined, logger: errorLogger };
+    const handler = createProxyService(route, appWithErrorLogger, { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -64,7 +70,7 @@ describe('createProxyService — errors', () => {
     });
 
     expect(res.status).toBe(502);
-    expect(errorLogger.error).toHaveBeenCalled();
+    expect(errorLogger.error).toHaveBeenCalledWith({}, expect.any(String));
   });
 
   it('normalizes headers with non-string and array values in transform', async () => {
@@ -82,7 +88,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+    const handler = createProxyService(route, createApp(), { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -112,7 +118,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+    const handler = createProxyService(route, createApp(), { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -142,7 +148,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+    const handler = createProxyService(route, createApp(), { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -167,7 +173,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
 
     const app = new Hono();
     app.get('/api/*', handler);
@@ -187,7 +193,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
 
     const app = new Hono();
     app.get('/api/*', handler);
@@ -206,7 +212,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
 
     const app = new Hono();
     app.get('/api/users', handler);
@@ -227,7 +233,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
 
     const app = new Hono();
     app.get('/api/users', handler);

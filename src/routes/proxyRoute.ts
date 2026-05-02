@@ -4,7 +4,7 @@ import type { ProxyRoute, ProxyRouteInput } from '../types';
 /**
  * Factory function to create a proxy route configuration.
  * Sets `type: 'proxy'` and provides a default authorize function.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param route - The route input configuration.
  * @returns A complete ProxyRoute object.
  * @example
@@ -17,7 +17,7 @@ import type { ProxyRoute, ProxyRouteInput } from '../types';
  * })
  * ```
  */
-export function proxyRoute<TClaims>(route: ProxyRouteInput<TClaims>): ProxyRoute<TClaims> {
+export function proxyRoute<TApp = unknown>(route: ProxyRouteInput<TApp>): ProxyRoute<TApp> {
   return {
     ...route,
     authorize: route.authorize ?? defaultAuthorize,

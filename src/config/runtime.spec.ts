@@ -218,10 +218,10 @@ describe('createApp', () => {
 
   it('logs errors through the custom logger', async () => {
     const logger = {
-      debug: vi.fn(),
+      debug: (_scope: unknown) => {},
       error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
+      info: (_scope: unknown) => {},
+      warn: (_scope: unknown) => {},
     };
     const { app } = createApp({
       ...minimalConfig,
@@ -235,7 +235,14 @@ describe('createApp', () => {
           type: 'api',
         },
       ],
-      observability: { logger },
+      observability: {
+        logger,
+        onResponse: (_ctx: unknown, _claims: unknown, { error }: { error?: Error }) => {
+          if (error) {
+            logger.error(_ctx, `Request failed: ${error.message}`);
+          }
+        },
+      },
     });
     await app.request('/fail');
     expect(logger.error).toHaveBeenCalled();

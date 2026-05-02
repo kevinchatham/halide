@@ -46,11 +46,11 @@ export interface CreateAppResult {
  * This is the core function that builds the server. It validates the config,
  * applies middleware, registers routes, and sets up the SPA fallback handler.
  *
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param configInput - The server configuration.
  * @returns An object containing the Hono app and cleanup functions.
  */
-export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>): CreateAppResult {
+export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): CreateAppResult {
   validateServerConfig(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
@@ -90,6 +90,7 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
 
   if (openapiEnabled) {
     logger.warn(
+      {} as unknown,
       `[${
         configInput.app?.name ?? DEFAULTS.app.name
       }] OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
@@ -108,7 +109,7 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes<TClaims>(app, configInput, logger);
+  registerRoutes(app, configInput, logger);
 
   createOpenApiRoutes(configInput, app as unknown as Hono);
 
@@ -131,7 +132,7 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
  * The server is synchronous to create. Call `server.start()` to listen.
  * Graceful shutdown is handled automatically on SIGINT/SIGTERM.
  *
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param configInput - The server configuration.
  * @returns A `Server` object with `ready`, `start`, and `stop` methods.
  * @example
@@ -153,8 +154,8 @@ export function createApp<TClaims = unknown>(configInput: ServerConfig<TClaims>)
  * });
  * ```
  */
-export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaims>): Server {
-  const { app, rateLimitDispose } = createApp<TClaims>(configInput);
+export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): Server {
+  const { app, rateLimitDispose } = createApp<TApp>(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
 
@@ -175,6 +176,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
     if (isShuttingDown) return;
     isShuttingDown = true;
     logger.info(
+      {} as unknown,
       `[${configInput.app?.name ?? DEFAULTS.app.name}] Received ${signal}, shutting down...`,
     );
     rateLimitDispose?.();
@@ -201,6 +203,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
       const port =
         Number.parseInt(process.env.PORT || '', 10) || (configInput.app?.port ?? DEFAULTS.app.port);
       logger.info(
+        {} as unknown,
         `[${configInput.app?.name ?? DEFAULTS.app.name}] Server starting on port ${port}`,
       );
       httpServer = serve(
@@ -216,6 +219,7 @@ export function createServer<TClaims = unknown>(configInput: ServerConfig<TClaim
       httpServer.on('error', (err: Error) => {
         readyReject(err);
         logger.error(
+          {} as unknown,
           `[${configInput.app?.name ?? DEFAULTS.app.name}] Failed to start: ${err.message}`,
         );
         process.exit(1);

@@ -5,17 +5,30 @@
 The top-level configuration object passed to `createServer()`:
 
 ```typescript
-interface ServerConfig<TClaims = unknown> {
+type App = THalideApp<UserClaims>;
+
+interface ServerConfig<TApp = THalideApp> {
   app?: AppConfig; // optional — server can run as pure backend without static files
-  apiRoutes?: ApiRoute<TClaims>[]; // optional array
-  proxyRoutes?: ProxyRoute<TClaims>[]; // optional array
+  apiRoutes?: ApiRoute<TApp>[]; // optional array
+  proxyRoutes?: ProxyRoute<TApp>[]; // optional array
   security?: SecurityConfig; // optional
-  observability?: ObservabilityConfig<TClaims>; // optional
+  observability?: ObservabilityConfig<TApp>; // optional
   openapi?: OpenApiConfig; // optional
 }
 ```
 
 **Critical:** `ServerConfig` uses **separate arrays** — `apiRoutes` and `proxyRoutes`. There is no single `routes` array.
+
+## THalideApp
+
+Bundles claims and logger into a single object passed to handlers:
+
+```typescript
+type THalideApp<TClaims = unknown, TLogScope = unknown> = {
+  claims: TClaims | undefined; // decoded JWT (undefined for public routes)
+  logger: Logger<TLogScope>; // structured logger
+};
+```
 
 ## AppConfig (optional — for static file serving)
 
@@ -50,28 +63,29 @@ interface SecurityAuthConfig {
 
 ## Key Types
 
-| Type                              | Description                                                                   |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `ServerConfig<TClaims>`           | Top-level configuration object                                                |
-| `Server`                          | Server instance with `ready`, `start(onReady)`, `stop()`                      |
-| `CreateAppResult`                 | Return of `createApp()` — `{ app, rateLimitDispose }`                         |
-| `ApiRoute<TClaims, TBody>`        | API route definition                                                          |
-| `ApiRouteHandler<TClaims, TBody>` | Handler signature: `(ctx, claims, logger) => Promise<unknown>`                |
-| `ProxyRoute<TClaims>`             | Proxy route definition                                                        |
-| `AuthorizeFn<TClaims>`            | `(ctx, claims, logger) => boolean \| Promise<boolean>`                        |
-| `TransformFn`                     | `({ body, headers }) => { body, headers }`                                    |
-| `RequestContext`                  | Normalized request context: `{ method, path, headers, params, query, body? }` |
-| `SecurityConfig`                  | CORS, CSP, auth, rate limit configuration                                     |
-| `SecurityAuthConfig`              | Auth strategy, secret/JWKS, audience                                          |
-| `CorsConfig`                      | Origin, methods, credentials, headers                                         |
-| `CspOptions`                      | CSP directives container                                                      |
-| `CspDirectives`                   | CSP directive map (camelCase keys)                                            |
-| `AppConfig`                       | Static file serving configuration                                             |
-| `ObservabilityConfig<TClaims>`    | Logger, requestId, lifecycle hooks                                            |
-| `OpenApiConfig`                   | OpenAPI toggle, path, options                                                 |
-| `OpenApiRouteMeta`                | Per-route OpenAPI metadata                                                    |
-| `Logger`                          | `{ debug, error, info, warn }` interface                                      |
-| `ClaimExtractor<TClaims>`         | Function to extract claims from a Hono Context                                |
+| Type                             | Description                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| `ServerConfig<TApp>`             | Top-level configuration object                                                |
+| `THalideApp<TClaims, TLogScope>` | Bundled app context: `{ claims, logger }`                                     |
+| `Server`                         | Server instance with `ready`, `start(onReady)`, `stop()`                      |
+| `CreateAppResult`                | Return of `createApp()` — `{ app, rateLimitDispose }`                         |
+| `ApiRoute<TApp, TBody>`          | API route definition                                                          |
+| `ApiRouteHandler<TApp, TBody>`   | Handler signature: `(ctx, app) => Promise<unknown>`                           |
+| `ProxyRoute<TApp>`               | Proxy route definition                                                        |
+| `AuthorizeFn<TApp>`              | `(ctx, app) => boolean \| Promise<boolean>`                                   |
+| `TransformFn`                    | `({ body, headers }) => { body, headers }`                                    |
+| `RequestContext`                 | Normalized request context: `{ method, path, headers, params, query, body? }` |
+| `SecurityConfig`                 | CORS, CSP, auth, rate limit configuration                                     |
+| `SecurityAuthConfig`             | Auth strategy, secret/JWKS, audience                                          |
+| `CorsConfig`                     | Origin, methods, credentials, headers                                         |
+| `CspOptions`                     | CSP directives container                                                      |
+| `CspDirectives`                  | CSP directive map (camelCase keys)                                            |
+| `AppConfig`                      | Static file serving configuration                                             |
+| `ObservabilityConfig<TApp>`      | Logger, requestId, lifecycle hooks                                            |
+| `OpenApiConfig`                  | OpenAPI toggle, path, options                                                 |
+| `OpenApiRouteMeta`               | Per-route OpenAPI metadata                                                    |
+| `Logger<TLogScope>`              | `{ debug, error, info, warn }` interface                                      |
+| `ClaimExtractor<TClaims>`        | Function to extract claims from a Hono Context                                |
 
 ## App Configuration
 

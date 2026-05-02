@@ -4,7 +4,7 @@ import { createOpenApiRoutes } from '../middleware/swagger';
 import type { Logger, ServerConfig } from '../types';
 import { registerRoutes } from './registry';
 
-const noopLogger: Logger = createNoopLogger();
+const noopLogger: Logger<unknown> = createNoopLogger();
 
 type HalideVariables = { rawBody?: unknown };
 

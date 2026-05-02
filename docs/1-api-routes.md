@@ -11,7 +11,7 @@ apiRoute({
   access: 'public',
   path: '/bff/config',
   method: 'get',
-  handler: async (ctx, claims, logger) => ({
+  handler: async (ctx, app) => ({
     environment: process.env.NODE_ENV,
   }),
 });
@@ -28,7 +28,7 @@ apiRoute({
   path: '/users',
   method: 'post',
   requestSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
-  handler: async (ctx, claims, logger) => {
+  handler: async (ctx, app) => {
     return { id: crypto.randomUUID(), ...ctx.body };
   },
 });
@@ -36,13 +36,17 @@ apiRoute({
 
 ## Handler signature
 
-The handler receives three arguments:
+The handler receives two arguments:
 
 | Parameter | Type                               | Description                                              |
 | --------- | ---------------------------------- | -------------------------------------------------------- |
 | `ctx`     | `RequestContext & { body: TBody }` | Method, path, headers, params, query, and validated body |
-| `claims`  | `TClaims \| undefined`             | Decoded JWT claims (undefined for public routes)         |
-| `logger`  | `Logger`                           | Structured logger instance                               |
+| `app`     | `THalideApp`                       | Bundled app context with `claims` and `logger`           |
+
+`app` is a `THalideApp` object containing:
+
+- `claims` — decoded JWT claims (undefined for public routes)
+- `logger` — structured logger instance
 
 `ctx` is a **plain object** (not a Hono Context). It is constructed from the Hono request with normalized method, path, headers, params, query, and body.
 

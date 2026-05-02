@@ -41,11 +41,12 @@ import {
   apiRoute, // Factory for API routes (type: 'api')
   proxyRoute, // Factory for proxy routes (type: 'proxy')
   type ServerConfig, // Root config type
+  type THalideApp, // Bundled app context: { claims, logger }
   type ApiRoute, // API route definition
-  type ApiRouteHandler, // (ctx, claims, logger) => Promise<T>
+  type ApiRouteHandler, // (ctx, app) => Promise<T>
   type ProxyRoute, // Proxy route definition
   type RequestContext, // Normalized context for handlers
-  type AuthorizeFn, // (ctx, claims, logger) => boolean
+  type AuthorizeFn, // (ctx, app) => boolean
   type TransformFn, // Transform request body/headers
   type SecurityConfig, // auth + cors + csp + rateLimit
   type CorsConfig,
@@ -81,6 +82,7 @@ createServer({
 4. **Bearer requires secret**, **JWKS requires jwksUri**
 5. **OpenAPI enabled** warns about relaxed CSP — disable in production
 6. **apiPrefix** returns 404 for paths starting with it when `app.root` is set
+7. **Handlers receive `app`** — not separate `claims` and `logger`; use `app.claims` and `app.logger`
 
 ## Fallback Reference
 

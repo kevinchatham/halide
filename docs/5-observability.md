@@ -3,14 +3,21 @@
 Attach logging, request IDs, and lifecycle hooks for visibility into every request.
 
 ```ts
+type MyLogScope = { requestId: string; service: string };
+
 observability: {
   requestId: true,       // generates/forwards x-request-id headers
-  logger: myLogger,      // your Logger implementation (defaults to no-op if omitted)
-  onRequest: (ctx, claims, logger) => {
-    logger.info(`${ctx.method} ${ctx.path}`);
+  logger: {
+    debug: (scope) => myLogger.debug(scope),
+    error: (scope) => myLogger.error(scope),
+    info: (scope) => myLogger.info(scope),
+    warn: (scope) => myLogger.warn(scope),
   },
-  onResponse: (ctx, claims, response, logger) => {
-    logger.info(`${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`);
+  onRequest: (ctx, app) => {
+    app.logger.info(ctx, `${ctx.method} ${ctx.path}`);
+  },
+  onResponse: (ctx, app, response) => {
+    app.logger.info(ctx, `${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms - body:`, response.body);
   },
 }
 ```
@@ -19,12 +26,14 @@ Per-route observability is controlled with the `observe` flag. Set `observe: fal
 
 ## Logger interface
 
+The `Logger` interface is generic over a log scope type `TLogScope`, allowing structured logging with a context object as the first parameter:
+
 ```ts
-interface Logger {
-  debug: (...args: unknown[]) => void;
-  error: (...args: unknown[]) => void;
-  info: (...args: unknown[]) => void;
-  warn: (...args: unknown[]) => void;
+interface Logger<TLogScope = unknown> {
+  debug: (scope: TLogScope, ...args: unknown[]) => void;
+  error: (scope: TLogScope, ...args: unknown[]) => void;
+  info: (scope: TLogScope, ...args: unknown[]) => void;
+  warn: (scope: TLogScope, ...args: unknown[]) => void;
 }
 ```
 
@@ -32,16 +41,19 @@ If no logger is provided, a no-op logger is used (all methods are empty function
 
 ## Lifecycle hooks
 
-- **`onRequest(ctx, claims, logger)`** — called after auth/authorization, before handler
-- **`onResponse(ctx, claims, response, logger)`** — called after handler completes (including on error)
+- **`onRequest(ctx, app)`** — called after auth/authorization, before handler
+- **`onResponse(ctx, app, response)`** — called after handler completes (including on error)
+
+The `app` parameter is a `THalideApp` containing `claims` (decoded JWT) and `logger` (structured logger).
 
 The `response` object has the following shape:
 
-| Field        | Type     | Description                                   |
-| ------------ | -------- | --------------------------------------------- |
-| `statusCode` | `number` | HTTP status code of the response              |
-| `durationMs` | `number` | Time in milliseconds from request start       |
-| `error?`     | `Error`  | Error thrown by the handler (undefined if OK) |
+| Field        | Type      | Description                                   |
+| ------------ | --------- | --------------------------------------------- |
+| `statusCode` | `number`  | HTTP status code of the response              |
+| `durationMs` | `number`  | Time in milliseconds from request start       |
+| `error?`     | `Error`   | Error thrown by the handler (undefined if OK) |
+| `body?`      | `unknown` | Response body returned by the handler         |
 
 Note: `ResponseContext` exists in `src/types.ts` but is **not exported** from `index.ts`.
 

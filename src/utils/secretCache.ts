@@ -10,13 +10,14 @@ interface CachedSecret {
 
 /**
  * Create a caching resolver for JWT secrets.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param ttlSeconds - Time-to-live for cached secrets in seconds.
  * @param logger - Logger instance.
  * @returns An async function that resolves secrets with caching, accepting a fetcher callback.
  */
-export function createSecretCache(
+export function createSecretCache<TLogScope = unknown>(
   ttlSeconds: number,
-  logger: Logger,
+  logger: Logger<TLogScope>,
 ): (fetcher: () => string | Promise<string>) => Promise<string> {
   let cache: CachedSecret | null = null;
 
@@ -33,6 +34,7 @@ export function createSecretCache(
       return value;
     } catch (err) {
       logger.error(
+        { error: 'secret_refresh_failed' } as unknown as TLogScope,
         'Failed to refresh JWT secret from secret provider:',
         err instanceof Error ? err.message : String(err),
       );

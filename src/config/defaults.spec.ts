@@ -1,8 +1,9 @@
+import type { RequestContext } from '../types';
 import { createNoopLogger, DEFAULTS, defaultAuthorize } from './defaults';
 
 describe('defaultAuthorize', () => {
   it('returns true', async () => {
-    const result = await defaultAuthorize();
+    const result = await defaultAuthorize({} as RequestContext, {});
     expect(result).toBe(true);
   });
 });
