@@ -29,17 +29,17 @@ apiRoute({
   path: '/users',
   method: 'post',
   requestSchema: CreateUserSchema,
+  responseSchema: UserResponseSchema,
   openapi: {
     summary: 'Create a user',
     description: 'Creates a new user with the given name and email.',
     tags: ['Users'],
-    responseSchema: UserResponseSchema,
   },
   handler: async (ctx) => createUser(ctx.body),
 });
 ```
 
-Zod schemas from `requestSchema` are automatically used for the OpenAPI request body. `openapi.responseSchema` defines the 200 response body. All Zod schemas are automatically converted to JSON Schema in the generated spec.
+Zod schemas from `requestSchema` are automatically used for the OpenAPI request body. `responseSchema` defines the 200 response body. All Zod schemas are automatically converted to JSON Schema in the generated spec.
 
 ### Per-route `openapi` fields
 

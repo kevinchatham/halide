@@ -71,10 +71,10 @@ const server = createServer<App>({
       path: '/users',
       method: 'post',
       requestSchema: CreateUserSchema,
+      responseSchema: z.object({ id: z.string(), email: z.string(), name: z.string() }),
       openapi: {
         summary: 'Create a user',
         tags: ['Users'],
-        responseSchema: z.object({ id: z.string(), email: z.string(), name: z.string() }),
       },
       handler: async (ctx, app) => ({
         id: crypto.randomUUID(),
