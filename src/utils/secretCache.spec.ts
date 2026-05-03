@@ -1,11 +1,11 @@
 import type { Logger } from '../types';
 import { createSecretCache } from './secretCache';
 
-const mockLogger: Logger = {
-  debug: vi.fn(),
+const mockLogger: Logger<unknown> = {
+  debug: (_scope: unknown) => {},
   error: vi.fn(),
-  info: vi.fn(),
-  warn: vi.fn(),
+  info: (_scope: unknown) => {},
+  warn: (_scope: unknown) => {},
 };
 
 describe('createSecretCache', () => {
@@ -77,6 +77,7 @@ describe('createSecretCache', () => {
     await expect(resolver(fetcher)).rejects.toThrow('Vault unavailable');
 
     expect(mockLogger.error).toHaveBeenCalledWith(
+      { error: 'secret_refresh_failed' },
       'Failed to refresh JWT secret from secret provider:',
       'Vault unavailable',
     );
@@ -102,6 +103,7 @@ describe('createSecretCache', () => {
     await expect(resolver(fetcher)).rejects.toBe('string error');
 
     expect(mockLogger.error).toHaveBeenCalledWith(
+      { error: 'secret_refresh_failed' },
       'Failed to refresh JWT secret from secret provider:',
       'string error',
     );

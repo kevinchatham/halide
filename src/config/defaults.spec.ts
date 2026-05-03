@@ -1,8 +1,9 @@
+import type { RequestContext } from '../types';
 import { createNoopLogger, DEFAULTS, defaultAuthorize } from './defaults';
 
 describe('defaultAuthorize', () => {
   it('returns true', async () => {
-    const result = await defaultAuthorize();
+    const result = await defaultAuthorize({} as RequestContext, {});
     expect(result).toBe(true);
   });
 });
@@ -31,8 +32,8 @@ describe('DEFAULTS', () => {
     expect(DEFAULTS.proxy.timeoutMs).toBe(60_000);
     expect(DEFAULTS.rateLimit.maxRequests).toBe(100);
     expect(DEFAULTS.rateLimit.windowMs).toBe(900_000);
-    expect(DEFAULTS.spa.apiPrefix).toBe('/api');
-    expect(DEFAULTS.spa.fallback).toBe('index.html');
+    expect(DEFAULTS.app.apiPrefix).toBe('/api');
+    expect(DEFAULTS.app.fallback).toBe('index.html');
     expect(DEFAULTS.openapi.path).toBe('/swagger');
     expect(DEFAULTS.openapi.title).toBe('Halide API');
     expect(DEFAULTS.openapi.version).toBe('1.0.0');

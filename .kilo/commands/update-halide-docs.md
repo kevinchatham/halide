@@ -11,7 +11,7 @@ This command audits the `docs/` directory against the actual source code and upd
 
 Documentation lives in `docs/`. The files below are the starting point — create or remove files as the codebase requires:
 
-- `docs/0-spa.md` — SPA hosting configuration (root, port, fallback, apiPrefix)
+- `docs/0-app.md` — App hosting configuration (root optional for pure backend, port, fallback, apiPrefix)
 - `docs/1-api-routes.md` — API routes, handler signatures, body validation
 - `docs/2-proxy-routes.md` — proxy routes, path rewriting, identity, transform
 - `docs/3-auth.md` — authentication (bearer/JWKS) and authorization (authorize fn)
@@ -20,11 +20,6 @@ Documentation lives in `docs/`. The files below are the starting point — creat
 - `docs/6-openapi.md` — OpenAPI/Scalar documentation, per-route metadata
 - `docs/7-full-example.md` — complete working example
 - `docs/8-api-reference.md` — all exported functions and types from index.ts
-
-Also update if source architecture changed:
-- `README.md` — project overview, quick start, when not to use
-- `skills/halide/SKILL.md` — agent skill documentation
-- `AGENTS.md` — developer guide
 
 ## Steps
 
@@ -46,10 +41,10 @@ Read these source files to establish what is actually exported and how it works:
 
 First, scan all source files under `src/` to identify concepts that may lack documentation. Then for each existing file in `docs/`, verify against source truth:
 
-#### docs/0-spa.md
-- `spa.root` is the only required field
+#### docs/0-app.md
+- `app.root` is optional — server can run as pure backend when omitted
 - `apiPrefix` defaults to `'/api'`, set to `''` to disable
-- Port resolution: `PORT` env → `spa.port` → default `3553`
+- Port resolution: `PORT` env → `app.port` → default `3553`
 - `fallback` defaults to `'index.html'`
 - `name` defaults to `'app'` (used in log output)
 
@@ -116,7 +111,7 @@ First, scan all source files under `src/` to identify concepts that may lack doc
 #### docs/8-api-reference.md
 - Must list ALL exports from `src/index.ts`:
   - Functions: `createServer`, `createApp`, `apiRoute`, `proxyRoute`
-  - Types: `ServerConfig`, `Server`, `CreateAppResult`, `ApiRoute`, `ApiRouteHandler`, `ProxyRoute`, `AuthorizeFn`, `TransformFn`, `RequestContext`, `SecurityConfig`, `SecurityAuthConfig`, `CorsConfig`, `CspOptions`, `CspDirectives`, `SpaConfig`, `ObservabilityConfig`, `OpenApiConfig`, `OpenApiRouteMeta`, `Logger`, `ClaimExtractor`
+  - Types: `ServerConfig`, `Server`, `CreateAppResult`, `ApiRoute`, `ApiRouteHandler`, `ProxyRoute`, `AuthorizeFn`, `TransformFn`, `RequestContext`, `SecurityConfig`, `SecurityAuthConfig`, `CorsConfig`, `CspOptions`, `CspDirectives`, `AppConfig`, `ObservabilityConfig`, `OpenApiConfig`, `OpenApiRouteMeta`, `Logger`, `ClaimExtractor`
 - `createServer` is synchronous (no await)
 - `createApp` returns `{ app, rateLimitDispose }` — useful for testing
 
@@ -151,15 +146,6 @@ For obsolete doc files:
 2. Verify `docs/7-full-example.md` uses patterns consistent with individual docs
 3. Verify `docs/8-api-reference.md` matches `src/index.ts` exports exactly
 4. Check that `README.md` quick start example works as-is
-5. Ensure `skills/halide/SKILL.md` contains the most complete reference
-
-### Phase 5: Update AGENTS.md if Needed
-
-If source architecture changed (new directories, moved files, changed patterns):
-
-1. Update "Architecture" section with current directory structure
-2. Update "Gotchas" section with any new Biome rules or patterns
-3. Update file path references if modules moved
 
 ## Important Rules
 

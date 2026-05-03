@@ -9,6 +9,10 @@ const mockReadFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockAppendFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockInput: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockConfirm: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockCpSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockMkdirSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockResolve: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockReaddirSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', () => ({
   execSync: mockExecSync,
@@ -17,13 +21,36 @@ vi.mock('node:child_process', () => ({
 vi.mock('node:fs', () => {
   const mocks = {
     appendFileSync: mockAppendFileSync,
+    cpSync: mockCpSync,
     existsSync: mockExistsSync,
+    mkdirSync: mockMkdirSync,
+    readdirSync: mockReaddirSync,
     readFileSync: mockReadFileSync,
     writeFileSync: mockWriteFileSync,
   };
   return {
     ...mocks,
     default: mocks,
+  };
+});
+
+vi.mock('node:path', async (importOriginal) => {
+  const actual = await importOriginal();
+  const typedActual = actual as Record<string, unknown>;
+  return {
+    ...typedActual,
+    default: actual,
+    dirname: vi.fn(),
+  };
+});
+
+vi.mock('node:module', async (importOriginal) => {
+  const actual = await importOriginal();
+  const typedActual = actual as Record<string, unknown>;
+  return {
+    ...typedActual,
+    createRequire: vi.fn(() => ({ resolve: mockResolve })),
+    default: actual,
   };
 });
 
@@ -85,7 +112,7 @@ describe('init', () => {
     );
   });
 
-  it('creates server.ts with user-provided spa name', async () => {
+  it('creates server.ts with user-provided app name', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
@@ -104,7 +131,7 @@ describe('init', () => {
     );
   });
 
-  it('rejects spa names with invalid characters', async () => {
+  it('rejects app names with invalid characters', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       return false;
@@ -139,19 +166,23 @@ describe('init', () => {
     expect(serverWriteCall).toBeUndefined();
   });
 
-  it('runs skills add interactively with stdio inherit', async () => {
+  it('copies skills from node_modules/halide to .agents/skills/halide', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (p.endsWith('package.json')) return true;
       if (p.endsWith('server.ts')) return false;
       return false;
     });
 
+    mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([
+      { isDirectory: () => false, name: 'SKILL.md' },
+      { isDirectory: () => true, name: 'subdir' },
+    ]);
+
     await init();
 
-    expect(mockExecSync).toHaveBeenCalledWith('npx skills add kevinchatham/halide', {
-      cwd: projectDir,
-      stdio: 'inherit',
-    });
+    expect(mockMkdirSync).toHaveBeenCalled();
+    expect(mockCpSync).toHaveBeenCalled();
   });
 
   it('detects pnpm and uses pnpm add', async () => {
@@ -168,5 +199,33 @@ describe('init', () => {
       'pnpm add halide && pnpm add -D @types/node',
       expect.objectContaining({ cwd: projectDir, stdio: 'pipe' }),
     );
+  });
+
+  it('skips all setup except skill installation when skillsOnly is true', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+
+    mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([{ isDirectory: () => false, name: 'SKILL.md' }]);
+
+    await init({ skillsOnly: true });
+
+    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+    expect(mockMkdirSync).toHaveBeenCalled();
+    expect(mockCpSync).toHaveBeenCalled();
+  });
+
+  it('exits early in skillsOnly mode if no package.json', async () => {
+    mockExistsSync.mockReturnValue(false);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    await init({ skillsOnly: true });
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 });

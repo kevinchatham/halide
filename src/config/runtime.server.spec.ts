@@ -10,7 +10,7 @@ function getFreePort(): number {
   return port;
 }
 
-const minimalConfig = { spa: { root: '/var/www' } } as const;
+const minimalConfig = { app: { root: '/var/www' } } as const;
 
 describe('createServer', () => {
   it('returns a server object with start and stop methods', async () => {
@@ -22,16 +22,17 @@ describe('createServer', () => {
   it('starts and stops without error', async () => {
     const server = createServer({
       ...minimalConfig,
-      spa: { ...minimalConfig.spa, port: getFreePort() },
+      app: { ...minimalConfig.app, port: getFreePort() },
     });
     server.start();
     await server.stop();
   });
 
-  it('logs startup with custom spa.name', async () => {
+  it('logs startup with custom app.name', async () => {
     const infoMessages: string[] = [];
     const server = createServer({
       ...minimalConfig,
+      app: { ...minimalConfig.app, name: 'my-app', port: getFreePort() },
       observability: {
         logger: {
           debug: () => {},
@@ -40,7 +41,6 @@ describe('createServer', () => {
           warn: () => {},
         },
       },
-      spa: { ...minimalConfig.spa, name: 'my-app', port: getFreePort() },
     });
     server.start();
     await server.stop();
@@ -48,10 +48,11 @@ describe('createServer', () => {
     expect(infoMessages[0]).toContain('my-app');
   });
 
-  it('logs startup with default spa.name', async () => {
+  it('logs startup with default app.name', async () => {
     const infoMessages: string[] = [];
     const server = createServer({
       ...minimalConfig,
+      app: { ...minimalConfig.app, port: getFreePort() },
       observability: {
         logger: {
           debug: () => {},
@@ -60,7 +61,6 @@ describe('createServer', () => {
           warn: () => {},
         },
       },
-      spa: { ...minimalConfig.spa, port: getFreePort() },
     });
     server.start();
     await server.stop();
@@ -102,6 +102,7 @@ describe('createServer', () => {
       const infoMessages: string[] = [];
       const server = createServer({
         ...minimalConfig,
+        app: { ...minimalConfig.app, port: 3999 },
         observability: {
           logger: {
             debug: () => {},
@@ -110,7 +111,6 @@ describe('createServer', () => {
             warn: () => {},
           },
         },
-        spa: { ...minimalConfig.spa, port: 3999 },
       });
       server.start();
       await server.stop();
@@ -133,7 +133,7 @@ describe('createServer', () => {
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
     const server = createServer({
       ...minimalConfig,
-      spa: { ...minimalConfig.spa, port: getFreePort() },
+      app: { ...minimalConfig.app, port: getFreePort() },
     });
     server.start();
     await server.stop();
@@ -156,7 +156,7 @@ describe('createServer', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const server = createServer({
       ...minimalConfig,
-      spa: { ...minimalConfig.spa, port: getFreePort() },
+      app: { ...minimalConfig.app, port: getFreePort() },
     });
     server.start();
     await server.stop();
@@ -168,7 +168,7 @@ describe('createServer', () => {
     const port = getFreePort();
     const server = createServer({
       ...minimalConfig,
-      spa: { ...minimalConfig.spa, port },
+      app: { ...minimalConfig.app, port },
     });
     let receivedPort: number | undefined;
     server.start((p) => {
@@ -186,6 +186,7 @@ describe('createServer', () => {
     const port = getFreePort();
     const server = createServer({
       ...minimalConfig,
+      app: { ...minimalConfig.app, name: 'test-app', port },
       observability: {
         logger: {
           debug: () => {},
@@ -194,7 +195,6 @@ describe('createServer', () => {
           warn: () => {},
         },
       },
-      spa: { ...minimalConfig.spa, name: 'test-app', port },
     });
     server.start();
     const sigtermHandler = onSpy.mock.calls.find((c: unknown[]) => c[0] === 'SIGTERM')?.[1] as
@@ -217,6 +217,7 @@ describe('createServer', () => {
     const port = getFreePort();
     const server = createServer({
       ...minimalConfig,
+      app: { ...minimalConfig.app, name: 'test-app', port },
       observability: {
         logger: {
           debug: () => {},
@@ -225,7 +226,6 @@ describe('createServer', () => {
           warn: () => {},
         },
       },
-      spa: { ...minimalConfig.spa, name: 'test-app', port },
     });
     server.start();
     const sigintHandler = onSpy.mock.calls.find((c: unknown[]) => c[0] === 'SIGINT')?.[1] as

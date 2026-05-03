@@ -14,10 +14,10 @@ const productsProxy = proxyRoute({
   target: 'http://products.internal',
   proxyPath: '/products',
   timeout: 5000,
-  identity: (ctx, claims) => ({
-    'x-user-id': claims.sub,
+  identity: (ctx, app) => ({
+    'x-user-id': app.claims?.sub,
   }),
-  transform: ({ body, headers }) => ({
+  transform: ({ method, body, headers }) => ({
     body: { ...body, source: 'halide' },
     headers,
   }),
@@ -29,8 +29,8 @@ const productsProxy = proxyRoute({
 - **`methods` is required** — unlike `apiRoute`'s optional `method`, proxy routes require an array of methods. Supported: `'get'`, `'post'`, `'put'`, `'patch'`, `'delete'`.
 - **`proxyPath` defaults to `path`** — if omitted, the route path is used as-is for path prefix rewriting.
 - **`timeout` defaults to `60000`** (60 seconds) — uses `AbortSignal.timeout()` to abort slow requests.
-- **`identity(ctx, claims)`** — only called when `claims` is defined (private routes with successful auth). Returns a record of headers to inject into the proxied request.
-- **`transform({ body, headers })`** — called when present. Body is JSON-stringified, headers are normalized to lowercase keys. Without transform, the raw request body is forwarded as-is.
+- **`identity(ctx, app)`** — only called when `app.claims` is defined (private routes with successful auth). Returns a record of headers to inject into the proxied request.
+- **`transform({ method, body, headers })`** — called when present. `method` is the lowercase HTTP method. Body is JSON-stringified, headers are normalized to lowercase keys. Without transform, the raw request body is forwarded as-is.
 
 ## Path rewriting
 

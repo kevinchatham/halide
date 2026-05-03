@@ -42,7 +42,7 @@ security: {
 - For JWKS: token is verified with `hono/jwk` middleware using RS256
 - If audience is specified, the `aud` claim is validated (supports string or array)
 - Failed auth returns `401 Unauthorized` with `{ error: 'Unauthorized' }`
-- Public routes skip auth entirely — `claims` will be `undefined` in handlers
+- Public routes skip auth entirely — `app.claims` will be `undefined` in handlers
 
 ## Authorization Functions
 
@@ -52,17 +52,17 @@ Beyond the `access: 'public' | 'private'` toggle, every route accepts an optiona
 apiRoute({
   access: 'private',
   path: '/admin/settings',
-  authorize: (ctx, claims, logger) => claims?.role === 'admin',
+  authorize: (ctx, app) => app.claims?.role === 'admin',
   handler: async () => ({ settings: '...' }),
 });
 ```
 
-The `authorize` function receives `(ctx, claims, logger)` and returns `boolean | Promise<boolean>`. Failed authorization returns `403 Forbidden` with `{ error: 'Forbidden' }`.
+The `authorize` function receives `(ctx, app)` and returns `boolean | Promise<boolean>`. Failed authorization returns `403 Forbidden` with `{ error: 'Forbidden' }`.
 
 The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.
 
 ## Claims
 
-- `claims` is populated only for private routes with successful auth
-- For public routes, `claims` will be `undefined` in handlers
-- Type claims via the `TClaims` generic on `createServer<TClaims>()`
+- `app.claims` is populated only for private routes with successful auth
+- For public routes, `app.claims` will be `undefined` in handlers
+- Type claims via `THalideApp<TClaims>` — e.g., `type App = THalideApp<UserClaims>`

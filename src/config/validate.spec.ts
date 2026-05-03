@@ -4,7 +4,7 @@ describe('validateServerConfig', () => {
   it('accepts minimal valid config', () => {
     expect(() =>
       validateServerConfig({
-        spa: { root: '/var/www' },
+        app: {},
       }),
     ).not.toThrow();
   });
@@ -12,25 +12,17 @@ describe('validateServerConfig', () => {
   it('accepts full valid config', () => {
     expect(() =>
       validateServerConfig({
+        app: { fallback: 'index.html', name: 'test' },
         security: {
           auth: { secret: () => 'secret123', strategy: 'bearer' },
           cors: { credentials: true, origin: ['http://localhost:3000'] },
           csp: { directives: { defaultSrc: ["'self'"] } },
         },
-        spa: { fallback: 'index.html', name: 'test', root: '/public' },
       }),
     ).not.toThrow();
   });
 
-  it('rejects missing spa.root', () => {
-    expect(() =>
-      validateServerConfig({
-        spa: {},
-      }),
-    ).toThrow('spa.root is required');
-  });
-
-  it('rejects missing spa', () => {
-    expect(() => validateServerConfig({})).toThrow('spa.root is required');
+  it('accepts empty config (no spa required anymore)', () => {
+    expect(() => validateServerConfig({})).not.toThrow();
   });
 });

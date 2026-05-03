@@ -1,10 +1,16 @@
-import type { Logger } from '../types';
+import type { AuthorizeFn, Logger, RequestContext } from '../types';
 
 /**
  * Default configuration values used when options are omitted.
  * These are applied during server creation in `createApp` and `createServer`.
  */
 export const DEFAULTS = {
+  app: {
+    apiPrefix: '/api',
+    fallback: 'index.html',
+    name: 'app',
+    port: 3553,
+  },
   auth: {
     secretTtl: 60,
   },
@@ -53,26 +59,22 @@ export const DEFAULTS = {
   route: {
     method: 'get' as const,
   },
-  spa: {
-    apiPrefix: '/api',
-    fallback: 'index.html',
-    name: 'app',
-    port: 3553,
-  },
 } as const;
 
 /** Default authorization function that allows all requests. */
-export const defaultAuthorize = async (): Promise<boolean> => true;
+export const defaultAuthorize: AuthorizeFn<unknown> = async (_ctx: RequestContext, _app: unknown) =>
+  true;
 
 /**
  * Create a noop logger that discards all log messages.
+ * @typeParam T - The type of the log scope (defaults to unknown).
  * @returns A {@link Logger} implementation where all methods are no-ops.
  */
-export function createNoopLogger(): Logger {
+export function createNoopLogger<T = unknown>(): Logger<T> {
   return {
-    debug: (..._args) => {},
-    error: (..._args) => {},
-    info: (..._args) => {},
-    warn: (..._args) => {},
+    debug: (_scope: T) => {},
+    error: (_scope: T) => {},
+    info: (_scope: T) => {},
+    warn: (_scope: T) => {},
   };
 }

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Logger } from '../types';
 import { createErrorHandler } from './errorHandler';
 
-const logger: Logger = {
+const logger: Logger<unknown> = {
   debug: vi.fn(),
   error: vi.fn(),
   info: vi.fn(),
@@ -10,19 +10,6 @@ const logger: Logger = {
 };
 
 describe('createErrorHandler', () => {
-  it('logs the error with method and path', () => {
-    const app = new Hono();
-    const handler = createErrorHandler(logger);
-    app.onError(handler);
-    app.get('/test', () => {
-      throw new Error('Test error');
-    });
-
-    app.request('/test');
-
-    expect(logger.error).toHaveBeenCalledWith('[error] GET /test:', expect.any(Error));
-  });
-
   it('returns 500 with error message', async () => {
     const app = new Hono();
     const handler = createErrorHandler(logger);
@@ -62,6 +49,5 @@ describe('createErrorHandler', () => {
     handler('string error', mockContext);
 
     expect(mockJson).toHaveBeenCalledWith({ error: 'Internal Server Error' }, 500);
-    expect(logger.error).toHaveBeenCalledWith('[error] GET /test:', expect.any(Error));
   });
 });

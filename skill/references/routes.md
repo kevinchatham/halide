@@ -5,13 +5,15 @@
 Created with `apiRoute()`. These are handler functions that compose and return data directly.
 
 ```typescript
+type App = THalideApp<UserClaims>;
+
 apiRoute({
   access: 'public' | 'private',    // REQUIRED
   path: '/api/health',             // REQUIRED — must start with /
   method: 'get',                   // default: 'get'
-  handler: async (ctx, claims, logger) => ({ status: 'ok' }),  // REQUIRED
-  validationSchema: MyZodSchema,   // optional — Zod schema for body validation
-  authorize: (ctx, claims, logger) => true,  // auto-filled by factory
+  handler: async (ctx, app) => ({ status: 'ok' }),  // REQUIRED
+  requestSchema: MyZodSchema,   // optional — Zod schema for body validation
+  authorize: (ctx, app) => true,  // auto-filled by factory
   observe: true,                   // optional — set false to skip observability hooks
   openapi: { ... },                // optional — OpenAPI metadata
 })
@@ -20,18 +22,18 @@ apiRoute({
 ### Handler Signature
 
 ```typescript
-handler: (ctx: RequestContext & { body: TBody }, claims: TClaims | undefined, logger: Logger) =>
-  Promise<unknown>;
+handler: (ctx: RequestContext & { body: TBody }, app: THalideApp) => Promise<unknown>;
 ```
 
 - `ctx` is a **plain object** (NOT a Hono Context) with `{ method, path, headers, params, query, body }`
-- `claims` is populated only for private routes with successful auth
-- `logger` is the configured Logger (defaults to no-op if omitted)
+- `app` is a `THalideApp` containing `claims` and `logger`
+- `app.claims` is populated only for private routes with successful auth
+- `app.logger` is the configured Logger (defaults to no-op if omitted)
 - Return value is automatically JSON-serialized via `c.json(result)`
 
 ### Body Validation
 
-Attach a Zod schema with `validationSchema`. The body is parsed and validated before the handler runs. Failed validation returns `400 Bad Request`.
+Attach a Zod schema with `requestSchema`. The body is parsed and validated before the handler runs. Failed validation returns `400 Bad Request`.
 
 ```typescript
 import { z } from 'zod';
@@ -45,12 +47,12 @@ apiRoute({
   access: 'private',
   path: '/users',
   method: 'post',
-  validationSchema: CreateUserSchema,
-  handler: async (ctx) => createUser(ctx.body),
+  requestSchema: CreateUserSchema,
+  handler: async (ctx, app) => createUser(ctx.body),
 });
 ```
 
-For routes without `validationSchema`, the body is parsed from JSON for POST/PUT/PATCH requests (returns `undefined` if parsing fails).
+For routes without `requestSchema`, the body is parsed from JSON for POST/PUT/PATCH requests (returns `undefined` if parsing fails).
 
 ### Supported Methods
 
@@ -61,6 +63,8 @@ For routes without `validationSchema`, the body is parsed from JSON for POST/PUT
 Created with `proxyRoute()`. These forward requests to backend services.
 
 ```typescript
+type App = THalideApp<UserClaims>;
+
 proxyRoute({
   access: 'public' | 'private',    // REQUIRED
   path: '/api/products',           // REQUIRED — must start with /
@@ -68,9 +72,9 @@ proxyRoute({
   target: 'http://products.internal',  // REQUIRED
   proxyPath: '/products',          // optional — rewrites path prefix (defaults to path)
   timeout: 5000,                   // optional — ms, default: 60000
-  identity: (ctx, claims) => ({ 'x-user-id': claims.sub }),  // optional
-  transform: ({ body, headers }) => ({ body, headers }),     // optional
-  authorize: (ctx, claims, logger) => true,  // auto-filled by factory
+  identity: (ctx, app) => ({ 'x-user-id': app.claims?.sub }),  // optional
+  transform: ({ method, body, headers }) => ({ body, headers }), // optional
+  authorize: (ctx, app) => true,  // auto-filled by factory
   observe: true,                   // optional
   openapi: { ... },                // optional
 })
@@ -115,21 +119,21 @@ This prevents routing issues with CDNs (like Akamai) that use the `host` header 
 
 ### Identity Headers
 
-The `identity` function receives `(ctx, claims)` and returns a `Record<string, string>` of headers to inject into the proxied request. Only called when `claims` is defined (i.e., private routes with successful auth).
+The `identity` function receives `(ctx, app)` and returns a `Record<string, string>` of headers to inject into the proxied request. Only called when `app.claims` is defined (i.e., private routes with successful auth).
 
 ```typescript
-identity: (ctx, claims) => ({
-  'x-user-id': claims.sub,
-  'x-user-role': claims.role,
+identity: (ctx, app) => ({
+  'x-user-id': app.claims?.sub,
+  'x-user-role': app.claims?.role,
 });
 ```
 
 ### Transform
 
-The `transform` function receives `{ body, headers }` and returns `{ body, headers }` to modify the request before proxying. The body is JSON-stringified. Headers are normalized to lowercase keys.
+The `transform` function receives `{ method, body, headers }` and returns `{ body, headers }` to modify the request before proxying. `method` is the lowercase HTTP method. The body is JSON-stringified. Headers are normalized to lowercase keys.
 
 ```typescript
-transform: ({ body, headers }) => ({
+transform: ({ method, body, headers }) => ({
   body: { ...body, source: 'halide' },
   headers: { ...headers, 'x-proxy': 'true' },
 });

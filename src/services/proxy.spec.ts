@@ -1,13 +1,18 @@
 import { Hono } from 'hono';
-import type { Logger, ProxyRoute } from '../types';
+import type { Logger, ProxyRoute, THalideApp } from '../types';
 import { createProxyService } from './proxy';
 
-const noopLogger: Logger = {
-  debug: vi.fn(),
-  error: vi.fn(),
-  info: vi.fn(),
-  warn: vi.fn(),
+const noopLogger: Logger<unknown> = {
+  debug: (_scope: unknown) => {},
+  error: (_scope: unknown) => {},
+  info: (_scope: unknown) => {},
+  warn: (_scope: unknown) => {},
 };
+
+const createApp = (claims?: unknown): THalideApp => ({
+  claims,
+  logger: noopLogger,
+});
 
 describe('createProxyService', () => {
   it('creates a handler function', () => {
@@ -19,7 +24,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
     expect(typeof handler).toBe('function');
   });
 
@@ -32,7 +37,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
     expect(typeof handler).toBe('function');
   });
 
@@ -46,7 +51,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
     expect(typeof handler).toBe('function');
   });
 
@@ -60,15 +65,15 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger);
+    const handler = createProxyService(route, createApp());
     expect(typeof handler).toBe('function');
   });
 
   it('applies identity headers when claims are provided', async () => {
     const route: ProxyRoute = {
       access: 'private',
-      identity: (_ctx: unknown, claims: unknown) => ({
-        'x-user-id': (claims as { sub: string }).sub,
+      identity: (_ctx: unknown, app: THalideApp) => ({
+        'x-user-id': (app.claims as { sub: string }).sub,
       }),
       methods: ['get'],
       path: '/api/users',
@@ -76,13 +81,13 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const claims = { role: 'admin', sub: 'user-123' };
-    const handler = createProxyService(route, claims, noopLogger);
+    const app = createApp({ role: 'admin', sub: 'user-123' });
+    const handler = createProxyService(route, app);
 
-    const app = new Hono();
-    app.get('/api/users', handler);
+    const honoApp = new Hono();
+    honoApp.get('/api/users', handler);
 
-    const res = await app.request('/api/users');
+    const res = await honoApp.request('/api/users');
     expect(res.status).toBeLessThan(600);
   });
 
@@ -101,7 +106,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, undefined, noopLogger, { original: true });
+    const handler = createProxyService(route, createApp(), { original: true });
 
     const app = new Hono<{ Variables: { rawBody?: unknown } }>();
     app.post('/api/data', handler);
@@ -113,6 +118,7 @@ describe('createProxyService', () => {
     });
 
     expect(transformFn).toHaveBeenCalled();
+    expect(transformFn.mock.calls[0]![0].method).toBe('post');
     expect(transformFn.mock.calls[0]![0].body).toEqual({ original: true });
   });
 });

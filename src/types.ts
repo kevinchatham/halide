@@ -80,10 +80,6 @@ export type OpenApiRouteMeta = {
   description?: string;
   /** Tags for grouping routes in the OpenAPI UI. */
   tags?: string[];
-  /** Zod schema for the request body. Overrides validationSchema for documentation purposes. */
-  requestSchema?: ZodSchema;
-  /** Zod schema for the response body. */
-  responseSchema?: ZodSchema;
   /** Map of HTTP status codes to response definitions. */
   responses?: Record<number, { description: string; schema?: ZodSchema }>;
 };
@@ -116,47 +112,71 @@ export type ResponseContext = {
   durationMs: number;
   /** Error thrown during request processing, if any. */
   error?: Error;
+  /** Response body, if available. */
+  body?: unknown;
 };
 
 /**
  * Logging interface for observability.
+ * @typeParam TLogScope - The type of the structured log scope object passed to each log method.
  */
-export type Logger = {
+export type Logger<TLogScope = unknown> = {
   /** Log a debug-level message. */
-  debug: (...args: unknown[]) => void;
+  debug: (scope: TLogScope, ...args: unknown[]) => void;
   /** Log an error-level message. */
-  error: (...args: unknown[]) => void;
+  error: (scope: TLogScope, ...args: unknown[]) => void;
   /** Log an info-level message. */
-  info: (...args: unknown[]) => void;
+  info: (scope: TLogScope, ...args: unknown[]) => void;
   /** Log a warning-level message. */
-  warn: (...args: unknown[]) => void;
+  warn: (scope: TLogScope, ...args: unknown[]) => void;
+};
+
+/**
+ * Bundled app context type that combines claims and logger.
+ * Passed to handlers instead of separate claims and logger parameters.
+ *
+ * @example
+ * ```ts
+ * type MyApp = THalideApp<UserClaims, { requestId: string }>;
+ *
+ * apiRoute({
+ *   access: 'private',
+ *   path: '/users',
+ *   handler: async (ctx, app: MyApp) => {
+ *     app.logger.info({ requestId: app.claims.sub }, 'fetching user');
+ *   },
+ * });
+ * ```
+ */
+export type THalideApp<TClaims = unknown, TLogScope = unknown> = {
+  /** Decoded JWT claims from the request (undefined if not authenticated). */
+  claims: TClaims | undefined;
+  /** Logger instance for recording observability events. */
+  logger: Logger<TLogScope>;
 };
 
 /**
  * Handler function for API routes.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteHandler<TClaims, TBody = unknown> = (
+export type ApiRouteHandler<TApp = THalideApp, TBody = unknown, TResponse = unknown> = (
   /** Request context including path, method, headers, params, query, and body. */
   ctx: RequestContext & { body: TBody },
-  /** Decoded JWT claims from the request (undefined if not authenticated). */
-  claims: TClaims | undefined,
-  /** Logger instance for recording observability events. */
-  logger: Logger,
-) => Promise<unknown>;
+  /** Bundled app context with claims and logger. */
+  app: TApp,
+) => Promise<TResponse>;
 
 /**
  * Authorization function that determines if a request should be allowed.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type AuthorizeFn<TClaims> = (
+export type AuthorizeFn<TApp = THalideApp> = (
   /** Normalized request context. */
   ctx: RequestContext,
-  /** Decoded JWT claims from the request (undefined if not authenticated). */
-  claims: TClaims | undefined,
-  /** Logger instance for recording authorization decisions. */
-  logger: Logger,
+  /** Bundled app context with claims and logger. */
+  app: TApp,
 ) => boolean | Promise<boolean>;
 
 /**
@@ -164,6 +184,8 @@ export type AuthorizeFn<TClaims> = (
  * Allows transforming the request body and headers before forwarding.
  */
 export type TransformFn = (request: {
+  /** HTTP method in lowercase. */
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
   /** Request body to transform. */
   body: unknown;
   /** Request headers to transform. */
@@ -176,17 +198,17 @@ export type TransformFn = (request: {
 };
 
 /**
- * Configuration for SPA (Single Page Application) hosting.
- * The spa.root property is required; all other properties have sensible defaults.
+ * Configuration for app hosting (static files and/or API backend).
+ * The app.root property is not required when using as a pure backend.
  */
-export type SpaConfig = {
+export type AppConfig = {
   /**
-   * URL prefix that should return 404 instead of the SPA fallback.
+   * URL prefix that should return 404 instead of the app fallback.
    * Defaults to '/api'.
    */
   apiPrefix?: string;
   /**
-   * Fallback file to serve when no route matches (for SPA client-side routing).
+   * Fallback file to serve when no route matches (for app client-side routing).
    * Defaults to 'index.html'.
    */
   fallback?: string;
@@ -200,16 +222,17 @@ export type SpaConfig = {
    */
   port?: number;
   /**
-   * Root directory containing the SPA static files. This is required.
+   * Root directory containing the app static files. Optional when not serving static files.
+   * Can be an absolute path (e.g. '/var/www/app') or a relative path from the current working directory.
    */
-  root: string;
+  root?: string;
 };
 
 /**
  * Configuration for observability features: logging, request IDs, and lifecycle hooks.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ObservabilityConfig<TClaims = unknown> = {
+export type ObservabilityConfig<TApp = THalideApp> = {
   /**
    * Enable x-request-id header propagation. If an incoming request has an
    * x-request-id header, it is reused; otherwise a new UUID is generated.
@@ -219,17 +242,15 @@ export type ObservabilityConfig<TClaims = unknown> = {
   /**
    * Logger instance. If not provided, a noop logger is used.
    */
-  logger?: Logger;
+  logger?: Logger<unknown>;
   /**
    * Hook called before each request is handled. Use for logging, metrics, or request tracing.
    */
   onRequest?: (
     /** Normalized request context. */
     ctx: RequestContext,
-    /** Decoded JWT claims, if authenticated. */
-    claims: TClaims | undefined,
-    /** Logger instance. */
-    logger: Logger,
+    /** Bundled app context with claims and logger. */
+    app: TApp,
   ) => void | Promise<void>;
   /**
    * Hook called after each response is sent. Use for logging response times and status codes.
@@ -237,12 +258,10 @@ export type ObservabilityConfig<TClaims = unknown> = {
   onResponse?: (
     /** Normalized request context. */
     ctx: RequestContext,
-    /** Decoded JWT claims, if authenticated. */
-    claims: TClaims | undefined,
+    /** Bundled app context with claims and logger. */
+    app: TApp,
     /** Response context including status code and duration. */
     response: ResponseContext,
-    /** Logger instance. */
-    logger: Logger,
   ) => void | Promise<void>;
 };
 
@@ -341,19 +360,19 @@ export type OpenApiConfig = {
 
 /**
  * Complete configuration for a Halide server.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ServerConfig<TClaims = unknown> = {
+export type ServerConfig<TApp = THalideApp> = {
   /** Observability configuration: logging, request IDs, and lifecycle hooks. */
-  observability?: ObservabilityConfig<TClaims>;
+  observability?: ObservabilityConfig<TApp>;
   /** API route definitions. Each route maps a path+method to a handler function. */
-  apiRoutes?: ApiRoute<TClaims, unknown>[];
+  apiRoutes?: ApiRoute<TApp, unknown, unknown>[];
   /** Proxy route definitions. Each route forwards requests to an upstream target. */
-  proxyRoutes?: ProxyRoute<TClaims>[];
+  proxyRoutes?: ProxyRoute<TApp>[];
   /** Security configuration: auth, CORS, CSP, rate limiting. */
   security?: SecurityConfig;
-  /** SPA hosting configuration. This is the only required config section. */
-  spa: SpaConfig;
+  /** App hosting configuration (static files and/or API backend). Optional when not serving static files. */
+  app?: AppConfig;
   /** OpenAPI/Scalar documentation UI configuration. */
   openapi?: OpenApiConfig;
 };
@@ -361,10 +380,11 @@ export type ServerConfig<TClaims = unknown> = {
 /**
  * Definition of an API route that executes a handler function.
  * Created via the {@link apiRoute} factory function.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  */
-export type ApiRoute<TClaims = unknown, TBody = unknown> = {
+export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP method for this route. Defaults to GET. */
@@ -376,11 +396,13 @@ export type ApiRoute<TClaims = unknown, TBody = unknown> = {
   /** Route type discriminator. Set automatically by {@link apiRoute}. */
   type: 'api';
   /** Authorization function called after JWT validation. */
-  authorize?: AuthorizeFn<TClaims>;
+  authorize?: AuthorizeFn<TApp>;
   /** Handler function that processes the request and returns a response. */
-  handler: ApiRouteHandler<TClaims, TBody>;
-  /** Zod schema for validating the request body. */
-  validationSchema?: ZodSchema<TBody>;
+  handler: ApiRouteHandler<TApp, TBody, TResponse>;
+  /** Zod schema for validating the request body and documenting it in OpenAPI. */
+  requestSchema?: ZodSchema<TBody>;
+  /** Zod schema for documenting the response body in OpenAPI. */
+  responseSchema?: ZodSchema<TResponse>;
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
 };
@@ -388,9 +410,9 @@ export type ApiRoute<TClaims = unknown, TBody = unknown> = {
 /**
  * Definition of a proxy route that forwards requests to an upstream target.
  * Created via the {@link proxyRoute} factory function.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ProxyRoute<TClaims = unknown> = {
+export type ProxyRoute<TApp = THalideApp> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP methods this proxy route handles. At least one is required. */
@@ -408,12 +430,12 @@ export type ProxyRoute<TClaims = unknown> = {
   /** Route type discriminator. Set automatically by {@link proxyRoute}. */
   type: 'proxy';
   /** Authorization function called after JWT validation. */
-  authorize?: AuthorizeFn<TClaims>;
+  authorize?: AuthorizeFn<TApp>;
   /**
    * Function to extract identity headers from claims and add to the upstream request.
    * Useful for passing user ID or tenant info to the backend.
    */
-  identity?: (ctx: RequestContext, claims: TClaims) => Record<string, string> | undefined;
+  identity?: (ctx: RequestContext, app: TApp) => Record<string, string> | undefined;
   /** Transform function to modify the request body/headers before forwarding. */
   transform?: TransformFn;
   /** OpenAPI/Scalar metadata for documentation. */
@@ -421,33 +443,35 @@ export type ProxyRoute<TClaims = unknown> = {
 };
 
 /**
- * Union type for any route (API or proxy).
- * @typeParam TClaims - The type of the decoded JWT claims object.
- * @typeParam TBody - The type of the request body (for API routes).
- */
-export type Route<TClaims = unknown, TBody = unknown> =
-  | ApiRoute<TClaims, TBody>
-  | ProxyRoute<TClaims>;
-
-/**
  * Input type for creating an API route via the factory function.
  * Omits 'type', 'authorize' (has default), and 'handler' (required).
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteInput<TClaims, TBody = unknown> = Omit<
-  ApiRoute<TClaims, TBody>,
+export type ApiRouteInput<TApp, TBody = unknown, TResponse = unknown> = Omit<
+  ApiRoute<TApp, TBody, TResponse>,
   'type' | 'authorize' | 'handler'
 > & {
   /** Handler function that processes the request and returns a response. */
-  handler: ApiRouteHandler<TClaims, TBody>;
+  handler: ApiRouteHandler<TApp, TBody, TResponse>;
   /** Authorization function called after JWT validation. */
-  authorize?: AuthorizeFn<TClaims>;
+  authorize?: AuthorizeFn<TApp>;
 };
 
 /**
  * Input type for creating a proxy route via the factory function.
  * Omits 'type' which is set automatically.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ProxyRouteInput<TClaims> = Omit<ProxyRoute<TClaims>, 'type'>;
+export type ProxyRouteInput<TApp = THalideApp> = Omit<ProxyRoute<TApp>, 'type'>;
+
+/**
+ * Union of all route types.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
+ */
+export type Route<TApp = THalideApp, TBody = unknown, TResponse = unknown> =
+  | ApiRoute<TApp, TBody, TResponse>
+  | ProxyRoute<TApp>;

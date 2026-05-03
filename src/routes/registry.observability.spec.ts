@@ -4,7 +4,7 @@ import { createOpenApiRoutes } from '../middleware/swagger';
 import type { Logger, ServerConfig } from '../types';
 import { registerRoutes } from './registry';
 
-const noopLogger: Logger = createNoopLogger();
+const noopLogger: Logger<unknown> = createNoopLogger();
 
 type HalideVariables = { rawBody?: unknown };
 
@@ -30,8 +30,8 @@ describe('registerRoutes — observability', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         observability: { onRequest, onResponse },
-        spa: { root: '/var/www' },
       });
 
       await app.request('/items');
@@ -54,8 +54,8 @@ describe('registerRoutes — observability', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         observability: { onRequest, onResponse },
-        spa: { root: '/var/www' },
       });
 
       await app.request('/items');
@@ -74,8 +74,8 @@ describe('registerRoutes — observability', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         observability: {},
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -100,8 +100,8 @@ describe('registerRoutes — observability', () => {
               type: 'api',
             },
           ],
+          app: { root: '/var/www' },
           observability: { onResponse },
-          spa: { root: '/var/www' },
         },
         noopLogger,
       );
@@ -112,6 +112,29 @@ describe('registerRoutes — observability', () => {
       const call = onResponse.mock.calls[0]!;
       expect(call[2].statusCode).toBe(500);
       expect(call[2].error).toBeInstanceOf(Error);
+    });
+
+    it('passes response body to onResponse hook', async () => {
+      const onResponse = vi.fn();
+
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ data: [1, 2, 3], ok: true }),
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+        observability: { onResponse },
+      });
+
+      await app.request('/items');
+
+      expect(onResponse).toHaveBeenCalledTimes(1);
+      const call = onResponse.mock.calls[0]!;
+      expect(call[2].body).toEqual({ data: [1, 2, 3], ok: true });
     });
   });
 });

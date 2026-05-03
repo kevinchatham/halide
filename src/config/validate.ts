@@ -1,12 +1,12 @@
-import type { CorsConfig, CspOptions, Route, SecurityConfig, SpaConfig } from '../types';
+import type { AppConfig, CorsConfig, CspOptions, Route, SecurityConfig } from '../types';
 
 /** Input type for route validation. */
-type RouteInput<TClaims = unknown> =
-  | Partial<Extract<Route<TClaims>, { type: 'api' }>>
-  | Partial<Extract<Route<TClaims>, { type: 'proxy' }>>;
+type RouteInput<TApp = unknown> =
+  | Partial<Extract<Route<TApp>, { type: 'api' }>>
+  | Partial<Extract<Route<TApp>, { type: 'proxy' }>>;
 
-/** Input type for SPA config validation. */
-type SpaInput = Partial<SpaConfig>;
+/** Input type for app config validation. */
+type AppInput = Partial<AppConfig>;
 
 /** Input type for CORS config validation. */
 type CorsInput = Partial<CorsConfig>;
@@ -23,28 +23,25 @@ type SecurityInput = {
 };
 
 /** Input type for server config validation. */
-type ServerConfigInput<TClaims = unknown> = {
-  spa?: SpaInput;
-  apiRoutes?: RouteInput<TClaims>[];
-  proxyRoutes?: RouteInput<TClaims>[];
+type ServerConfigInput<TApp = unknown> = {
+  app?: AppInput;
+  apiRoutes?: RouteInput<TApp>[];
+  proxyRoutes?: RouteInput<TApp>[];
   observability?: unknown;
   security?: SecurityInput;
 };
 
-/** Validate that SPA config is valid. */
-function validateSpaConfig(spa?: SpaInput): void {
-  if (!spa?.root) {
-    throw new Error('spa.root is required');
-  }
-  if (spa.port !== undefined) {
-    if (!Number.isInteger(spa.port) || spa.port < 1 || spa.port > 65535) {
-      throw new Error('spa.port must be an integer between 1 and 65535');
+/** Validate that app config is valid (only validates port if app is provided). */
+function validateAppConfig(app?: AppInput): void {
+  if (app?.port !== undefined) {
+    if (!Number.isInteger(app.port) || app.port < 1 || app.port > 65535) {
+      throw new Error('app.port must be an integer between 1 and 65535');
     }
   }
 }
 
 /** Validate a single route configuration. */
-function validateRoute<TClaims = unknown>(route: RouteInput<TClaims>): void {
+function validateRoute<TApp = unknown>(route: RouteInput<TApp>): void {
   if (!route.path?.startsWith('/')) {
     throw new Error(`Route path must start with / (${route.type ?? 'api'}): ${route.path}`);
   }
@@ -66,7 +63,7 @@ function validateRoute<TClaims = unknown>(route: RouteInput<TClaims>): void {
 }
 
 /** Validate an array of routes. */
-function validateRoutes<TClaims = unknown>(routes?: RouteInput<TClaims>[]): void {
+function validateRoutes<TApp = unknown>(routes?: RouteInput<TApp>[]): void {
   if (!routes) return;
   for (const route of routes) {
     validateRoute(route);
@@ -74,8 +71,8 @@ function validateRoutes<TClaims = unknown>(routes?: RouteInput<TClaims>[]): void
 }
 
 /** Validate that auth config exists if any routes require authentication. */
-function validateSecurityForRoutes<TClaims = unknown>(
-  routes?: RouteInput<TClaims>[],
+function validateSecurityForRoutes<TApp = unknown>(
+  routes?: RouteInput<TApp>[],
   security?: SecurityInput,
 ): void {
   const hasPrivateRoute = routes?.some((r) => r.access === 'private');
@@ -123,11 +120,11 @@ function validateCspDirectives(csp?: CspOptions): void {
 /**
  * Validate a server configuration object.
  * Throws descriptive errors for invalid configurations.
- * @typeParam TClaims - The type of the decoded JWT claims object.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration to validate.
  */
-export function validateServerConfig<TClaims = unknown>(config: ServerConfigInput<TClaims>): void {
-  validateSpaConfig(config.spa);
+export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<TApp>): void {
+  validateAppConfig(config.app);
   validateRoutes(config.apiRoutes);
   validateRoutes(config.proxyRoutes);
   validateSecurityForRoutes(

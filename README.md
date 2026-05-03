@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
-    <img src="https://img.shields.io/badge/docs-0.0.8-cyan" alt="Documentation"/>
+    <img src="https://img.shields.io/badge/docs-0.0.9-cyan" alt="Documentation"/>
   </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
@@ -31,6 +31,8 @@ Halide is not an API gateway, a service mesh, or a full backend framework. It is
 
 ## Get started
 
+See the [demo app](https://github.com/kevinchatham/halide-demo) for a complete example.
+
 Run Halide in an empty project (`npm init`) or add it directly to your existing frontend project. The server runs as a standalone process alongside your SPA build tooling.
 
 ```bash
@@ -44,7 +46,7 @@ This automatically:
 3. Scaffolds a `server.ts` entry point with a health route
 4. Creates `tsconfig.server.json` and updates project references
 5. Adds `halide:start` and `halide:build` scripts to `package.json`
-6. Installs agent skill via `npx skills add kevinchatham/halide`
+6. Installs agent skill via native copy from node_modules/halide/skill/
 
 ### Manual Installation
 
@@ -77,7 +79,7 @@ import { healthRoute, userProxyRoute } from './routes';
 import { createServer, type ServerConfig } from 'halide';
 
 const config: ServerConfig = {
-  spa: {
+  app: {
     root: './browser',
   },
   security: {
@@ -100,7 +102,7 @@ server.start((port) => console.log(`Serving on ${port}`));
 npx tsx server.ts
 ```
 
-> The server starts on port 3553. Override with `spa.port` or the `PORT` environment variable.
+> The server starts on port 3553. Override with `app.port` or the `PORT` environment variable.
 
 ## Why Halide?
 

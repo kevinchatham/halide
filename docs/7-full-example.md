@@ -9,13 +9,15 @@ interface UserClaims {
   role: 'admin' | 'user';
 }
 
+type App = THalideApp<UserClaims>;
+
 const CreateUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
 });
 
-const server = createServer<UserClaims>({
-  spa: {
+const server = createServer<App>({
+  app: {
     name: 'dashboard',
     root: './dist/browser',
   },
@@ -45,11 +47,11 @@ const server = createServer<UserClaims>({
 
   observability: {
     requestId: true,
-    onRequest: (ctx, claims, logger) => {
-      logger.info(`[Request] ${ctx.method} ${ctx.path} user=${claims?.sub ?? 'anon'}`);
+    onRequest: (ctx, app) => {
+      app.logger.info(`[Request] ${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`);
     },
-    onResponse: (ctx, claims, { statusCode, durationMs }, logger) => {
-      logger.info(`[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`);
+    onResponse: (ctx, app, { statusCode, durationMs }) => {
+      app.logger.info(`[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`);
     },
   },
 
@@ -68,13 +70,13 @@ const server = createServer<UserClaims>({
       access: 'private',
       path: '/users',
       method: 'post',
-      validationSchema: CreateUserSchema,
+      requestSchema: CreateUserSchema,
+      responseSchema: z.object({ id: z.string(), email: z.string(), name: z.string() }),
       openapi: {
         summary: 'Create a user',
         tags: ['Users'],
-        responseSchema: z.object({ id: z.string(), email: z.string(), name: z.string() }),
       },
-      handler: async (ctx, claims, logger) => ({
+      handler: async (ctx, app) => ({
         id: crypto.randomUUID(),
         email: ctx.body.email,
         name: ctx.body.name,
@@ -83,7 +85,7 @@ const server = createServer<UserClaims>({
     apiRoute({
       access: 'private',
       path: '/admin/settings',
-      authorize: (_ctx, claims) => claims.role === 'admin',
+      authorize: (_ctx, app) => app.claims?.role === 'admin',
       handler: async () => ({ maintenance: false }),
     }),
   ],
@@ -95,7 +97,7 @@ const server = createServer<UserClaims>({
       methods: ['get'],
       target: 'http://orders.internal:8080',
       proxyPath: '/orders',
-      identity: (_ctx, claims) => ({ 'x-user-id': claims.sub }),
+      identity: (_ctx, app) => ({ 'x-user-id': app.claims?.sub }),
     }),
   ],
 

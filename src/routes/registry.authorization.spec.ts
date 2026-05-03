@@ -4,7 +4,7 @@ import { createOpenApiRoutes } from '../middleware/swagger';
 import type { Logger, ServerConfig } from '../types';
 import { registerRoutes } from './registry';
 
-const noopLogger: Logger = createNoopLogger();
+const noopLogger: Logger<unknown> = createNoopLogger();
 
 type HalideVariables = { rawBody?: unknown };
 
@@ -28,7 +28,7 @@ describe('registerRoutes — authorization', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -48,7 +48,7 @@ describe('registerRoutes — authorization', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -68,7 +68,7 @@ describe('registerRoutes — authorization', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -79,6 +79,7 @@ describe('registerRoutes — authorization', () => {
   describe('Proxy authorization', () => {
     it('returns 403 when proxy authorize returns false', async () => {
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -89,7 +90,6 @@ describe('registerRoutes — authorization', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/admin');
@@ -98,6 +98,7 @@ describe('registerRoutes — authorization', () => {
 
     it('returns 403 when proxy authorize throws', async () => {
       const app = await createTestApp({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -110,7 +111,6 @@ describe('registerRoutes — authorization', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/admin');

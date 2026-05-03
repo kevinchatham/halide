@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addScriptsToPackageJson, addTypeModuleToPackageJson } from './init';
+import { addScriptsToPackageJson } from './init';
 
 const mockExecSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
@@ -146,66 +146,5 @@ describe('addScriptsToPackageJson', () => {
     expect((parsed.scripts as Record<string, string>)['halide:build']).toBe(
       'tsc --project tsconfig.server.json',
     );
-  });
-});
-
-describe('addTypeModuleToPackageJson', () => {
-  const projectDir = '/fake/project';
-
-  beforeEach(() => {
-    vi.stubEnv('PATH', '/usr/bin');
-    process.cwd = (): string => projectDir;
-  });
-
-  afterEach(() => {
-    process.cwd = originalCwd;
-    vi.clearAllMocks();
-  });
-
-  it('adds "type": "module" when it does not exist', () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0","name":"my-app"}';
-      return '';
-    });
-
-    addTypeModuleToPackageJson(projectDir);
-
-    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('package.json'),
-    );
-    expect(written).toBeDefined();
-    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
-    expect(parsed.type).toBe('module');
-  });
-
-  it('skips when "type": "module" already exists', () => {
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0","type":"module"}';
-      return '';
-    });
-
-    addTypeModuleToPackageJson(projectDir);
-
-    const writeCall = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('package.json'),
-    );
-    expect(writeCall).toBeUndefined();
-  });
-
-  it('overwrites when "type" is set to "commonjs"', () => {
-    mockReadFileSync.mockImplementation((p: string) => {
-      if (p.endsWith('package.json')) return '{"version":"0.0.0","type":"commonjs"}';
-      return '';
-    });
-
-    addTypeModuleToPackageJson(projectDir);
-
-    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
-      String(c[0]).endsWith('package.json'),
-    );
-    expect(written).toBeDefined();
-    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
-    expect(parsed.type).toBe('module');
   });
 });

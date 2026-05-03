@@ -1,4 +1,4 @@
 sonar.exclusions=**/*.spec.ts,scripts/**/*.*,src/demo.ts
-sonar.host.url=http://desktop:9000
+sonar.host.url=http://localhost:9000
 sonar.projectKey=halide
 sonar.typescript.lcov.reportPaths=coverage/lcov.info

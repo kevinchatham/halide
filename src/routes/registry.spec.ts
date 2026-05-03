@@ -5,7 +5,7 @@ import { createOpenApiRoutes } from '../middleware/swagger';
 import type { Logger, ServerConfig } from '../types';
 import { registerRoutes } from './registry';
 
-const noopLogger: Logger = createNoopLogger();
+const noopLogger: Logger<unknown> = createNoopLogger();
 
 type HalideVariables = { rawBody?: unknown };
 
@@ -19,8 +19,8 @@ function createTestApp(config: ServerConfig): Hono<{ Variables: HalideVariables 
 describe('registerRoutes', () => {
   it('does nothing when routes is missing', async () => {
     const app = createTestApp({
+      app: { root: '/var/www' },
       security: { auth: { secret: () => 'test-secret', strategy: 'bearer' } },
-      spa: { root: '/var/www' },
     });
 
     const res = await app.request('/nonexistent');
@@ -38,7 +38,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items');
@@ -57,7 +57,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/data');
@@ -75,7 +75,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items', { method: 'POST' });
@@ -93,7 +93,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items/123', { method: 'PUT' });
@@ -111,7 +111,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items/123', { method: 'DELETE' });
@@ -134,7 +134,7 @@ describe('registerRoutes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res1 = await app.request('/public');
@@ -146,7 +146,7 @@ describe('registerRoutes', () => {
   });
 
   describe('Validation', () => {
-    it('registers routes with validation schema', async () => {
+    it('registers routes with request schema', async () => {
       const app = createTestApp({
         apiRoutes: [
           {
@@ -154,11 +154,11 @@ describe('registerRoutes', () => {
             handler: async (ctx: unknown) => ({ received: (ctx as { body: unknown }).body }),
             method: 'post',
             path: '/items',
+            requestSchema: z.object({ name: z.string() }),
             type: 'api',
-            validationSchema: z.object({ name: z.string() }),
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items', {
@@ -169,7 +169,7 @@ describe('registerRoutes', () => {
       expect(res.status).toBe(200);
     });
 
-    it('returns 400 for invalid body with validation schema', async () => {
+    it('returns 400 for invalid body with request schema', async () => {
       const app = createTestApp({
         apiRoutes: [
           {
@@ -177,11 +177,11 @@ describe('registerRoutes', () => {
             handler: async (ctx: unknown) => ({ received: (ctx as { body: unknown }).body }),
             method: 'post',
             path: '/items',
+            requestSchema: z.object({ name: z.string() }),
             type: 'api',
-            validationSchema: z.object({ name: z.string() }),
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       });
 
       const res = await app.request('/items', {

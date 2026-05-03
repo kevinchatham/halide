@@ -12,7 +12,7 @@ describe('validateServerConfig — routes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       }),
     ).toThrow('Route path must start with / (api): invalid');
   });
@@ -27,7 +27,7 @@ describe('validateServerConfig — routes', () => {
             type: 'api',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       }),
     ).toThrow('API route requires handler');
   });
@@ -35,6 +35,7 @@ describe('validateServerConfig — routes', () => {
   it('rejects proxy route without target', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -43,7 +44,6 @@ describe('validateServerConfig — routes', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       }),
     ).toThrow('Proxy route requires target');
   });
@@ -51,6 +51,7 @@ describe('validateServerConfig — routes', () => {
   it('rejects proxy route with empty methods', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -60,7 +61,6 @@ describe('validateServerConfig — routes', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       }),
     ).toThrow('Proxy route requires at least one method');
   });
@@ -68,6 +68,7 @@ describe('validateServerConfig — routes', () => {
   it('rejects proxy route proxyPath not starting with /', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -78,7 +79,6 @@ describe('validateServerConfig — routes', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       }),
     ).toThrow('Proxy route proxyPath must start with /: invalid');
   });
@@ -86,6 +86,7 @@ describe('validateServerConfig — routes', () => {
   it('accepts valid proxy route', () => {
     expect(() =>
       validateServerConfig({
+        app: { root: '/var/www' },
         proxyRoutes: [
           {
             access: 'public',
@@ -97,7 +98,6 @@ describe('validateServerConfig — routes', () => {
             type: 'proxy',
           },
         ],
-        spa: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -112,7 +112,7 @@ describe('validateServerConfig — routes', () => {
             path: '/test',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       }),
     ).not.toThrow();
   });
@@ -126,7 +126,7 @@ describe('validateServerConfig — routes', () => {
             path: '/test',
           },
         ],
-        spa: { root: '/var/www' },
+        app: { root: '/var/www' },
       }),
     ).toThrow('API route requires handler');
   });

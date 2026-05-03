@@ -10,13 +10,9 @@ function _getFreePort(): number {
   return port;
 }
 
-const minimalConfig = { spa: { root: '/var/www' } } as const;
+const minimalConfig = { app: { root: '/var/www' } } as const;
 
 describe('createApp', () => {
-  it('throws on invalid config', () => {
-    expect(() => createApp({} as never)).toThrow('spa.root is required');
-  });
-
   it('returns an app and rateLimitDispose', async () => {
     const result = createApp(minimalConfig);
     expect(result.app).toBeDefined();
@@ -192,7 +188,7 @@ describe('createApp', () => {
   it('uses custom apiPrefix for SPA fallback', async () => {
     const { app } = createApp({
       ...minimalConfig,
-      spa: { apiPrefix: '/v1', root: '/var/www' },
+      app: { apiPrefix: '/v1', root: '/var/www' },
     });
     const res = await app.request('/v1/unknown');
     expect(res.status).toBe(404);
@@ -222,10 +218,10 @@ describe('createApp', () => {
 
   it('logs errors through the custom logger', async () => {
     const logger = {
-      debug: vi.fn(),
+      debug: (_scope: unknown) => {},
       error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
+      info: (_scope: unknown) => {},
+      warn: (_scope: unknown) => {},
     };
     const { app } = createApp({
       ...minimalConfig,
@@ -239,7 +235,14 @@ describe('createApp', () => {
           type: 'api',
         },
       ],
-      observability: { logger },
+      observability: {
+        logger,
+        onResponse: (_ctx: unknown, _claims: unknown, { error }: { error?: Error }) => {
+          if (error) {
+            logger.error(_ctx, `Request failed: ${error.message}`);
+          }
+        },
+      },
     });
     await app.request('/fail');
     expect(logger.error).toHaveBeenCalled();

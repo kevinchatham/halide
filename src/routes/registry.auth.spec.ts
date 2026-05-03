@@ -5,7 +5,7 @@ import { createOpenApiRoutes } from '../middleware/swagger';
 import type { Logger, ServerConfig } from '../types';
 import { registerRoutes } from './registry';
 
-const noopLogger: Logger = createNoopLogger();
+const noopLogger: Logger<unknown> = createNoopLogger();
 const secret = 'test-secret';
 
 async function createValidToken(claims: Record<string, unknown>): Promise<string> {
@@ -33,8 +33,8 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: { auth: { secret: () => secret, strategy: 'bearer' } },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/profile');
@@ -53,8 +53,8 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: { auth: { secret: () => secret, strategy: 'bearer' } },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/profile', {
@@ -74,8 +74,8 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: { auth: { secret: () => secret, strategy: 'bearer' } },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/profile', {
@@ -96,13 +96,13 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: {
           auth: {
             jwksUri: 'https://auth.example.com/.well-known/jwks.json',
             strategy: 'jwks',
           },
         },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/profile');
@@ -123,10 +123,10 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: {
           auth: { secret: secretFn, secretTtl: 60, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       });
 
       const token = await createValidToken({ sub: 'user-123' });
@@ -160,10 +160,10 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: {
           auth: { secret: secretFn, secretTtl: 60, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       });
 
       const token = await createValidToken({ sub: 'user-123' });
@@ -194,10 +194,10 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: {
           auth: { secret: secretFn, secretTtl: 0, strategy: 'bearer' },
         },
-        spa: { root: '/var/www' },
       });
 
       const token = await createValidToken({ sub: 'user-123' });
@@ -227,8 +227,8 @@ describe('registerRoutes — auth', () => {
             type: 'api',
           },
         ],
+        app: { root: '/var/www' },
         security: { auth: { strategy: 'bearer' } },
-        spa: { root: '/var/www' },
       });
 
       const res = await app.request('/profile');

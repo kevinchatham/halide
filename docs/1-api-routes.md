@@ -11,7 +11,7 @@ apiRoute({
   access: 'public',
   path: '/bff/config',
   method: 'get',
-  handler: async (ctx, claims, logger) => ({
+  handler: async (ctx, app) => ({
     environment: process.env.NODE_ENV,
   }),
 });
@@ -27,8 +27,8 @@ apiRoute({
   access: 'private',
   path: '/users',
   method: 'post',
-  validationSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
-  handler: async (ctx, claims, logger) => {
+  requestSchema: z.object({ email: z.string().email(), name: z.string().min(1) }),
+  handler: async (ctx, app) => {
     return { id: crypto.randomUUID(), ...ctx.body };
   },
 });
@@ -36,13 +36,17 @@ apiRoute({
 
 ## Handler signature
 
-The handler receives three arguments:
+The handler receives two arguments:
 
 | Parameter | Type                               | Description                                              |
 | --------- | ---------------------------------- | -------------------------------------------------------- |
 | `ctx`     | `RequestContext & { body: TBody }` | Method, path, headers, params, query, and validated body |
-| `claims`  | `TClaims \| undefined`             | Decoded JWT claims (undefined for public routes)         |
-| `logger`  | `Logger`                           | Structured logger instance                               |
+| `app`     | `THalideApp`                       | Bundled app context with `claims` and `logger`           |
+
+`app` is a `THalideApp` object containing:
+
+- `claims` — decoded JWT claims (undefined for public routes)
+- `logger` — structured logger instance
 
 `ctx` is a **plain object** (not a Hono Context). It is constructed from the Hono request with normalized method, path, headers, params, query, and body.
 
@@ -54,6 +58,6 @@ Handler return values are JSON-serialized via `c.json(result)`.
 
 ## Body handling
 
-For routes **with** `validationSchema`, the body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
+For routes **with** `requestSchema`, the body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
 
-For routes **without** `validationSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.
+For routes **without** `requestSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.

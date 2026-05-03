@@ -1,24 +1,25 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { confirm, input } from '@inquirer/prompts';
 import stripJsonComments from 'strip-json-comments';
 
 /** Generate the server.ts content for a new Halide project. */
-function generateServerTs(spaName: string, port: number): string {
+function generateServerTs(appName: string, port: number): string {
   return `import { createServer, apiRoute } from 'halide';
 
+const healthRoute = apiRoute({
+  access: 'public',
+  handler: async () => ({ status: 'ok' }),
+  method: 'get',
+  path: '/health',
+});
+
 const server = createServer({
-  apiRoutes: [
-    apiRoute({
-      access: 'public',
-      handler: async () => ({ status: 'ok' }),
-      method: 'get',
-      path: '/health',
-    }),
-  ],
-  spa: {
-    name: '${spaName}',
+  apiRoutes: [healthRoute],
+  app: {
+    name: '${appName}',
     port: ${port},
     root: 'dist',
   },
@@ -33,11 +34,12 @@ server.start((port) => {
 /** TypeScript configuration for the server build. */
 const TSCONFIG_SERVER = `{
   "compilerOptions": {
-    "module": "es2022",
-    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "module": "commonjs",
     "outDir": "./dist",
-    "rootDirs": ["."],
-    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "strict": true,
     "target": "es2022",
     "types": ["node"]
   },
@@ -115,22 +117,6 @@ function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
-/** Add "type": "module" to package.json if not present. */
-function addTypeModuleToPackageJson(cwd: string): void {
-  const pkgPath = path.join(cwd, 'package.json');
-  const raw = fs.readFileSync(pkgPath, 'utf8');
-  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
-
-  if (parsed.type === 'module') {
-    log('✓ "type": "module" already exists in package.json — skipping');
-    return;
-  }
-
-  parsed.type = 'module';
-  fs.writeFileSync(pkgPath, JSON.stringify(parsed, null, 2), 'utf8');
-  log('✓ Added "type": "module" to package.json');
-}
-
 /** Add halide:start and halide:build scripts to package.json. */
 function addScriptsToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
@@ -185,10 +171,35 @@ function getInstallCmd(pkgManager: PackageManager): string {
 }
 
 /**
- * Initialize a new Halide project in the current directory.
- * Prompts for project name and port, then sets up the project structure.
+ * Copy skill directory from the installed halide package
+ * to .agents/skills/halide/ in the consumer project.
+ * Docs are NOT copied — agents are directed to read them from node_modules/halide/docs/.
  */
-export async function init(): Promise<undefined> {
+export function installSkillsFromHalide(cwd: string): void {
+  try {
+    const require = createRequire(import.meta.url);
+    const halidePath = require.resolve('halide', { paths: [cwd] });
+    const halideDir = path.dirname(halidePath);
+    const skillSrc = path.join(halideDir, '..', 'skill');
+
+    const agentsDir = path.join(cwd, '.agents');
+    const skillsDest = path.join(agentsDir, 'skills', 'halide');
+
+    fs.mkdirSync(path.join(agentsDir, 'skills'), { recursive: true });
+    const entries = fs.readdirSync(skillSrc, { withFileTypes: true });
+    for (const entry of entries) {
+      fs.cpSync(path.join(skillSrc, entry.name), path.join(skillsDest, entry.name), {
+        recursive: entry.isDirectory(),
+      });
+    }
+    log('✓ Installed halide skills to .agents/skills/halide/');
+  } catch {
+    log(`⚠ Warning: Could not install skills`);
+  }
+}
+
+export async function init(options?: { skillsOnly?: boolean }): Promise<undefined> {
+  const { skillsOnly = false } = options ?? {};
   const cwd = process.cwd();
 
   if (!fs.existsSync(path.join(cwd, 'package.json'))) {
@@ -198,12 +209,17 @@ export async function init(): Promise<undefined> {
     process.exit(1);
   }
 
-  const spaName = await input({
+  if (skillsOnly) {
+    installSkillsFromHalide(cwd);
+    return;
+  }
+
+  const appName = await input({
     default: 'my-app',
-    message: 'What is your SPA name?',
+    message: 'What is your app name?',
     validate: (value: string) => {
       if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
-      return 'SPA name must contain only letters, numbers, dashes, and underscores';
+      return 'App name must contain only letters, numbers, dashes, and underscores';
     },
   });
 
@@ -237,30 +253,28 @@ export async function init(): Promise<undefined> {
   if (fs.existsSync(serverPath)) {
     log('✓ server.ts already exists — skipping');
   } else {
-    fs.writeFileSync(serverPath, generateServerTs(spaName, port), 'utf8');
+    fs.writeFileSync(serverPath, generateServerTs(appName, port), 'utf8');
     log('✓ Created server.ts');
   }
 
   writeTsconfigServer(cwd);
   addServerReference(cwd);
   excludeServerFromApp(cwd);
-  addTypeModuleToPackageJson(cwd);
   addScriptsToPackageJson(cwd);
 
   if (installSkills) {
-    execSync('npx skills add kevinchatham/halide', { cwd, stdio: 'inherit' });
+    installSkillsFromHalide(cwd);
   } else {
     log('✓ Skipping skills installation');
   }
 
   log('\nDone! Next steps:');
-  log('  1. Edit server.ts to configure your routes and SPA');
+  log('  1. Edit server.ts to configure your routes and app hosting');
   log('  2. Run your server with: npm run halide:start');
 }
 
 export {
   addScriptsToPackageJson,
-  addTypeModuleToPackageJson,
   detectPackageManager,
   generateServerTs,
   getInstallCmd,

@@ -55,24 +55,24 @@ For each file, add JSDoc to:
 
    Example:
    ```ts
-   /**
-    * Configuration for the Halide server.
-    * @typeParam TClaims - The type of the decoded JWT claims object.
-    */
-   export type ServerConfig<TClaims = unknown> = {
-     /** SPA hosting configuration. This is the only required config section. */
-     spa: SpaConfig;
-     /** API route definitions. Each route maps a path+method to a handler function. */
-     apiRoutes?: ApiRoute<TClaims, unknown>[];
-     /** Proxy route definitions. Each route forwards requests to an upstream target. */
-     proxyRoutes?: ProxyRoute<TClaims>[];
-     /** Security configuration: auth, CORS, CSP, rate limiting. */
-     security?: SecurityConfig;
-     /** OpenAPI/Scalar documentation UI configuration. */
-     openapi?: OpenApiConfig;
-     /** Observability: logging, request IDs, lifecycle hooks. */
-     observability?: ObservabilityConfig<TClaims>;
-   };
+/**
+     * Configuration for the Halide server.
+     * @typeParam TClaims - The type of the decoded JWT claims object.
+     */
+    export type ServerConfig<TClaims = unknown> = {
+      /** App hosting configuration (static files and/or API backend). Optional when not serving static files. */
+      app?: AppConfig;
+      /** API route definitions. Each route maps a path+method to a handler function. */
+      apiRoutes?: ApiRoute<TClaims, unknown>[];
+      /** Proxy route definitions. Each route forwards requests to an upstream target. */
+      proxyRoutes?: ProxyRoute<TClaims>[];
+      /** Security configuration: auth, CORS, CSP, rate limiting. */
+      security?: SecurityConfig;
+      /** OpenAPI/Scalar documentation UI configuration. */
+      openapi?: OpenApiConfig;
+      /** Observability: logging, request IDs, lifecycle hooks. */
+      observability?: ObservabilityConfig<TClaims>;
+    };
    ```
 
 6. **Inline properties** — for types with many fields (like `ServerConfig`, `ApiRoute`, `ProxyRoute`, `SecurityConfig`, `CorsConfig`, `CspDirectives`, `ObservabilityConfig`), add a JSDoc line on **every** property, not just the type itself. This is the most valuable documentation for consumers.
@@ -157,7 +157,7 @@ For each file, add JSDoc to:
 
 15. Verify JSDoc quality:
     - Every exported symbol in `src/index.ts` has a JSDoc block.
-    - Every property in complex types (`ServerConfig`, `ApiRoute`, `ProxyRoute`, `SecurityConfig`, `CorsConfig`, `CspDirectives`, `ObservabilityConfig`, `SecurityAuthConfig`, `SpaConfig`, `OpenApiConfig`) has a property-level doc.
+    - Every property in complex types (`ServerConfig`, `ApiRoute`, `ProxyRoute`, `SecurityConfig`, `CorsConfig`, `CspDirectives`, `ObservabilityConfig`, `SecurityAuthConfig`, `AppConfig`, `OpenApiConfig`) has a property-level doc.
     - Default values are mentioned in property docs (e.g. `Defaults to '/api'`).
     - No JSDoc says `@param ctx - The context` without explaining what the context contains.
     - No JSDoc merely restates the type (e.g. `/** The path. */ path: string` is bad; `/** URL path pattern for this route. Supports Hono-style path parameters like `/users/:id`. */ path: string` is good).
