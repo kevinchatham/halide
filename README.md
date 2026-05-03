@@ -31,6 +31,8 @@ Halide is not an API gateway, a service mesh, or a full backend framework. It is
 
 ## Get started
 
+See the [demo app](https://github.com/kevinchatham/halide-demo) for a complete example.
+
 Run Halide in an empty project (`npm init`) or add it directly to your existing frontend project. The server runs as a standalone process alongside your SPA build tooling.
 
 ```bash
