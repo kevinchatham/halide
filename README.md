@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
-    <img src="https://img.shields.io/badge/docs-0.0.9-cyan" alt="Documentation"/>
+    <img src="https://img.shields.io/badge/docs-0.0.10-cyan" alt="Documentation"/>
   </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">

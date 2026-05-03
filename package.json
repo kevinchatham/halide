@@ -1,6 +1,6 @@
 {
   "name": "halide",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "A declarative BFF (Backend for Frontend) framework that standardizes SPA communication with auth, proxy, CSP, rate limiting, OpenAPI support, and static file hosting",
   "keywords": [
     "angular",
@@ -61,7 +61,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "prebuild": "npx tsx scripts/update-readme.ts && npm run typecheck",
+    "prebuild": "npm i && npx tsx scripts/update-readme.ts && npm run typecheck",
     "build": "tsup",
     "postbuild": "cp -rf skill/ dist/skill/ && cp -rf docs/ dist/docs",
     "clean": "npx tsx scripts/clean.ts",
