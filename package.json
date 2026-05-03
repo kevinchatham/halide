@@ -1,6 +1,6 @@
 {
   "name": "halide",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "A declarative BFF (Backend for Frontend) framework that standardizes SPA communication with auth, proxy, CSP, rate limiting, OpenAPI support, and static file hosting",
   "keywords": [
     "angular",
