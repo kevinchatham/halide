@@ -40,6 +40,7 @@ import {
   createServer, // Returns Server with start/stop
   apiRoute, // Factory for API routes (type: 'api')
   proxyRoute, // Factory for proxy routes (type: 'proxy')
+  type Server,
   type ServerConfig, // Root config type
   type THalideApp, // Bundled app context: { claims, logger }
   type ApiRoute, // API route definition
@@ -48,9 +49,12 @@ import {
   type RequestContext, // Normalized context for handlers
   type AuthorizeFn, // (ctx, app) => boolean
   type TransformFn, // Transform request body/headers
+  type ClaimExtractor, // Extract claims from request context
   type SecurityConfig, // auth + cors + csp + rateLimit
+  type SecurityAuthConfig, // auth: { strategy, secret, jwksUri, audience }
   type CorsConfig,
   type CspDirectives,
+  type CspOptions,
   type Logger,
   type ObservabilityConfig,
   type OpenApiConfig,

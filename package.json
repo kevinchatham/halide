@@ -1,7 +1,7 @@
 {
   "name": "halide",
   "version": "0.0.9",
-  "description": "A declarative BFF (Backend for Frontend) runtime that standardizes SPA communication with auth, proxy, CSP, rate limiting, and OpenAPI support",
+  "description": "A declarative BFF (Backend for Frontend) framework that standardizes SPA communication with auth, proxy, CSP, rate limiting, OpenAPI support, and static file hosting",
   "keywords": [
     "angular",
     "api",
