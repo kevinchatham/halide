@@ -3,7 +3,7 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { Context, MiddlewareHandler } from 'hono';
 import { DEFAULTS } from '../config/defaults';
-import type { AppConfig } from '../types';
+import type { AppConfig } from '../types/app';
 
 /**
  * Create app static file serving and fallback handlers.

@@ -37,28 +37,34 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 
 ## Exported types
 
-| Type                                      | Description                                                                |
-| ----------------------------------------- | -------------------------------------------------------------------------- |
-| `ServerConfig<TApp>`                      | Top-level configuration object                                             |
-| `Server`                                  | Running server instance (`ready`, `start`, `stop`)                         |
-| `CreateAppResult`                         | Return type of `createApp()` — `{ app, rateLimitDispose }`                 |
-| `ApiRoute<TApp, TBody, TResponse>`        | API route definition                                                       |
-| `ApiRouteHandler<TApp, TBody, TResponse>` | `(ctx: RequestContext & { body: TBody }, app: TApp) => Promise<TResponse>` |
-| `ProxyRoute<TApp>`                        | Proxy route definition                                                     |
-| `AuthorizeFn<TApp>`                       | `(ctx: RequestContext, app: TApp) => boolean \| Promise<boolean>`          |
-| `TransformFn`                             | `({ body, headers }) => { body, headers }`                                 |
-| `RequestContext`                          | Normalized request context (method, path, headers, params, query, body)    |
-| `SecurityConfig`                          | CORS, CSP, auth, rate limit configuration                                  |
-| `SecurityAuthConfig`                      | Auth strategy, secret/JWKS, audience, secretTtl                            |
-| `CorsConfig`                              | Origin, methods, credentials, allowedHeaders, exposedHeaders, maxAge       |
-| `CspOptions`                              | Content Security Policy directives container                               |
-| `CspDirectives`                           | CSP directive map (camelCase keys)                                         |
-| `AppConfig`                               | Static file serving and port configuration                                 |
-| `ObservabilityConfig<TApp>`               | Logger, request ID, lifecycle hooks                                        |
-| `OpenApiConfig`                           | OpenAPI toggle, path, and options                                          |
-| `OpenApiRouteMeta`                        | Per-route OpenAPI metadata (summary, tags, schemas, responses)             |
-| `Logger`                                  | `{ debug, error, info, warn }` interface                                   |
-| `ClaimExtractor<TClaims>`                 | Function to extract claims from a Hono Context                             |
+| Type                                      | Description                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `ServerConfig<TApp>`                      | Top-level configuration object                                                                         |
+| `Server`                                  | Running server instance (`ready`, `start`, `stop`)                                                     |
+| `CreateAppResult`                         | Return type of `createApp()` — `{ app, rateLimitDispose }`                                             |
+| `ApiRoute<TApp, TBody, TResponse>`        | API route definition                                                                                   |
+| `ApiRouteHandler<TApp, TBody, TResponse>` | `(ctx: RequestContext & { body: TBody }, app: TApp) => Promise<TResponse>`                             |
+| `ProxyRoute<TApp>`                        | Proxy route definition                                                                                 |
+| `AuthorizeFn<TApp>`                       | `(ctx: RequestContext, app: TApp) => boolean \| Promise<boolean>`                                      |
+| `TransformFn`                             | `({ method, body, headers }) => { body, headers }`                                                     |
+| `RequestContext`                          | Normalized request context (method, path, headers, params, query, body)                                |
+| `ApiRouteInput<TApp, TBody, TResponse>`   | Input type for `apiRoute()` factory — omits `type`, `authorize`, and `handler`                         |
+| `ProxyRouteInput<TApp>`                   | Input type for `proxyRoute()` factory — omits `type`                                                   |
+| `SecurityConfig`                          | CORS, CSP, auth, rate limit configuration                                                              |
+| `SecurityAuthConfig`                      | Auth strategy, secret/JWKS, audience, secretTtl                                                        |
+| `CorsConfig`                              | Origin, methods, credentials, allowedHeaders, exposedHeaders, maxAge                                   |
+| `CspOptions`                              | Content Security Policy directives container                                                           |
+| `CspDirectives`                           | CSP directive map (camelCase keys)                                                                     |
+| `CspDirectiveValue`                       | `string \| ContentSecurityPolicyOptionHandler` — value for a CSP directive                             |
+| `AppConfig`                               | Static file serving and port configuration                                                             |
+| `THalideApp<TClaims, TLogScope>`          | `{ claims: TClaims \| undefined, logger: Logger<TLogScope> }` — bundled app context passed to handlers |
+| `ObservabilityConfig<TApp>`               | Logger, request ID, lifecycle hooks                                                                    |
+| `OpenApiConfig`                           | OpenAPI toggle, path, and options                                                                      |
+| `OpenApiRouteMeta`                        | Per-route OpenAPI metadata (summary, tags, responses)                                                  |
+| `OpenApiSource`                           | `{ path: string }` — source of an OpenAPI spec (local file or URL)                                     |
+| `ResolvedOpenApiSpec`                     | `{ spec: Record<string, unknown>, route: ProxyRoute }` — resolved external spec                        |
+| `Logger`                                  | `{ debug, error, info, warn }` interface                                                               |
+| `ClaimExtractor<TClaims>`                 | Function to extract claims from a Hono Context                                                         |
 
 ## Not exported but referenced
 

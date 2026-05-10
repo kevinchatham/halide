@@ -46,7 +46,7 @@ If no logger is provided, a no-op logger is used (all methods are empty function
 
 The `app` parameter is a `THalideApp` containing `claims` (decoded JWT) and `logger` (structured logger).
 
-The `response` object has the following shape:
+The `response` object (type `ResponseContext`) has the following shape:
 
 | Field        | Type      | Description                                   |
 | ------------ | --------- | --------------------------------------------- |

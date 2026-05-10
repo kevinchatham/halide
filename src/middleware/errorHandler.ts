@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Logger } from '../types';
+import type { Logger } from '../types/app';
 
 /**
  * Create an error handler middleware that returns a 500 response.

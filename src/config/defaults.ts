@@ -1,4 +1,5 @@
-import type { AuthorizeFn, Logger, RequestContext } from '../types';
+import type { AuthorizeFn } from '../types/api';
+import type { Logger, RequestContext } from '../types/app';
 
 /**
  * Default configuration values used when options are omitted.

@@ -4,10 +4,10 @@ Configure CORS, CSP, and rate limiting to lock down your BFF layer.
 
 ```ts
 security: {
-  cors: {
-    origin: ['https://myapp.com'],
-    credentials: true,
-    methods: ['get', 'post', 'put', 'delete', 'patch'],
+   cors: {
+      origin: ['https://myapp.com'],
+      credentials: true,
+      methods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
     allowedHeaders: ['content-type', 'authorization'],
     exposedHeaders: ['x-custom-header'],
     maxAge: 3600,

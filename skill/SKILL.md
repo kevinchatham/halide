@@ -1,65 +1,70 @@
 ---
 name: halide
-description: A declarative BFF runtime with auth, proxy, CSP, rate limiting, and OpenAPI support
+description: Halide BFF framework — server creation, API routes, proxy routes, auth, security, observability
 ---
 
-# Halide Skill
-
-A consuming agent should load this skill to build Halide servers.
+# Halide Agent Guide
 
 ## Primary Resources
 
-| Topic                                    | Guide                     |
-| ---------------------------------------- | ------------------------- |
-| Quick start, full examples               | `docs/7-full-example.md`  |
-| API route factory, handler signature     | `docs/1-api-routes.md`    |
-| Proxy routing, path rewriting, transform | `docs/2-proxy-routes.md`  |
-| Auth strategies (bearer/JWKS), audience  | `docs/3-auth.md`          |
-| CORS, CSP (camelCase), rate limiting     | `docs/4-security.md`      |
-| Logger, requestId, onRequest/onResponse  | `docs/5-observability.md` |
-| OpenAPI/Scalar UI, per-route metadata    | `docs/6-openapi.md`       |
-| Static serving, apiPrefix, fallback      | `docs/0-app.md`           |
-| CLI commands                             | `docs/9-cli.md`           |
+| Topic                            | File                                               |
+| -------------------------------- | -------------------------------------------------- |
+| App hosting                      | [docs/0-app.md](docs/0-app.md)                     |
+| API routes                       | [docs/1-api-routes.md](docs/1-api-routes.md)       |
+| Proxy routes                     | [docs/2-proxy-routes.md](docs/2-proxy-routes.md)   |
+| Auth & authorization             | [docs/3-auth.md](docs/3-auth.md)                   |
+| Security (CORS, CSP, rate limit) | [docs/4-security.md](docs/4-security.md)           |
+| Observability                    | [docs/5-observability.md](docs/5-observability.md) |
+| OpenAPI / Scalar UI              | [docs/6-openapi.md](docs/6-openapi.md)             |
+| Full example                     | [docs/7-full-example.md](docs/7-full-example.md)   |
+| API reference                    | [docs/8-api-reference.md](docs/8-api-reference.md) |
+| CLI                              | [docs/9-cli.md](docs/9-cli.md)                     |
 
 ## Detailed References
 
-| Topic                               | Reference                           |
-| ----------------------------------- | ----------------------------------- |
-| Complete ServerConfig, all types    | `skill/references/config.md`        |
-| Auth config, bearer/JWKS extraction | `skill/references/auth.md`          |
-| Security middleware, CSP directives | `skill/references/security.md`      |
-| Observability hooks                 | `skill/references/observability.md` |
-| OpenAPI route metadata              | `skill/references/openapi.md`       |
-| Route factories, path patterns      | `skill/references/routes.md`        |
+| Topic         | File                                                                   | Source                                                                     |
+| ------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Config types  | [skill/references/config.md](skill/references/config.md)               | `src/types/server-config.ts`, `src/types/app.ts`, `src/config/defaults.ts` |
+| Route types   | [skill/references/routes.md](skill/references/routes.md)               | `src/routes/apiRoute.ts`, `src/routes/proxyRoute.ts`, `src/types/api.ts`   |
+| Auth          | [skill/references/auth.md](skill/references/auth.md)                   | `src/middleware/auth.ts`, `src/routes/registry.auth.ts`                    |
+| Security      | [skill/references/security.md](skill/references/security.md)           | `src/types/security.ts`, `src/types/csp.ts`, `src/middleware/security.ts`  |
+| OpenAPI       | [skill/references/openapi.md](skill/references/openapi.md)             | `src/types/openapi.ts`, `src/routes/registry.openapi.ts`                   |
+| Observability | [skill/references/observability.md](skill/references/observability.md) | `src/types/app.ts`, `src/routes/registry.auth.ts`                          |
 
-## Complete Type Reference
+## Type Reference
 
 ```ts
-import {
-  createApp, // Returns { app, rateLimitDispose }
-  createServer, // Returns Server with start/stop
-  apiRoute, // Factory for API routes (type: 'api')
-  proxyRoute, // Factory for proxy routes (type: 'proxy')
-  type Server,
-  type ServerConfig, // Root config type
-  type THalideApp, // Bundled app context: { claims, logger }
-  type ApiRoute, // API route definition
-  type ApiRouteHandler, // (ctx, app) => Promise<T>
-  type ProxyRoute, // Proxy route definition
-  type RequestContext, // Normalized context for handlers
-  type AuthorizeFn, // (ctx, app) => boolean
-  type TransformFn, // Transform request body/headers
-  type ClaimExtractor, // Extract claims from request context
-  type SecurityConfig, // auth + cors + csp + rateLimit
-  type SecurityAuthConfig, // auth: { strategy, secret, jwksUri, audience }
-  type CorsConfig,
-  type CspDirectives,
-  type CspOptions,
-  type Logger,
-  type ObservabilityConfig,
-  type OpenApiConfig,
-  type OpenApiRouteMeta,
+import type {
+  ApiRoute,
+  ApiRouteHandler,
+  ApiRouteInput,
+  AuthorizeFn,
+  ProxyRoute,
+  ProxyRouteInput,
+  TransformFn,
+  CspDirectiveValue,
+  CspDirectives,
+  CspOptions,
+  OpenApiConfig,
+  OpenApiOptions,
+  OpenApiRouteMeta,
+  OpenApiSource,
+  ResolvedOpenApiSpec,
+  ClaimExtractor,
+  CorsConfig,
+  SecurityAuthConfig,
+  SecurityConfig,
+  AppConfig,
+  Logger,
+  ObservabilityConfig,
+  RequestContext,
+  ResponseContext,
+  THalideApp,
+  ServerConfig,
+  Server,
+  CreateAppResult,
 } from 'halide';
+import { createApp, createServer, apiRoute, proxyRoute } from 'halide';
 ```
 
 ## Minimal Example
@@ -67,7 +72,7 @@ import {
 ```ts
 import { createServer, apiRoute } from 'halide';
 
-createServer({
+const server = createServer({
   apiRoutes: [
     apiRoute({
       access: 'public',
@@ -75,23 +80,28 @@ createServer({
       handler: async () => ({ status: 'ok' }),
     }),
   ],
-}).start();
+});
+
+server.start((port) => {
+  console.log(`Server running on port ${port}`);
+});
 ```
 
 ## Key Gotchas
 
-1. **CSP uses camelCase** — `defaultSrc`, not `default-src`
-2. **Wildcard origin** cannot be `'*'` when `credentials: true`
-3. **Private routes** require `security.auth` configured
-4. **Bearer requires secret**, **JWKS requires jwksUri**
-5. **OpenAPI enabled** warns about relaxed CSP — disable in production
-6. **apiPrefix** returns 404 for paths starting with it when `app.root` is set
-7. **Handlers receive `app`** — not separate `claims` and `logger`; use `app.claims` and `app.logger`
+- CSP directive keys must use **camelCase** (`defaultSrc`), not kebab-case (`default-src`) — validator throws
+- Wildcard CORS origin (`'*'`) cannot be combined with `credentials: true` — validator throws
+- Private routes require `security.auth` configured — validation throws if missing
+- `ServerConfig` uses separate `apiRoutes` and `proxyRoutes` arrays, not a single `routes` array
+- `apiRoute.method` is optional (defaults to `'get'`); `proxyRoute.methods` is required (array)
+- Proxy route strips `host`, `connection`, `content-length`, `transfer-encoding`, `set-cookie` headers
+- OpenAPI UI disabled by default — when enabled, warns about relaxed CSP; should be disabled in production
+- `onRequest`/`onResponse` hooks fire per-route; set `observe: false` on a route to skip them
+- `apiPrefix` defaults to `'/api'` — paths starting with this get 404 instead of app fallback; set `''` to disable
 
 ## Fallback Reference
 
-For complete type information, read:
+When docs are unavailable, check:
 
-- `node_modules/halide/dist/index.d.ts` — Type definitions
-- `node_modules/halide/dist/index.js` — Implementation
-- `node_modules/halide/dist/docs/*.md` — Documentation
+- `node_modules/halide/dist/index.d.ts` — full TypeScript type definitions
+- `node_modules/halide/dist/index.js` — runtime behavior

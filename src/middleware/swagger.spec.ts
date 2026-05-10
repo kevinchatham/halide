@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { ServerConfig } from '../types';
+import type { ProxyRoute } from '../types/api';
 import { createOpenApiRoutes } from './swagger';
 
 function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerConfig {
@@ -7,6 +8,17 @@ function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerCon
     app: { root: '.' },
     openapi: { enabled: true, ...overrides },
   };
+}
+
+function makeProxyRoute(overrides: Partial<ProxyRoute> = {}): ProxyRoute {
+  return {
+    access: 'public',
+    methods: ['get'],
+    path: '/api/users',
+    target: 'https://api.example.com',
+    type: 'proxy',
+    ...overrides,
+  } as ProxyRoute;
 }
 
 describe('createOpenApiRoutes', () => {
@@ -126,5 +138,82 @@ describe('createOpenApiRoutes', () => {
     const body = (await res.json()) as { servers?: unknown };
 
     expect(body.servers).toBeUndefined();
+  });
+
+  it('merges external OpenAPI spec from file path', async () => {
+    const app = new Hono();
+    const proxyRoute = makeProxyRoute({
+      openapiSpec: { path: 'test/fixtures/test-spec.json' },
+    });
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+
+    const res = await app.request('/swagger/openapi.json');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('paths');
+  });
+
+  it('merges external OpenAPI spec from URL', async () => {
+    const mockSpec = JSON.stringify({
+      info: { title: 'Mock API', version: '1.0.0' },
+      openapi: '3.1.0',
+      paths: { '/users': { get: { summary: 'Get users' } } },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          json: () => Promise.resolve(JSON.parse(mockSpec)),
+          ok: true,
+        } as unknown as Response),
+      ),
+    );
+
+    const app = new Hono();
+    const proxyRoute = makeProxyRoute({
+      openapiSpec: { path: 'https://api.example.com/openapi.json' },
+    });
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+
+    const res = await app.request('/swagger/openapi.json');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('paths');
+  });
+
+  it('applies openapi metadata overrides to merged external spec', async () => {
+    const app = new Hono();
+    const proxyRoute = makeProxyRoute({
+      openapi: {
+        description: 'Proxy to users service',
+        summary: 'Users API',
+        tags: ['users'],
+      },
+      openapiSpec: { path: 'test/fixtures/test-spec.json' },
+    });
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+
+    const res = await app.request('/swagger/openapi.json');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('paths');
+  });
+
+  it('caches the resolved spec on first request', async () => {
+    const app = new Hono();
+    const proxyRoute = makeProxyRoute({
+      openapiSpec: { path: 'test/fixtures/test-spec.json' },
+    });
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+
+    const res1 = await app.request('/swagger/openapi.json');
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json();
+
+    const res2 = await app.request('/swagger/openapi.json');
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json();
+
+    expect(JSON.stringify(body1)).toEqual(JSON.stringify(body2));
   });
 });

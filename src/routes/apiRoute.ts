@@ -1,5 +1,5 @@
 import { defaultAuthorize } from '../config/defaults';
-import type { ApiRoute, ApiRouteInput } from '../types';
+import type { ApiRoute, ApiRouteInput } from '../types/api';
 
 /**
  * Factory function to create an API route configuration.

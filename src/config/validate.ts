@@ -1,4 +1,7 @@
-import type { AppConfig, CorsConfig, CspOptions, Route, SecurityConfig } from '../types';
+import type { Route } from '../types/api';
+import type { AppConfig } from '../types/app';
+import type { CspOptions } from '../types/csp';
+import type { CorsConfig, SecurityConfig } from '../types/security';
 
 /** Input type for route validation. */
 type RouteInput<TApp = unknown> =
@@ -31,7 +34,7 @@ type ServerConfigInput<TApp = unknown> = {
   security?: SecurityInput;
 };
 
-/** Validate that app config is valid (only validates port if app is provided). */
+/** Validate that the app port is an integer between 1 and 65535. */
 function validateAppConfig(app?: AppInput): void {
   if (app?.port !== undefined) {
     if (!Number.isInteger(app.port) || app.port < 1 || app.port > 65535) {
@@ -40,7 +43,7 @@ function validateAppConfig(app?: AppInput): void {
   }
 }
 
-/** Validate a single route configuration. */
+/** Validate a single route configuration, checking path, handler, and proxy requirements. */
 function validateRoute<TApp = unknown>(route: RouteInput<TApp>): void {
   if (!route.path?.startsWith('/')) {
     throw new Error(`Route path must start with / (${route.type ?? 'api'}): ${route.path}`);
@@ -62,7 +65,7 @@ function validateRoute<TApp = unknown>(route: RouteInput<TApp>): void {
   }
 }
 
-/** Validate an array of routes. */
+/** Validate an array of routes by calling `validateRoute` on each entry. */
 function validateRoutes<TApp = unknown>(routes?: RouteInput<TApp>[]): void {
   if (!routes) return;
   for (const route of routes) {
@@ -70,7 +73,7 @@ function validateRoutes<TApp = unknown>(routes?: RouteInput<TApp>[]): void {
   }
 }
 
-/** Validate that auth config exists if any routes require authentication. */
+/** Validate that auth config exists if any routes have `access: 'private'`. */
 function validateSecurityForRoutes<TApp = unknown>(
   routes?: RouteInput<TApp>[],
   security?: SecurityInput,
@@ -81,7 +84,7 @@ function validateSecurityForRoutes<TApp = unknown>(
   }
 }
 
-/** Validate CORS configuration (wildcard origin cannot be used with credentials). */
+/** Validate CORS config: wildcard origin (`*`) cannot be combined with credentials: true. */
 function validateCors(cors?: CorsInput): void {
   if (!cors?.credentials) return;
   if (cors.origin === '*' || (Array.isArray(cors.origin) && cors.origin.includes('*'))) {
@@ -89,7 +92,7 @@ function validateCors(cors?: CorsInput): void {
   }
 }
 
-/** Validate authentication configuration. */
+/** Validate auth config: check strategy-specific requirements and secretTtl range. */
 function validateAuth(auth?: AuthInput): void {
   if (auth?.strategy === 'bearer' && !auth.secret) {
     throw new Error('auth.secret is required when strategy is bearer');
@@ -104,7 +107,7 @@ function validateAuth(auth?: AuthInput): void {
   }
 }
 
-/** Validate CSP directives (must use camelCase, not kebab-case). */
+/** Validate CSP directives use camelCase (not kebab-case like `default-src`). */
 function validateCspDirectives(csp?: CspOptions): void {
   if (!csp?.directives) return;
   const kebabPattern = /^[a-z]+-[a-z]/;

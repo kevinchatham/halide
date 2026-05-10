@@ -36,11 +36,11 @@ If no logger is provided, a no-op logger is used (all methods are empty function
 ## Lifecycle Hooks
 
 - `onRequest(ctx, app)` — called after auth/authorization, before handler
-- `onResponse(ctx, app, response)` — called after handler completes
+- `onResponse(ctx, app, response)` — called after handler completes (including on error)
 
 The `app` parameter is a `THalideApp` containing `claims` (decoded JWT) and `logger` (structured logger).
 
-The `response` object contains:
+The `response` object (type `ResponseContext`) has the following shape:
 
 ```typescript
 interface ResponseContext {
@@ -53,8 +53,28 @@ interface ResponseContext {
 
 ## Per-Route Observability
 
-Set `observe: false` on a route to skip `onRequest`/`onResponse` hooks for that specific route.
+Set `observe: false` on a route to skip `onRequest`/`onResponse` hooks for that specific route. Hooks fire per-route for logging and metrics.
 
 ## Request ID Middleware
 
 When `observability.requestId` is `true`, every request gets an `x-request-id` header. If the incoming request already has an `x-request-id` header, it is forwarded as-is. Otherwise, a new UUID is generated via `crypto.randomUUID()`.
+
+## Types
+
+```typescript
+type RequestContext = {
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
+  path: string;
+  headers: Record<string, string | string[]>;
+  params: Record<string, string>;
+  query: Record<string, string | string[]>;
+  body?: unknown;
+};
+
+type ObservabilityConfig<TApp = THalideApp> = {
+  requestId?: boolean;
+  logger?: Logger<unknown>;
+  onRequest?: (ctx: RequestContext, app: TApp) => void | Promise<void>;
+  onResponse?: (ctx: RequestContext, app: TApp, response: ResponseContext) => void | Promise<void>;
+};
+```

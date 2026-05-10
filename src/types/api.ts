@@ -1,0 +1,167 @@
+import type { ZodSchema } from 'zod';
+import type { RequestContext, THalideApp } from './app';
+
+/**
+ * Metadata for OpenAPI/Scalar documentation generation on a route.
+ */
+export type OpenApiRouteMeta = {
+  /** Short summary of what the route does. */
+  summary?: string;
+  /** Detailed description of the route. */
+  description?: string;
+  /** Tags for grouping routes in the OpenAPI UI. */
+  tags?: string[];
+  /** Map of HTTP status codes to response definitions. */
+  responses?: Record<number, { description: string; schema?: ZodSchema }>;
+};
+
+/**
+ * Source of an OpenAPI specification document.
+ */
+export type OpenApiSource = {
+  /** Path to a local OpenAPI JSON file, or a URL to fetch. */
+  path: string;
+};
+
+/**
+ * Definition of an API route that executes a handler function.
+ * Created via the {@link apiRoute} factory function.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
+ */
+export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = {
+  /** Whether the route is public (no auth required) or private (requires valid JWT). */
+  access: 'public' | 'private';
+  /** HTTP method for this route. Defaults to GET. */
+  method?: 'get' | 'post' | 'put' | 'patch' | 'delete';
+  /** Whether to fire observability hooks for this route. Defaults to true. */
+  observe?: boolean;
+  /** URL path pattern for this route. Supports Hono-style path parameters like '/users/:id'. */
+  path: string;
+  /** Route type discriminator. Set automatically by {@link apiRoute}. */
+  type: 'api';
+  /** Authorization function called after JWT validation. */
+  authorize?: AuthorizeFn<TApp>;
+  /** Handler function that processes the request and returns a response. */
+  handler: ApiRouteHandler<TApp, TBody, TResponse>;
+  /** Zod schema for validating the request body and documenting it in OpenAPI. */
+  requestSchema?: ZodSchema<TBody>;
+  /** Zod schema for documenting the response body in OpenAPI. */
+  responseSchema?: ZodSchema<TResponse>;
+  /** OpenAPI/Scalar metadata for documentation. */
+  openapi?: OpenApiRouteMeta;
+};
+
+/**
+ * Definition of a proxy route that forwards requests to an upstream target.
+ * Created via the {@link proxyRoute} factory function.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ */
+export type ProxyRoute<TApp = THalideApp> = {
+  /** Whether the route is public (no auth required) or private (requires valid JWT). */
+  access: 'public' | 'private';
+  /** HTTP methods this proxy route handles. At least one is required. */
+  methods: Array<'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options'>;
+  /** Whether to fire observability hooks for this route. Defaults to true. */
+  observe?: boolean;
+  /** URL path pattern to match. Supports Hono-style path parameters and wildcards. */
+  path: string;
+  /** Override path to use when forwarding (e.g., '/api/*' → '/v1/*'). Defaults to path. */
+  proxyPath?: string;
+  /** Upstream target URL to forward requests to. Required. */
+  target: string;
+  /** Timeout in milliseconds for upstream requests. Defaults to 60000. */
+  timeout?: number;
+  /** Route type discriminator. Set automatically by {@link proxyRoute}. */
+  type: 'proxy';
+  /** Authorization function called after JWT validation. */
+  authorize?: AuthorizeFn<TApp>;
+  /**
+   * Function to extract identity headers from claims and add to the upstream request.
+   * Useful for passing user ID or tenant info to the backend.
+   */
+  identity?: (ctx: RequestContext, app: TApp) => Record<string, string> | undefined;
+  /** Transform function to modify the request body/headers before forwarding. */
+  transform?: TransformFn;
+  /** OpenAPI/Scalar metadata for documentation. */
+  openapi?: OpenApiRouteMeta;
+  /** External OpenAPI spec source for documenting the proxied API. */
+  openapiSpec?: OpenApiSource;
+};
+
+/**
+ * Handler function for API routes.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
+ */
+export type ApiRouteHandler<TApp = THalideApp, TBody = unknown, TResponse = unknown> = (
+  /** Request context including path, method, headers, params, query, and body. */
+  ctx: RequestContext & { body: TBody },
+  /** Bundled app context with claims and logger. */
+  app: TApp,
+) => Promise<TResponse>;
+
+/**
+ * Authorization function that determines if a request should be allowed.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ */
+export type AuthorizeFn<TApp = THalideApp> = (
+  /** Normalized request context. */
+  ctx: RequestContext,
+  /** Bundled app context with claims and logger. */
+  app: TApp,
+) => boolean | Promise<boolean>;
+
+/**
+ * Transform function for proxy route request modification.
+ * Allows transforming the request body and headers before forwarding.
+ */
+export type TransformFn = (request: {
+  /** HTTP method in lowercase. */
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
+  /** Request body to transform. */
+  body: unknown;
+  /** Request headers to transform. */
+  headers: Record<string, string>;
+}) => {
+  /** Transformed request body. */
+  body: unknown;
+  /** Transformed request headers. */
+  headers: Record<string, string>;
+};
+
+/**
+ * Input type for creating an API route via the factory function.
+ * Omits 'type', 'authorize' (has default), and 'handler' (required).
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
+ */
+export type ApiRouteInput<TApp, TBody = unknown, TResponse = unknown> = Omit<
+  ApiRoute<TApp, TBody, TResponse>,
+  'type' | 'authorize' | 'handler'
+> & {
+  /** Handler function that processes the request and returns a response. */
+  handler: ApiRouteHandler<TApp, TBody, TResponse>;
+  /** Authorization function called after JWT validation. */
+  authorize?: AuthorizeFn<TApp>;
+};
+
+/**
+ * Input type for creating a proxy route via the factory function.
+ * Omits 'type' which is set automatically.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ */
+export type ProxyRouteInput<TApp = THalideApp> = Omit<ProxyRoute<TApp>, 'type'>;
+
+/**
+ * Union of all route types.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TBody - The type of the request body.
+ * @typeParam TResponse - The type of the response body.
+ */
+export type Route<TApp = THalideApp, TBody = unknown, TResponse = unknown> =
+  | ApiRoute<TApp, TBody, TResponse>
+  | ProxyRoute<TApp>;

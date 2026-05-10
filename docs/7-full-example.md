@@ -11,6 +11,8 @@ interface UserClaims {
 
 type App = THalideApp<UserClaims>;
 
+type LogScope = { requestId: string; service: string };
+
 const CreateUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
@@ -26,6 +28,7 @@ const server = createServer<App>({
     cors: {
       origin: ['https://dashboard.example.com'],
       credentials: true,
+      methods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
     },
     csp: {
       directives: {
@@ -48,10 +51,16 @@ const server = createServer<App>({
   observability: {
     requestId: true,
     onRequest: (ctx, app) => {
-      app.logger.info(`[Request] ${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`);
+      app.logger.info(
+        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' } as LogScope,
+        `${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`,
+      );
     },
     onResponse: (ctx, app, { statusCode, durationMs }) => {
-      app.logger.info(`[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`);
+      app.logger.info(
+        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' } as LogScope,
+        `${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`,
+      );
     },
   },
 

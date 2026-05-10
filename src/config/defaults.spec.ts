@@ -1,4 +1,4 @@
-import type { RequestContext } from '../types';
+import type { RequestContext } from '../types/app';
 import { createNoopLogger, DEFAULTS, defaultAuthorize } from './defaults';
 
 describe('defaultAuthorize', () => {

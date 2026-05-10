@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
-import type { Logger, ProxyRoute, RequestContext, THalideApp } from '../types';
+import type { ProxyRoute } from '../types/api';
+import type { Logger, RequestContext, THalideApp } from '../types/app';
 
 /** Headers that cannot be modified by proxy transformations. */
 const READONLY_HEADERS: Set<string> = new Set([
@@ -41,7 +42,7 @@ export function buildRequestContextFromHono(c: Context, body?: unknown): Request
   };
 }
 
-/** Normalize headers to a consistent string format, handling multi-value headers. */
+/** Normalize headers to string values, joining array values with ', '. Tracks multi-value keys. */
 function normalizeHeaders(headers: Record<string, unknown>): {
   headers: Record<string, string>;
   multiValueKeys: Set<string>;
@@ -63,7 +64,7 @@ function normalizeHeaders(headers: Record<string, unknown>): {
   return { headers: normalized, multiValueKeys };
 }
 
-/** Apply identity headers from JWT claims to the upstream request. */
+/** Apply identity headers from JWT claims to the upstream request headers map. */
 function applyIdentityHeaders<TApp>(
   headers: Record<string, string | undefined>,
   route: ProxyRoute<TApp>,
@@ -84,7 +85,7 @@ function applyIdentityHeaders<TApp>(
   }
 }
 
-/** Check if a header can be modified (not in readonly or array headers). */
+/** Check if a header name is writable (not readonly, not array, not already multi-value). */
 function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   const lowerKey = key.toLowerCase();
   return (
@@ -92,7 +93,7 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   );
 }
 
-/** Apply request body transformation if configured. */
+/** Apply a configured body transformation, returning the transformed body or original request body. */
 function applyTransform<TApp>(
   route: ProxyRoute<TApp>,
   parsedBody: unknown,
@@ -131,6 +132,10 @@ function applyTransform<TApp>(
 
 /**
  * Create a proxy handler function that forwards requests to an upstream target.
+ *
+ * Rewrites paths (supporting wildcard patterns), applies identity headers,
+ * transforms the request body, and forwards using `hono/proxy`.
+ *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param route - The proxy route configuration.
  * @param app - Bundled app context with claims and logger.

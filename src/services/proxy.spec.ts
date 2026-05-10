@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import type { Logger, ProxyRoute, THalideApp } from '../types';
+import type { ProxyRoute } from '../types/api';
+import type { Logger, THalideApp } from '../types/app';
 import { createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {

@@ -2,7 +2,7 @@
 
 ## CORS
 
-Applied to all routes via `hono/cors`.
+Applied to all routes via `hono/cors` in `createApp()`.
 
 ```typescript
 security: {
@@ -32,7 +32,7 @@ security: {
 
 ## CSP
 
-Applied via `hono/secure-headers`. Always active — defaults to a restrictive policy if not specified.
+Applied via `hono/secure-headers` using `createSecurityMiddleware()`. Always active — defaults to a restrictive policy if not specified.
 
 ```typescript
 security: {
@@ -55,10 +55,6 @@ security: {
 ```
 
 **Gotcha:** CSP directive keys must use **camelCase** (`defaultSrc`), NOT kebab-case (`default-src`). The validator throws on kebab-case keys.
-
-### OpenAPI CSP Overrides
-
-When OpenAPI is enabled, the Swagger UI routes use relaxed CSP directives to allow Scalar UI to load external resources (scripts from `cdn.jsdelivr.net`, inline styles). A warning is logged at startup. Custom CSP settings do not apply to these routes.
 
 ### Available CSP Directives
 
@@ -109,6 +105,10 @@ styleSrc: ["'self'", 'https:', "'unsafe-inline'"]
 upgradeInsecureRequests: []
 ```
 
+### OpenAPI CSP Overrides
+
+When OpenAPI is enabled, the Swagger UI routes use relaxed CSP directives to allow Scalar UI to load external resources (scripts from `cdn.jsdelivr.net`, inline styles). A warning is logged at startup. Custom CSP settings do not apply to these routes.
+
 ## Rate Limiting
 
 IP-based sliding window. Opt-in — not enabled unless `security.rateLimit` is configured.
@@ -122,7 +122,7 @@ security: {
 }
 ```
 
-Client IP is determined from `x-forwarded-for` header (first value) or falls back to `'unknown'`. Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
+Client IP is determined from `x-forwarded-for` header (first value) or falls back to `'unknown'`. Returns `429 Too Many Requests` with `Retry-After` header when exceeded. The middleware uses an in-memory store with periodic cleanup.
 
 | Field         | Default  | Description                        |
 | ------------- | -------- | ---------------------------------- |

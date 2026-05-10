@@ -16,7 +16,7 @@ interface WindowEntry {
   resetTime: number;
 }
 
-/** Extract client IP from request headers (supports X-Forwarded-For). */
+/** Extract client IP from request headers, falling back to 'unknown'. Supports X-Forwarded-For. */
 function getClientIp(c: Context): string {
   const forwarded = c.req.header('x-forwarded-for');
   if (forwarded) {
@@ -28,6 +28,10 @@ function getClientIp(c: Context): string {
 
 /**
  * Create rate limiting middleware that restricts requests per client IP.
+ *
+ * Uses an in-memory store with periodic cleanup. Returns 429 when the client
+ * has exceeded its window quota. The dispose function clears the cleanup timer.
+ *
  * @param config - Rate limit configuration (maxRequests and windowMs).
  * @returns Object containing the middleware and a dispose function for cleanup.
  */

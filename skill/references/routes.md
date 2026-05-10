@@ -111,12 +111,6 @@ proxyPath: /backend
 Result:   http://products.internal/backend/users/123
 ```
 
-### Host Header Behavior
-
-The original `Host` header from the client request is **NOT** forwarded to the backend. Instead, the `host` header is derived from the target URL, which is the correct behavior for most backend services and CDNs. The original host value is preserved as `X-Forwarded-Host` for backend reference.
-
-This prevents routing issues with CDNs (like Akamai) that use the `host` header to route requests — forwarding the client's host header to the backend would cause 404 errors.
-
 ### Identity Headers
 
 The `identity` function receives `(ctx, app)` and returns a `Record<string, string>` of headers to inject into the proxied request. Only called when `app.claims` is defined (i.e., private routes with successful auth).

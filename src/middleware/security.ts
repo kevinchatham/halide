@@ -1,6 +1,6 @@
 import { secureHeaders } from 'hono/secure-headers';
 import { DEFAULTS } from '../config/defaults';
-import type { CspDirectives, CspOptions } from '../types';
+import type { CspDirectives, CspOptions } from '../types/csp';
 
 /**
  * Create middleware that applies Content Security Policy headers.
