@@ -101,7 +101,7 @@ imgSrc: ["'self'", 'data:']
 objectSrc: ["'none'"]
 scriptSrc: ["'self'"]
 scriptSrcAttr: ["'none'"]
-styleSrc: ["'self'", 'https:', "'unsafe-inline'"]
+styleSrc: ["'self'", 'https:']
 upgradeInsecureRequests: []
 ```
 
@@ -116,15 +116,19 @@ IP-based sliding window. Opt-in — not enabled unless `security.rateLimit` is c
 ```typescript
 security: {
   rateLimit: {
-    maxRequests: 100,    // default: 100
-    windowMs: 900000,    // default: 900000 (15 minutes)
+    maxRequests: 100,       // default: 100
+    windowMs: 900000,       // default: 900000 (15 minutes)
+    trustedProxies: ['10.0.0.0/8'],  // optional — trust x-forwarded-for from these IPs/CIDRs
+    maxEntries: 1000,       // optional — max store entries; oldest evicted when exceeded
   },
 }
 ```
 
-Client IP is determined from `x-forwarded-for` header (first value) or falls back to `'unknown'`. Returns `429 Too Many Requests` with `Retry-After` header when exceeded. The middleware uses an in-memory store with periodic cleanup.
+Client IP is extracted from `x-forwarded-for` (first value) when socket IP matches a trusted proxy, or falls back to socket IP. Returns `429 Too Many Requests` with `Retry-After` header. Uses an in-memory store with periodic cleanup.
 
-| Field         | Default  | Description                        |
-| ------------- | -------- | ---------------------------------- |
-| `maxRequests` | `100`    | Maximum requests per window        |
-| `windowMs`    | `900000` | Window duration in ms (15 minutes) |
+| Field            | Default     | Description                                            |
+| ---------------- | ----------- | ------------------------------------------------------ |
+| `maxRequests`    | `100`       | Maximum requests per window                            |
+| `windowMs`       | `900000`    | Window duration in ms (15 minutes)                     |
+| `trustedProxies` | `[]`        | Trusted proxy IPs/CIDRs for x-forwarded-for validation |
+| `maxEntries`     | `undefined` | Max store entries; oldest evicted when exceeded        |

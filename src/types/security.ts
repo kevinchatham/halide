@@ -71,5 +71,9 @@ export type SecurityConfig = {
     maxRequests?: number;
     /** Time window in milliseconds. Defaults to 900000 (15 minutes). */
     windowMs?: number;
+    /** Trusted proxy IPs/CIDRs. When set, x-forwarded-for is only trusted from these IPs. */
+    trustedProxies?: string[];
+    /** Maximum number of entries in the rate limit store. Oldest entries are evicted when exceeded. */
+    maxEntries?: number;
   };
 };

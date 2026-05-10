@@ -179,7 +179,7 @@ describe('createServer', () => {
     expect(receivedPort).toBe(port);
   });
 
-  it('logs shutdown message and exits on SIGTERM signal', async () => {
+  it('logs shutdown message and sets exitCode on SIGTERM signal', async () => {
     const infoMessages: string[] = [];
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
@@ -205,12 +205,13 @@ describe('createServer', () => {
     }
     await new Promise((resolve) => setImmediate(resolve));
     expect(infoMessages.some((msg) => msg.includes('SIGTERM'))).toBe(true);
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(process.exitCode).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     onSpy.mockRestore();
   });
 
-  it('logs shutdown message and exits on SIGINT signal', async () => {
+  it('logs shutdown message and sets exitCode on SIGINT signal', async () => {
     const infoMessages: string[] = [];
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
@@ -236,7 +237,8 @@ describe('createServer', () => {
     }
     await new Promise((resolve) => setImmediate(resolve));
     expect(infoMessages.some((msg) => msg.includes('SIGINT'))).toBe(true);
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(process.exitCode).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     onSpy.mockRestore();
   });

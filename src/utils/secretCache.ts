@@ -2,7 +2,7 @@ import type { Logger } from '../types/app';
 
 /** Internal cache entry for a resolved JWT secret. */
 interface CachedSecret {
-  /** Timestamp (Date.now()) when this cache entry expires. */
+  /** Timestamp (Date.now()) when this cache entry expires. After this time the cache is invalidated. */
   expiresAt: number;
   /** The resolved secret string. */
   value: string;

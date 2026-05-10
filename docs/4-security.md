@@ -4,10 +4,10 @@ Configure CORS, CSP, and rate limiting to lock down your BFF layer.
 
 ```ts
 security: {
-   cors: {
-      origin: ['https://myapp.com'],
-      credentials: true,
-      methods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
+  cors: {
+    origin: ['https://myapp.com'],
+    credentials: true,
+    methods: ['get', 'post', 'put', 'delete', 'patch'],
     allowedHeaders: ['content-type', 'authorization'],
     exposedHeaders: ['x-custom-header'],
     maxAge: 3600,
@@ -21,7 +21,7 @@ security: {
   },
   rateLimit: {
     maxRequests: 100,
-    windowMs: 900000,  // 15 minutes
+    windowMs: 900000, // 15 minutes
   },
 }
 ```
@@ -30,14 +30,14 @@ security: {
 
 Applied to all routes via `hono/cors`.
 
-| Field            | Default                                     | Description                              |
-| ---------------- | ------------------------------------------- | ---------------------------------------- |
-| `origin`         | `['*']`                                     | Allowed origins (string or string array) |
-| `credentials`    | `false`                                     | Include credentials in CORS requests     |
-| `methods`        | `['get', 'post', 'put', 'delete', 'patch']` | Allowed HTTP methods                     |
-| `allowedHeaders` | `undefined`                                 | Allowed request headers                  |
-| `exposedHeaders` | `undefined`                                 | Headers exposed to the client            |
-| `maxAge`         | `undefined`                                 | Preflight cache duration in seconds      |
+| Field            | Default                                     | Description                                           |
+| ---------------- | ------------------------------------------- | ----------------------------------------------------- |
+| `origin`         | `['*']`                                     | Allowed origins (string or string array)              |
+| `credentials`    | `false`                                     | Include credentials in CORS requests                  |
+| `methods`        | `['get', 'post', 'put', 'delete', 'patch']` | Allowed HTTP methods (supports `'head'`, `'options'`) |
+| `allowedHeaders` | `undefined`                                 | Allowed request headers                               |
+| `exposedHeaders` | `undefined`                                 | Headers exposed to the client                         |
+| `maxAge`         | `undefined`                                 | Preflight cache duration in seconds                   |
 
 Wildcard origin (`'*'`) cannot be combined with `credentials: true` — the validator will throw.
 
@@ -51,20 +51,20 @@ Directive keys must use **camelCase** (`defaultSrc`), not kebab-case (`default-s
 
 If no CSP is specified, these defaults apply:
 
-| Directive                 | Default value                             |
-| ------------------------- | ----------------------------------------- |
-| `baseUri`                 | `["'self'"]`                              |
-| `defaultSrc`              | `["'self'"]`                              |
-| `fontSrc`                 | `["'self'", 'https:', 'data:']`           |
-| `formAction`              | `["'self'"]`                              |
-| `frameAncestors`          | `["'self'"]`                              |
-| `frameSrc`                | `["'self'"]`                              |
-| `imgSrc`                  | `["'self'", 'data:']`                     |
-| `objectSrc`               | `["'none'"]`                              |
-| `scriptSrc`               | `["'self'"]`                              |
-| `scriptSrcAttr`           | `["'none'"]`                              |
-| `styleSrc`                | `["'self'", 'https:', "'unsafe-inline'"]` |
-| `upgradeInsecureRequests` | `[]`                                      |
+| Directive                 | Default value                   |
+| ------------------------- | ------------------------------- |
+| `baseUri`                 | `["'self'"]`                    |
+| `defaultSrc`              | `["'self'"]`                    |
+| `fontSrc`                 | `["'self'", 'https:', 'data:']` |
+| `formAction`              | `["'self'"]`                    |
+| `frameAncestors`          | `["'self'"]`                    |
+| `frameSrc`                | `["'self'"]`                    |
+| `imgSrc`                  | `["'self'", 'data:']`           |
+| `objectSrc`               | `["'none'"]`                    |
+| `scriptSrc`               | `["'self'"]`                    |
+| `scriptSrcAttr`           | `["'none'"]`                    |
+| `styleSrc`                | `["'self'", 'https:']`          |
+| `upgradeInsecureRequests` | `[]`                            |
 
 ### OpenAPI CSP overrides
 

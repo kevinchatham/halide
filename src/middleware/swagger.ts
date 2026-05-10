@@ -1,5 +1,6 @@
 import { Scalar } from '@scalar/hono-api-reference';
-import type { Hono } from 'hono';
+import type { Context } from 'hono';
+import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
 import { resolveOpenApiSpec } from '../routes/registry';
 import type { ServerConfig } from '../types';
@@ -19,7 +20,7 @@ function applyMetadata(
   if (metadata?.tags?.length) operation.tags = metadata.tags;
 }
 
-/** Merge external OpenAPI spec paths into the inline spec's paths map. */
+/** Merge external OpenAPI spec paths into the inline spec's paths map, respecting route method filtering. */
 function mergeExternalSpecs(
   inlineSpec: Record<string, unknown>,
   resolvedSpecs: Array<{ spec: Record<string, unknown>; route: ProxyRoute<unknown> }>,
@@ -41,7 +42,7 @@ function mergeExternalSpecs(
   return { ...inlineSpec, paths };
 }
 
-/** Merge a single path item from an external spec into the paths map. */
+/** Merge a single path item from an external spec into the paths map, filtering by allowed methods. */
 function mergePathItem(
   pathItem: Record<string, unknown>,
   mappedPath: string,
@@ -62,13 +63,24 @@ function mergePathItem(
   }
 }
 
-/** Build the inline OpenAPI spec by fetching from the Hono app's openAPIRouteHandler. */
-function buildInlineSpec(
+/** Build the inline OpenAPI spec by fetching from a temporary Hono app using hono-openapi. */
+async function buildInlineSpec(
   app: Hono,
   options: OpenApiOptions | undefined,
-  ctx: unknown,
 ): Promise<Record<string, unknown>> {
-  const inlineHandler = openAPIRouteHandler(app, {
+  const tempApp = new Hono();
+  const inlineHandler = openAPIRouteHandler as (
+    app: Hono,
+    opts: {
+      documentation: {
+        info: { title: string; version: string };
+        description?: string;
+        servers?: Array<{ url: string }>;
+      };
+    },
+  ) => (ctx: unknown) => Promise<Response>;
+
+  const handler = inlineHandler(app, {
     documentation: {
       info: {
         title: options?.title ?? 'Halide API',
@@ -78,12 +90,22 @@ function buildInlineSpec(
       ...(options?.servers?.length && { servers: options.servers }),
     },
   });
-  return (inlineHandler as unknown as (ctx: unknown) => Promise<Response>)(ctx).then(
-    (res) => ((res as unknown as Response)?.json() as Promise<Record<string, unknown>>) ?? {},
+
+  const swaggerPath = '/__internal-spec';
+  (tempApp.get as (path: string, ...handlers: Array<unknown>) => Hono)(
+    `${swaggerPath}/openapi.json`,
+    handler as (ctx: Context) => Promise<Response>,
   );
+
+  try {
+    const res = await tempApp.fetch(new Request(`http://localhost${swaggerPath}/openapi.json`));
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
-/** Build the final OpenAPI spec with title, version, description, and servers. */
+/** Build the final OpenAPI spec with title, version, description, and servers, preferring options over inline defaults. */
 function buildFinalSpec(
   mergedSpec: Record<string, unknown>,
   options: OpenApiOptions | undefined,
@@ -129,34 +151,32 @@ export function createOpenApiRoutes<TApp = unknown>(config: ServerConfig<TApp>, 
 
   if (hasExternalSpecs) {
     let cachedSpec: Record<string, unknown> | null = null;
-    let specResolution: Promise<void> | null = null;
 
     app.get(`${swaggerPath}/openapi.json`, async (c) => {
       if (cachedSpec) {
         return c.json(cachedSpec);
       }
 
-      specResolution ??= (async () => {
+      let specResolution: Promise<void> | null = null;
+
+      const resolveSpec = async (): Promise<void> => {
         try {
-          const inlineSpec = await buildInlineSpec(app, options, c);
+          const inlineSpec = await buildInlineSpec(app, options);
           const resolved = await resolveOpenApiSpec(proxyRoutes as ProxyRoute<unknown>[]);
           const mergedSpec = mergeExternalSpecs(inlineSpec, resolved);
           cachedSpec = buildFinalSpec(mergedSpec, options);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          // biome-ignore lint/suspicious/noConsole: error logging for OpenAPI spec resolution
-          console.error('Failed to resolve OpenAPI spec:', msg);
-          cachedSpec = {} as Record<string, unknown>;
+        } catch {
+          cachedSpec = {};
         }
-      })();
+      };
 
+      specResolution = resolveSpec();
       await specResolution;
-      return c.json(cachedSpec);
+      return c.json(cachedSpec ?? {});
     });
   } else {
-    app.get(
-      `${swaggerPath}/openapi.json`,
-      openAPIRouteHandler(app, {
+    app.get(`${swaggerPath}/openapi.json`, ((c: Context) => {
+      const handler = openAPIRouteHandler(app, {
         documentation: {
           info: {
             title: options?.title ?? 'Halide API',
@@ -165,8 +185,9 @@ export function createOpenApiRoutes<TApp = unknown>(config: ServerConfig<TApp>, 
           },
           ...(options?.servers?.length && { servers: options.servers }),
         },
-      }),
-    );
+      });
+      return (handler as (ctx: unknown) => Promise<Response>)(c);
+    }) as (c: Context) => Promise<Response>);
   }
 
   app.get(

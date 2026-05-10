@@ -55,7 +55,7 @@ export function addScriptsToPackageJson(cwd: string): void {
 /** Supported package managers for dependency installation. */
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
-/** Detect which package manager is used in the project. */
+/** Detect which package manager is used in the project by checking for lock files. */
 export function detectPackageManager(cwd: string): PackageManager {
   if (fs.existsSync(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
   if (fs.existsSync(path.join(cwd, 'yarn.lock'))) return 'yarn';
@@ -103,7 +103,7 @@ export function installSkillsFromHalide(cwd: string): void {
   }
 }
 
-/** Output a message to stdout with a trailing newline. */
+/** Output a message to stdout with a trailing newline. Used for CLI progress reporting. */
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }

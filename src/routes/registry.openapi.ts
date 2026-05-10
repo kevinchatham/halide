@@ -60,7 +60,7 @@ export async function resolveOpenApiSpec(
   return results;
 }
 
-/** Build OpenAPI describeRoute options from route metadata, including hidden flag and request body. */
+/** Build OpenAPI describeRoute options from route metadata, including hidden flag and request body schema. */
 export function buildDescribeRouteOptions<TApp>(
   route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): DescribeRouteOptions {
@@ -79,7 +79,7 @@ export function buildDescribeRouteOptions<TApp>(
   return options;
 }
 
-/** Build OpenAPI request body configuration from route request schema. */
+/** Build OpenAPI request body configuration from route request schema, detecting optional wrappers. */
 export function buildRequestBody<TApp>(
   route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): DescribeRouteOptions['requestBody'] {
@@ -97,7 +97,7 @@ export function buildRequestBody<TApp>(
   };
 }
 
-/** Build OpenAPI responses object from route metadata or response schema. */
+/** Build OpenAPI responses object from route metadata or response schema, defaulting to a 200 successful response. */
 export function buildResponses<TApp>(
   route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): ResponsesWithResolver {

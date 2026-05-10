@@ -65,6 +65,57 @@ describe('validateServerConfig — routes', () => {
     ).toThrow('Proxy route requires at least one method');
   });
 
+  it('rejects proxy route with invalid URL', () => {
+    expect(() =>
+      validateServerConfig({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/test',
+            target: 'not a url',
+            type: 'proxy',
+          },
+        ],
+      }),
+    ).toThrow('Proxy route target is not a valid URL');
+  });
+
+  it('rejects proxy route with file protocol', () => {
+    expect(() =>
+      validateServerConfig({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/test',
+            target: 'file:///etc/passwd',
+            type: 'proxy',
+          },
+        ],
+      }),
+    ).toThrow('Proxy route target is not a valid URL');
+  });
+
+  it('rejects proxy route with data protocol', () => {
+    expect(() =>
+      validateServerConfig({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/test',
+            target: 'data:text/html,<h1>Hello</h1>',
+            type: 'proxy',
+          },
+        ],
+      }),
+    ).toThrow('Proxy route target is not a valid URL');
+  });
+
   it('rejects proxy route proxyPath not starting with /', () => {
     expect(() =>
       validateServerConfig({

@@ -74,9 +74,11 @@ proxyRoute({
   timeout: 5000,                   // optional — ms, default: 60000
   identity: (ctx, app) => ({ 'x-user-id': app.claims?.sub }),  // optional
   transform: ({ method, body, headers }) => ({ body, headers }), // optional
+  forwardHeaders: ['accept', 'content-type'],  // optional — headers to forward (default: safe subset)
   authorize: (ctx, app) => true,  // auto-filled by factory
   observe: true,                   // optional
   openapi: { ... },                // optional
+  openapiSpec: { path: '/openapi.json' },  // optional — external spec source
 })
 ```
 
@@ -134,6 +136,14 @@ transform: ({ method, body, headers }) => ({
 ```
 
 If no transform is provided, the raw request body is forwarded as-is.
+
+### Forward Headers
+
+Controls which request headers are forwarded to upstream. Defaults to a safe subset: `accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-type`, `content-length`, `origin`, `user-agent`. Set to an empty array `[]` to forward no headers. Headers are matched case-insensitively.
+
+```typescript
+forwardHeaders: ['accept', 'content-type', 'x-custom'],
+```
 
 ### Host Header Behavior
 

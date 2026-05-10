@@ -28,7 +28,7 @@ server.start((port) => {
 `;
 }
 
-/** TypeScript configuration for the server build. */
+/** TypeScript configuration for the server build. Used by `writeTsconfigServer`. */
 export const TSCONFIG_SERVER = `{
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
@@ -44,7 +44,7 @@ export const TSCONFIG_SERVER = `{
 }
 `;
 
-/** Write tsconfig.server.json if it doesn't exist. */
+/** Write tsconfig.server.json if it doesn't already exist. */
 export function writeTsconfigServer(cwd: string): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
   if (fs.existsSync(tsconfigServerPath)) {
@@ -55,7 +55,7 @@ export function writeTsconfigServer(cwd: string): void {
   log('✓ Created tsconfig.server.json');
 }
 
-/** Add tsconfig.server.json reference to tsconfig.json. */
+/** Add tsconfig.server.json reference to tsconfig.json, skipping if already referenced. */
 export function addServerReference(cwd: string): void {
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
   if (!fs.existsSync(tsconfigPath)) return;
@@ -75,7 +75,7 @@ export function addServerReference(cwd: string): void {
   log('✓ Added tsconfig.server.json reference to tsconfig.json');
 }
 
-/** Exclude server.ts from tsconfig.app.json. */
+/** Exclude server.ts from tsconfig.app.json, adding it to the exclude list if not already present. */
 export function excludeServerFromApp(cwd: string): void {
   const appPath = path.join(cwd, 'tsconfig.app.json');
   if (!fs.existsSync(appPath)) return;
@@ -97,7 +97,7 @@ export function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
-/** Output a message to stdout with a trailing newline. */
+/** Output a message to stdout with a trailing newline. Used for CLI progress reporting. */
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }

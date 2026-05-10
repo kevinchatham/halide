@@ -52,6 +52,8 @@ type SecurityConfig = {
   rateLimit?: {
     maxRequests?: number; // default: 100
     windowMs?: number; // default: 900000 (15 minutes)
+    trustedProxies?: string[]; // optional — trust x-forwarded-for from these IPs/CIDRs
+    maxEntries?: number; // optional — max store entries; oldest evicted
   };
 };
 

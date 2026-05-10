@@ -12,10 +12,22 @@ const READONLY_HEADERS: Set<string> = new Set([
   'transfer-encoding',
 ]);
 
+/** Default headers allowed to be forwarded to upstream when forwardHeaders is not specified. */
+const DEFAULT_FORWARD_HEADERS: string[] = [
+  'accept',
+  'accept-encoding',
+  'accept-language',
+  'cache-control',
+  'content-type',
+  'content-length',
+  'origin',
+  'user-agent',
+];
+
 /** Headers that can have multiple values and need special handling. */
 const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
 
-/** Serialize a query parameter value to string or string array. */
+/** Serialize a query parameter value to string or string array, JSON-encoding non-string values. */
 export function serializeQueryParam(v: unknown): string | string[] {
   if (Array.isArray(v)) {
     return v.map((item) => (typeof item === 'string' ? item : JSON.stringify(item)));
@@ -42,7 +54,7 @@ export function buildRequestContextFromHono(c: Context, body?: unknown): Request
   };
 }
 
-/** Normalize headers to string values, joining array values with ', '. Tracks multi-value keys. */
+/** Normalize headers to string values, joining array values with ', '. Tracks which keys had multiple values. */
 function normalizeHeaders(headers: Record<string, unknown>): {
   headers: Record<string, string>;
   multiValueKeys: Set<string>;
@@ -64,7 +76,39 @@ function normalizeHeaders(headers: Record<string, unknown>): {
   return { headers: normalized, multiValueKeys };
 }
 
-/** Apply identity headers from JWT claims to the upstream request headers map. */
+/** Filter headers through the forwardHeaders allowlist, returning only allowed headers. Uses a default allowlist when forwardHeaders is undefined. */
+function filterForwardHeaders(
+  headers: Record<string, string | undefined>,
+  forwardHeaders?: string[],
+): Record<string, string> {
+  if (forwardHeaders === undefined) {
+    // Default allowlist
+    const allowed = new Set(DEFAULT_FORWARD_HEADERS.map((h) => h.toLowerCase()));
+    const filtered: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (value !== undefined && allowed.has(key.toLowerCase())) {
+        filtered[key] = value;
+      }
+    }
+    return filtered;
+  }
+
+  if (forwardHeaders.length === 0) {
+    // Explicit empty array — forward no headers
+    return {};
+  }
+
+  const allowed = new Set(forwardHeaders.map((h) => h.toLowerCase()));
+  const filtered: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (value !== undefined && allowed.has(key.toLowerCase())) {
+      filtered[key] = value;
+    }
+  }
+  return filtered;
+}
+
+/** Apply identity headers from JWT claims to the upstream request headers map, respecting readonly and multi-value constraints. */
 function applyIdentityHeaders<TApp>(
   headers: Record<string, string | undefined>,
   route: ProxyRoute<TApp>,
@@ -85,7 +129,7 @@ function applyIdentityHeaders<TApp>(
   }
 }
 
-/** Check if a header name is writable (not readonly, not array, not already multi-value). */
+/** Check if a header name is writable — not readonly, not in ARRAY_HEADERS, and not already multi-valued. */
 function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   const lowerKey = key.toLowerCase();
   return (
@@ -93,7 +137,7 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   );
 }
 
-/** Apply a configured body transformation, returning the transformed body or original request body. */
+/** Apply a configured body transformation, returning the transformed body or original request body, logging errors on failure. */
 function applyTransform<TApp>(
   route: ProxyRoute<TApp>,
   parsedBody: unknown,
@@ -170,9 +214,12 @@ export function createProxyService<TApp = unknown>(
     }
     const targetUrl = new URL(rewrittenPath, target).toString();
 
-    const headers: Record<string, string | undefined> = { ...c.req.header() };
-    delete headers['host'];
-    delete headers['Host'];
+    const allHeaders: Record<string, string | undefined> = { ...c.req.header() };
+    delete allHeaders['host'];
+    delete allHeaders['Host'];
+
+    const filteredHeaders = filterForwardHeaders(allHeaders, route.forwardHeaders);
+    const headers: Record<string, string | undefined> = { ...filteredHeaders };
     headers['x-forwarded-host'] = c.req.header('host') ?? '';
 
     applyIdentityHeaders(headers, route, app, c, parsedBody);

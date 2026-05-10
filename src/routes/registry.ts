@@ -12,13 +12,15 @@ import {
   emitOnRequest,
   emitOnResponse,
   extractClaims,
-  getValidJson,
   resolveBody,
 } from './registry.auth';
 import { buildDescribeRouteOptions } from './registry.openapi';
 
-/** Internal Hono variables type. */
+/** Internal Hono variables type for storing raw request body. */
 type HalideVariables = { rawBody?: unknown };
+
+/** Hono method types that have direct app.* methods on the Hono app instance. */
+type HonoMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
 
 /** Register a route on the Hono app by calling the method-specific handler (e.g., app.get, app.post). */
 function registerRouteOnApp(
@@ -27,13 +29,17 @@ function registerRouteOnApp(
   path: string,
   ...handlers: MiddlewareHandler[]
 ): void {
-  const appRecord = app as unknown as Record<
-    string,
-    (path: string, ...handlers: MiddlewareHandler[]) => void
-  >;
-  const appMethod = appRecord[method];
-  if (appMethod) {
-    appMethod(path, ...handlers);
+  if (method === 'head') {
+    (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(
+      'HEAD',
+      path,
+      ...handlers,
+    );
+  } else {
+    (app[method as HonoMethod] as (path: string, ...handlers: MiddlewareHandler[]) => void)(
+      path,
+      ...handlers,
+    );
   }
 }
 
@@ -60,12 +66,12 @@ function registerApiRoute<TApp = unknown>(
     const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
     if (authResponse) return authResponse;
 
-    const authBody = route.requestSchema ? getValidJson(c) : undefined;
-    const app: TApp = { claims, logger } as TApp;
-    const forbidResponse = await checkAuthorization(c, route, app, authBody);
+    const authBody = route.requestSchema ? resolveBody(c, route) : undefined;
+    const appCtx: TApp = { claims, logger } as TApp;
+    const forbidResponse = await checkAuthorization(c, route, appCtx, authBody);
     if (forbidResponse) return forbidResponse;
 
-    emitOnRequest(c, authBody, app, observability, route.observe);
+    emitOnRequest(c, authBody, appCtx, observability, route.observe);
 
     const body = await resolveBody(c, route);
 
@@ -73,7 +79,7 @@ function registerApiRoute<TApp = unknown>(
     try {
       const ctx = buildRequestContextFromHono(c, body) as RequestContext & { body: unknown };
       ctx.body = body;
-      result = await route.handler(ctx, app);
+      result = await route.handler(ctx, appCtx);
     } catch (err) {
       handlerError = err instanceof Error ? err : new Error(String(err));
       statusCode = 500;
@@ -82,7 +88,7 @@ function registerApiRoute<TApp = unknown>(
       emitOnResponse(
         c,
         body,
-        app,
+        appCtx,
         observability,
         route.observe,
         { handlerError, start, statusCode },
@@ -105,15 +111,15 @@ function registerProxyRoute<TApp = unknown>(
   logger: THalideApp['logger'],
 ): void {
   for (const method of route.methods) {
-    const appRecord = app as unknown as Record<
-      string,
-      (path: string, ...handlers: MiddlewareHandler[]) => void
-    >;
-    const appMethod = appRecord[method];
-    if (appMethod) {
-      appMethod(route.path, describeRoute(buildDescribeRouteOptions(route)), async (c: Context) => {
+    registerRouteOnApp(
+      app,
+      method,
+      route.path,
+      describeRoute(buildDescribeRouteOptions(route)),
+      async (c: Context) => {
         const start = Date.now();
         let handlerError: Error | undefined;
+        let pipeError: Error | undefined;
         let statusCode = 200;
         let proxyResponseBody: unknown;
 
@@ -131,8 +137,8 @@ function registerProxyRoute<TApp = unknown>(
           });
         }
 
-        const app: TApp = { claims, logger } as TApp;
-        const forbidResponse = await checkAuthorization(c, route, app, parsedBody);
+        const appCtx: TApp = { claims, logger } as TApp;
+        const forbidResponse = await checkAuthorization(c, route, appCtx, parsedBody);
         if (forbidResponse) {
           return new Response(forbidResponse.body, {
             headers: forbidResponse.headers,
@@ -140,34 +146,82 @@ function registerProxyRoute<TApp = unknown>(
           });
         }
 
-        emitOnRequest(c, parsedBody, app, observability, route.observe);
+        emitOnRequest(c, parsedBody, appCtx, observability, route.observe);
 
         try {
-          const proxyHandler = createProxyService(route, app, parsedBody);
+          const proxyHandler = createProxyService(route, appCtx, parsedBody);
           const response = await proxyHandler(c);
           statusCode = response.status;
-          proxyResponseBody = await response
-            .clone()
-            .text()
-            .catch(() => undefined);
+
+          if (route.observe === false) {
+            return response;
+          }
+
+          const body = response.body;
+          if (body) {
+            const { readable, writable } = new TransformStream();
+            const reader = body.getReader();
+            const writer = writable.getWriter();
+            const collected: Uint8Array[] = [];
+            const maxCollect = 1024;
+            let collectedBytes = 0;
+
+            async function pipe(): Promise<void> {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  if (collectedBytes < maxCollect && value) {
+                    const slice = value.slice(0, Math.max(0, maxCollect - collectedBytes));
+                    collected.push(slice);
+                    collectedBytes += slice.length;
+                  }
+                  await writer.write(value);
+                }
+                await writer.close();
+              } catch (err) {
+                pipeError = err instanceof Error ? err : new Error(String(err));
+                await writer.close();
+              }
+            }
+
+            pipe().catch(() => {});
+
+            const responseBodyText =
+              collected.length > 0
+                ? await new Response(new Blob(collected as BlobPart[])).text()
+                : undefined;
+
+            proxyResponseBody = responseBodyText;
+            const responseInit: ResponseInit = {
+              headers: response.headers,
+              status: response.status,
+            };
+            return new Response(readable as ReadableStream<Uint8Array>, responseInit);
+          }
+
           return response;
         } catch (err) {
           handlerError = err instanceof Error ? err : new Error(String(err));
           statusCode = 500;
           throw err;
         } finally {
+          if (pipeError && !handlerError) {
+            handlerError = pipeError;
+            statusCode = 502;
+          }
           emitOnResponse(
             c,
             parsedBody,
-            app,
+            appCtx,
             observability,
             route.observe,
             { handlerError, start, statusCode },
             proxyResponseBody,
           );
         }
-      });
-    }
+      },
+    );
   }
 }
 

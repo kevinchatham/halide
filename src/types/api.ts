@@ -84,6 +84,8 @@ export type ProxyRoute<TApp = THalideApp> = {
   identity?: (ctx: RequestContext, app: TApp) => Record<string, string> | undefined;
   /** Transform function to modify the request body/headers before forwarding. */
   transform?: TransformFn;
+  /** Headers to forward to upstream. Defaults to a safe subset; omit authorization, cookie, x-forwarded-for. */
+  forwardHeaders?: string[];
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
   /** External OpenAPI spec source for documenting the proxied API. */

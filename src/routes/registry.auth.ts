@@ -98,11 +98,11 @@ export function emitOnRequest<TApp>(
 
 /** Context object capturing error, start time, and status code for the onResponse hook. */
 interface ResponseEmitContext {
-  /** Error thrown by the handler, if any. */
+  /** Error thrown by the handler during request processing, if any. */
   handlerError: Error | undefined;
   /** Timestamp (Date.now()) when request processing started. */
   start: number;
-  /** HTTP status code of the response. */
+  /** HTTP status code of the final response. */
   statusCode: number;
 }
 
@@ -127,14 +127,9 @@ export function emitOnResponse<TApp>(
   }
 }
 
-/** Get validated JSON from request using the hono-openapi Zod validation schema. */
-export function getValidJson(c: Context): unknown {
-  return (c.req as unknown as { valid: (t: string) => unknown }).valid('json');
-}
-
 /** Resolve request body, using request schema if available, otherwise parsing JSON for POST/PUT/PATCH. */
 export function resolveBody<TApp>(c: Context, route: ApiRoute<TApp>): unknown {
-  if (route.requestSchema) return getValidJson(c);
+  if (route.requestSchema) return (c.req as { valid: (format: string) => unknown }).valid('json');
   const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
   return methodsWithBody.has(c.req.method.toUpperCase())
     ? c.req.json().catch(() => undefined)

@@ -3,6 +3,22 @@ import type { AppConfig } from '../types/app';
 import type { CspOptions } from '../types/csp';
 import type { CorsConfig, SecurityConfig } from '../types/security';
 
+/** A single validation error with field location and message. */
+export type ValidationError = {
+  /** Dot-notation path to the offending field. */
+  field: string;
+  /** Human-readable error description. */
+  message: string;
+};
+
+/** Result of validation with collected errors. */
+export type ValidationResult = {
+  /** List of accumulated validation errors. Empty when `valid` is true. */
+  errors: ValidationError[];
+  /** Whether validation passed (no errors). */
+  valid: boolean;
+};
+
 /** Input type for route validation. */
 type RouteInput<TApp = unknown> =
   | Partial<Extract<Route<TApp>, { type: 'api' }>>
@@ -34,90 +50,153 @@ type ServerConfigInput<TApp = unknown> = {
   security?: SecurityInput;
 };
 
-/** Validate that the app port is an integer between 1 and 65535. */
-function validateAppConfig(app?: AppInput): void {
+/** Validate the app configuration, checking port range and other app-level constraints. */
+function validateAppConfig(app?: AppInput): ValidationResult {
+  const errors: ValidationError[] = [];
   if (app?.port !== undefined) {
     if (!Number.isInteger(app.port) || app.port < 1 || app.port > 65535) {
-      throw new Error('app.port must be an integer between 1 and 65535');
+      errors.push({
+        field: 'app.port',
+        message: 'app.port must be an integer between 1 and 65535',
+      });
     }
+  }
+  return { errors, valid: errors.length === 0 };
+}
+
+/** Validate proxy route fields: target URL must be valid, at least one method required, proxyPath must start with /. */
+function validateProxyRoute<TApp = unknown>(
+  route: Partial<Extract<Route<TApp>, { type: 'proxy' }>>,
+  errors: ValidationError[],
+): void {
+  if (route.target == null || route.target === '') {
+    errors.push({ field: 'route.target', message: 'Proxy route requires target' });
+  } else {
+    try {
+      const u = new URL(route.target);
+      if (!['http:', 'https:'].includes(u.protocol)) {
+        errors.push({
+          field: 'route.target',
+          message: `Proxy route target is not a valid URL: ${route.target}`,
+        });
+      }
+    } catch {
+      errors.push({
+        field: 'route.target',
+        message: `Proxy route target is not a valid URL: ${route.target}`,
+      });
+    }
+  }
+  if (!route.methods || route.methods.length === 0) {
+    errors.push({ field: 'route.methods', message: 'Proxy route requires at least one method' });
+  }
+  if (route.proxyPath && !route.proxyPath.startsWith('/')) {
+    errors.push({
+      field: 'route.proxyPath',
+      message: `Proxy route proxyPath must start with /: ${route.proxyPath}`,
+    });
   }
 }
 
 /** Validate a single route configuration, checking path, handler, and proxy requirements. */
-function validateRoute<TApp = unknown>(route: RouteInput<TApp>): void {
+function validateRoute<TApp = unknown>(route: RouteInput<TApp>): ValidationResult {
+  const errors: ValidationError[] = [];
   if (!route.path?.startsWith('/')) {
-    throw new Error(`Route path must start with / (${route.type ?? 'api'}): ${route.path}`);
+    errors.push({
+      field: 'route.path',
+      message: `Route path must start with / (${route.type ?? 'api'}): ${route.path}`,
+    });
   }
   const isApiRoute = route.type === 'api' || route.type === undefined;
   if (isApiRoute && !('handler' in route)) {
-    throw new Error('API route requires handler');
+    errors.push({ field: 'route.handler', message: 'API route requires handler' });
   }
   if (route.type === 'proxy') {
-    if (!route.target) {
-      throw new Error('Proxy route requires target');
-    }
-    if (!route.methods || route.methods.length === 0) {
-      throw new Error('Proxy route requires at least one method');
-    }
-    if (route.proxyPath && !route.proxyPath.startsWith('/')) {
-      throw new Error(`Proxy route proxyPath must start with /: ${route.proxyPath}`);
-    }
+    validateProxyRoute(route, errors);
   }
+  return { errors, valid: errors.length === 0 };
 }
 
-/** Validate an array of routes by calling `validateRoute` on each entry. */
-function validateRoutes<TApp = unknown>(routes?: RouteInput<TApp>[]): void {
-  if (!routes) return;
+/** Validate an array of routes by calling `validateRoute` on each entry and collecting errors. */
+function validateRoutes<TApp = unknown>(routes?: RouteInput<TApp>[]): ValidationResult {
+  const errors: ValidationError[] = [];
+  if (!routes) return { errors, valid: true };
   for (const route of routes) {
-    validateRoute(route);
+    const result = validateRoute(route);
+    errors.push(...result.errors);
   }
+  return { errors, valid: errors.length === 0 };
 }
 
-/** Validate that auth config exists if any routes have `access: 'private'`. */
+/** Validate that auth config is present when any route requires `access: 'private'`. */
 function validateSecurityForRoutes<TApp = unknown>(
   routes?: RouteInput<TApp>[],
   security?: SecurityInput,
-): void {
+): ValidationResult {
+  const errors: ValidationError[] = [];
   const hasPrivateRoute = routes?.some((r) => r.access === 'private');
   if (hasPrivateRoute && !security?.auth) {
-    throw new Error("security.auth is required when routes have access: 'private'");
+    errors.push({
+      field: 'security.auth',
+      message: "security.auth is required when routes have access: 'private'",
+    });
   }
+  return { errors, valid: errors.length === 0 };
 }
 
-/** Validate CORS config: wildcard origin (`*`) cannot be combined with credentials: true. */
-function validateCors(cors?: CorsInput): void {
-  if (!cors?.credentials) return;
+/** Validate CORS config, rejecting wildcard origin (`*`) combined with credentials: true. */
+function validateCors(cors?: CorsInput): ValidationResult {
+  const errors: ValidationError[] = [];
+  if (!cors?.credentials) return { errors, valid: true };
   if (cors.origin === '*' || (Array.isArray(cors.origin) && cors.origin.includes('*'))) {
-    throw new Error('Wildcard origin cannot be used with credentials: true');
+    errors.push({
+      field: 'cors.origin',
+      message: 'Wildcard origin cannot be used with credentials: true',
+    });
   }
+  return { errors, valid: errors.length === 0 };
 }
 
-/** Validate auth config: check strategy-specific requirements and secretTtl range. */
-function validateAuth(auth?: AuthInput): void {
+/** Validate auth config, checking strategy-specific requirements and secretTtl range. */
+function validateAuth(auth?: AuthInput): ValidationResult {
+  const errors: ValidationError[] = [];
   if (auth?.strategy === 'bearer' && !auth.secret) {
-    throw new Error('auth.secret is required when strategy is bearer');
+    errors.push({
+      field: 'auth.secret',
+      message: 'auth.secret is required when strategy is bearer',
+    });
   }
   if (auth?.strategy === 'jwks' && !auth.jwksUri) {
-    throw new Error('auth.jwksUri is required when strategy is jwks');
+    errors.push({
+      field: 'auth.jwksUri',
+      message: 'auth.jwksUri is required when strategy is jwks',
+    });
   }
   if (auth?.secretTtl !== undefined) {
     if (!Number.isInteger(auth.secretTtl) || auth.secretTtl < 0) {
-      throw new Error('auth.secretTtl must be a non-negative integer (seconds)');
+      errors.push({
+        field: 'auth.secretTtl',
+        message: 'auth.secretTtl must be a non-negative integer (seconds)',
+      });
     }
   }
+  return { errors, valid: errors.length === 0 };
 }
 
-/** Validate CSP directives use camelCase (not kebab-case like `default-src`). */
-function validateCspDirectives(csp?: CspOptions): void {
-  if (!csp?.directives) return;
+/** Validate CSP directives use camelCase naming (reject kebab-case like `default-src`). */
+function validateCspDirectives(csp?: CspOptions): ValidationResult {
+  const errors: ValidationError[] = [];
+  if (!csp?.directives) return { errors, valid: true };
   const kebabPattern = /^[a-z]+-[a-z]/;
   for (const key of Object.keys(csp.directives)) {
     if (kebabPattern.test(key)) {
-      throw new Error(
-        `CSP directive '${key}' uses kebab-case. Use camelCase instead (e.g., 'defaultSrc' not 'default-src').`,
-      );
+      errors.push({
+        field: 'csp.directives',
+        message: `CSP directive '${key}' uses kebab-case. Use camelCase instead (e.g., 'defaultSrc' not 'default-src').`,
+      });
     }
   }
+  return { errors, valid: errors.length === 0 };
 }
 
 /**
@@ -125,16 +204,30 @@ function validateCspDirectives(csp?: CspOptions): void {
  * Throws descriptive errors for invalid configurations.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration to validate.
+ * @throws {Error} When validation fails with a message listing all errors.
  */
 export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<TApp>): void {
-  validateAppConfig(config.app);
-  validateRoutes(config.apiRoutes);
-  validateRoutes(config.proxyRoutes);
-  validateSecurityForRoutes(
-    [...(config.apiRoutes ?? []), ...(config.proxyRoutes ?? [])],
-    config.security,
-  );
-  validateCors(config.security?.cors);
-  validateAuth(config.security?.auth);
-  validateCspDirectives(config.security?.csp);
+  const results: ValidationResult[] = [
+    validateAppConfig(config.app),
+    ...validateRoutes(config.apiRoutes).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateRoutes(config.proxyRoutes).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateSecurityForRoutes(
+      [...(config.apiRoutes ?? []), ...(config.proxyRoutes ?? [])],
+      config.security,
+    ).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateCors(config.security?.cors).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateAuth(config.security?.auth).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateCspDirectives(config.security?.csp).errors.map((e) => ({
+      errors: [e],
+      valid: false,
+    })),
+  ];
+
+  const allErrors = results.flatMap((r) => r.errors);
+  if (allErrors.length > 0) {
+    throw new Error(
+      'Configuration validation failed:\n' +
+        allErrors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
+    );
+  }
 }

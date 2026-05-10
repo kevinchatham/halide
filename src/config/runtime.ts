@@ -74,12 +74,21 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
     }),
   );
 
+  if (corsOrigin === '*' || (Array.isArray(corsOrigin) && corsOrigin.includes('*'))) {
+    logger.warn(
+      {} as unknown,
+      `[${configInput.app?.name ?? DEFAULTS.app.name}] CORS wildcard origin detected. Consider restricting origins for production use.`,
+    );
+  }
+
   let rateLimitDispose: (() => void) | undefined;
 
   if (security?.rateLimit) {
     const rateLimitConfig = security.rateLimit;
     const { middleware, dispose } = createRateLimitMiddleware({
+      maxEntries: rateLimitConfig.maxEntries,
       maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+      trustedProxies: rateLimitConfig.trustedProxies,
       windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
     });
     app.use('*', middleware);
@@ -193,7 +202,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
         });
       });
     }
-    process.exit(0);
+    process.exitCode = 0;
   };
 
   return {

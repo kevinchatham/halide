@@ -2,19 +2,19 @@
 
 ## Functions
 
-### `createServer<TClaims>(config): Server`
+### `createServer<TApp>(config): Server`
 
 Creates and returns a Halide server. Validates the config before starting. Synchronous — no `await` needed.
 
-### `createApp<TClaims>(config): CreateAppResult`
+### `createApp<TApp>(config): CreateAppResult`
 
 Creates a Hono app instance without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing or custom server setups. Synchronous — no `await` needed.
 
-### `apiRoute<TClaims, TBody>(input): ApiRoute`
+### `apiRoute<TApp, TBody, TResponse>(input): ApiRoute`
 
 Factory that fills in `type: 'api'` and a default `authorize` function (always returns `true`).
 
-### `proxyRoute<TClaims>(input): ProxyRoute`
+### `proxyRoute<TApp>(input): ProxyRoute`
 
 Factory that fills in `type: 'proxy'` and a default `authorize` function (always returns `true`).
 
@@ -64,7 +64,7 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 | `OpenApiSource`                           | `{ path: string }` — source of an OpenAPI spec (local file or URL)                                     |
 | `ResolvedOpenApiSpec`                     | `{ spec: Record<string, unknown>, route: ProxyRoute }` — resolved external spec                        |
 | `Logger`                                  | `{ debug, error, info, warn }` interface                                                               |
-| `ClaimExtractor<TClaims>`                 | Function to extract claims from a Hono Context                                                         |
+| `ClaimExtractor<TClaims>`                 | `(c: Context) => Promise<TClaims \| null>` — function to extract claims from a Hono Context            |
 
 ## Not exported but referenced
 
