@@ -22,28 +22,47 @@ description: Halide BFF framework — server creation, API/proxy routes, auth, s
 
 ## Detailed References
 
-| Topic         | File                              | Source                                                               |
-| ------------- | --------------------------------- | -------------------------------------------------------------------- |
-| Config types  | [skill/references/config.md](skill/references/config.md)          | `src/types/server-config.ts`, `src/types/app.ts`, `src/config/defaults.ts` |
-| Route types   | [skill/references/routes.md](skill/references/routes.md)          | `src/routes/apiRoute.ts`, `src/routes/proxyRoute.ts`, `src/types/api.ts` |
-| Auth          | [skill/references/auth.md](skill/references/auth.md)              | `src/middleware/auth.ts`, `src/routes/registry.auth.ts`              |
-| Security      | [skill/references/security.md](skill/references/security.md)      | `src/types/security.ts`, `src/types/csp.ts`, `src/middleware/security.ts` |
-| OpenAPI       | [skill/references/openapi.md](skill/references/openapi.md)        | `src/types/openapi.ts`, `src/routes/registry.openapi.ts`             |
-| Observability | [skill/references/observability.md](skill/references/observability.md) | `src/types/app.ts`, `src/routes/registry.auth.ts` |
+| Topic         | File                                                                   | Source                                                                     |
+| ------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Config types  | [skill/references/config.md](skill/references/config.md)               | `src/types/server-config.ts`, `src/types/app.ts`, `src/config/defaults.ts` |
+| Route types   | [skill/references/routes.md](skill/references/routes.md)               | `src/routes/apiRoute.ts`, `src/routes/proxyRoute.ts`, `src/types/api.ts`   |
+| Auth          | [skill/references/auth.md](skill/references/auth.md)                   | `src/middleware/auth.ts`, `src/routes/registry.auth.ts`                    |
+| Security      | [skill/references/security.md](skill/references/security.md)           | `src/types/security.ts`, `src/types/csp.ts`, `src/middleware/security.ts`  |
+| OpenAPI       | [skill/references/openapi.md](skill/references/openapi.md)             | `src/types/openapi.ts`, `src/routes/registry.openapi.ts`                   |
+| Observability | [skill/references/observability.md](skill/references/observability.md) | `src/types/app.ts`, `src/routes/registry.auth.ts`                          |
 
 ## Type Reference
 
 ```ts
 import type {
-  ApiRoute, ApiRouteHandler, ApiRouteInput, AuthorizeFn,
-  ProxyRoute, ProxyRouteInput, TransformFn,
-  CspDirectiveValue, CspDirectives, CspOptions,
-  OpenApiConfig, OpenApiOptions, OpenApiRouteMeta,
-  OpenApiSource, ResolvedOpenApiSpec,
-  ClaimExtractor, CorsConfig, SecurityAuthConfig, SecurityConfig,
-  AppConfig, Logger, ObservabilityConfig,
-  RequestContext, ResponseContext, THalideApp, ServerConfig,
-  Server, CreateAppResult,
+  ApiRoute,
+  ApiRouteHandler,
+  ApiRouteInput,
+  AuthorizeFn,
+  ProxyRoute,
+  ProxyRouteInput,
+  TransformFn,
+  CspDirectiveValue,
+  CspDirectives,
+  CspOptions,
+  OpenApiConfig,
+  OpenApiOptions,
+  OpenApiRouteMeta,
+  OpenApiSource,
+  ResolvedOpenApiSpec,
+  ClaimExtractor,
+  CorsConfig,
+  SecurityAuthConfig,
+  SecurityConfig,
+  AppConfig,
+  Logger,
+  ObservabilityConfig,
+  RequestContext,
+  ResponseContext,
+  THalideApp,
+  ServerConfig,
+  Server,
+  CreateAppResult,
 } from 'halide';
 import { createApp, createServer, apiRoute, proxyRoute } from 'halide';
 ```
