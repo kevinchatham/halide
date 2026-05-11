@@ -1,7 +1,7 @@
 # Full example
 
 ```ts
-import { createServer, apiRoute, proxyRoute } from 'halide';
+import { createServer, apiRoute, proxyRoute, type THalideApp } from 'halide';
 import { z } from 'zod';
 
 interface UserClaims {
@@ -9,9 +9,9 @@ interface UserClaims {
   role: 'admin' | 'user';
 }
 
-type App = THalideApp<UserClaims>;
-
 type LogScope = { requestId: string; service: string };
+
+type App = THalideApp<UserClaims, LogScope>;
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -52,13 +52,13 @@ const server = createServer<App>({
     requestId: true,
     onRequest: (ctx, app) => {
       app.logger.info(
-        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' } as LogScope,
+        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' },
         `${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`,
       );
     },
     onResponse: (ctx, app, { statusCode, durationMs }) => {
       app.logger.info(
-        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' } as LogScope,
+        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' },
         `${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`,
       );
     },
@@ -119,7 +119,5 @@ const server = createServer<App>({
   },
 });
 
-server.start((port) => {
-  console.log(`Server running on port ${port}`);
-});
+server.start();
 ```

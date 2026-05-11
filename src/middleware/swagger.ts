@@ -30,12 +30,11 @@ function mergeExternalSpecs(
   for (const { spec, route } of resolvedSpecs) {
     const externalPaths = (spec['paths'] as Record<string, unknown>) ?? {};
     const metadata = route.openapi;
-    const mappedPath = route.path.replace(/\*$/, '');
     const routeMethods = route.methods.map((m) => m.toUpperCase());
 
-    for (const [_externalPath, externalPathItem] of Object.entries(externalPaths)) {
+    for (const [externalPath, externalPathItem] of Object.entries(externalPaths)) {
       const pathItem = externalPathItem as Record<string, unknown>;
-      mergePathItem(pathItem, mappedPath, routeMethods, metadata, paths);
+      mergePathItem(externalPath, pathItem, routeMethods, metadata, paths);
     }
   }
 
@@ -44,12 +43,17 @@ function mergeExternalSpecs(
 
 /** Merge a single path item from an external spec into the paths map, filtering by allowed methods. */
 function mergePathItem(
+  externalPath: string,
   pathItem: Record<string, unknown>,
-  mappedPath: string,
   routeMethods: string[],
   metadata: ProxyRoute<unknown>['openapi'],
   paths: Record<string, unknown>,
 ): void {
+  if (!(externalPath in paths)) {
+    paths[externalPath] = {};
+  }
+  const pathObj = paths[externalPath] as Record<string, unknown>;
+
   for (const [method, operation] of Object.entries(pathItem)) {
     const upperMethod = method.toUpperCase();
     if (!ALLOWED_METHODS.has(upperMethod)) continue;
@@ -57,9 +61,7 @@ function mergePathItem(
 
     const mergedOperation = { ...(operation as Record<string, unknown>) };
     applyMetadata(mergedOperation, metadata);
-
-    const pathKey = `${mappedPath}.${upperMethod.toLowerCase()}`;
-    paths[pathKey] = mergedOperation;
+    pathObj[upperMethod.toLowerCase()] = mergedOperation;
   }
 }
 

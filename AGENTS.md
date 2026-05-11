@@ -31,6 +31,7 @@ Pre-commit order: `lint:fix` → `typecheck` → `test`. Coverage thresholds: 80
 - Auth uses `hono/jwt` (bearer) and `hono/jwk` (JWKS) — not `jose`.
 - Validation is imperative (`validateServerConfig` in `src/config/validate.ts`), not Zod — Zod only for route body validation and OpenAPI schemas.
 - CSP directives use camelCase (`defaultSrc`), not kebab-case (`default-src`) — validator throws on kebab.
+- Default logger is styled (colored in TTY, plain text otherwise) via `createDefaultLogger()` in `defaults.ts`. Falls back to plain `[LEVEL] message` when output is not a TTY. Use `createNoopLogger()` for silent output.
 - App `apiPrefix` defaults to `'/api'` — paths under that prefix get 404 instead of app fallback (set `apiPrefix: ''` to disable).
 - `src/demo.ts` is **not exported** — demo apps only.
 

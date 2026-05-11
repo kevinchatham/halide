@@ -48,7 +48,7 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 | `AuthorizeFn<TApp>`                       | `(ctx: RequestContext, app: TApp) => boolean \| Promise<boolean>`                                      |
 | `TransformFn`                             | `({ method, body, headers }) => { body, headers }`                                                     |
 | `RequestContext`                          | Normalized request context (method, path, headers, params, query, body)                                |
-| `ApiRouteInput<TApp, TBody, TResponse>`   | Input type for `apiRoute()` factory — omits `type`, `authorize`, and `handler`                         |
+| `ApiRouteInput<TApp, TBody, TResponse>`   | Input type for `apiRoute()` factory — omits `type`; requires `handler`                                 |
 | `ProxyRouteInput<TApp>`                   | Input type for `proxyRoute()` factory — omits `type`                                                   |
 | `SecurityConfig`                          | CORS, CSP, auth, rate limit configuration                                                              |
 | `SecurityAuthConfig`                      | Auth strategy, secret/JWKS, audience, secretTtl                                                        |
@@ -65,10 +65,5 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 | `ResolvedOpenApiSpec`                     | `{ spec: Record<string, unknown>, route: ProxyRoute }` — resolved external spec                        |
 | `Logger`                                  | `{ debug, error, info, warn }` interface                                                               |
 | `ClaimExtractor<TClaims>`                 | `(c: Context) => Promise<TClaims \| null>` — function to extract claims from a Hono Context            |
-
-## Not exported but referenced
-
-| Type              | Description                                                                        |
-| ----------------- | ---------------------------------------------------------------------------------- |
-| `ResponseContext` | `{ statusCode, durationMs, error?, body? }` — used by `onResponse` hook            |
-| `OpenApiOptions`  | `{ title?, version?, description?, servers? }` — nested in `OpenApiConfig.options` |
+| `ResponseContext`                         | `{ statusCode, durationMs, error?, body? }` — response context passed to `onResponse` hook             |
+| `OpenApiOptions`                          | `{ title?, version?, description?, servers? }` — OpenAPI specification options                         |

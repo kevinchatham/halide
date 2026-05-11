@@ -22,9 +22,7 @@ const server = createServer({
   },
 });
 
-server.start((port) => {
-  console.log(\`Server running on port \${port}\`);
-});
+server.start();
 `;
 }
 

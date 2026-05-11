@@ -37,7 +37,7 @@ interface Logger<TLogScope = unknown> {
 }
 ```
 
-If no logger is provided, a no-op logger is used (all methods are empty functions).
+If no logger is provided, a styled logger is used (colored in TTY, plain text otherwise).
 
 ## Lifecycle hooks
 
@@ -55,7 +55,7 @@ The `response` object (type `ResponseContext`) has the following shape:
 | `error?`     | `Error`   | Error thrown by the handler (undefined if OK) |
 | `body?`      | `unknown` | Response body returned by the handler         |
 
-Note: `ResponseContext` exists in `src/types.ts` but is **not exported** from `index.ts`.
+Note: `ResponseContext` is exported from `index.ts` and used by the `onResponse` hook.
 
 ## Request ID middleware
 

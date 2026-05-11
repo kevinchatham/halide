@@ -185,12 +185,14 @@ function registerProxyRoute<TApp = unknown>(
               }
             }
 
-            pipe().catch(() => {});
+            const pipePromise = pipe();
 
             const responseBodyText =
               collected.length > 0
                 ? await new Response(new Blob(collected as BlobPart[])).text()
                 : undefined;
+
+            await pipePromise;
 
             proxyResponseBody = responseBodyText;
             const responseInit: ResponseInit = {

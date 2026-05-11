@@ -8,8 +8,8 @@ import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
-import type { AppConfig, ServerConfig } from '../types.js';
-import { createNoopLogger, DEFAULTS } from './defaults.js';
+import type { AppConfig, Logger, ServerConfig } from '../types.js';
+import { createDefaultLogger, DEFAULTS } from './defaults.js';
 import { validateServerConfig } from './validate.js';
 
 /** Hono context variables used internally by Halide middleware. */
@@ -36,6 +36,8 @@ export interface Server {
 export interface CreateAppResult {
   /** The configured Hono application. */
   app: Hono<{ Variables: HalideVariables }>;
+  /** Logger instance used throughout the server. */
+  logger: Logger<unknown>;
   /** Function to dispose of rate limit resources. */
   rateLimitDispose: (() => void) | undefined;
 }
@@ -53,7 +55,7 @@ export interface CreateAppResult {
 export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): CreateAppResult {
   validateServerConfig(configInput);
 
-  const logger = configInput.observability?.logger ?? createNoopLogger();
+  const logger = configInput.observability?.logger ?? createDefaultLogger();
   const app = new Hono<{ Variables: HalideVariables }>();
 
   const appName = configInput.app?.name ?? DEFAULTS.app.name;
@@ -131,7 +133,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
 
   app.onError(createErrorHandler(logger));
 
-  return { app, rateLimitDispose };
+  return { app, logger, rateLimitDispose };
 }
 
 /**
@@ -157,15 +159,12 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
  *   ],
  * });
  *
- * server.start((port) => {
- *   console.log(`Server running on port ${port}`);
- * });
+ * server.start();
  * ```
  */
 export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): Server {
-  const { app, rateLimitDispose } = createApp<TApp>(configInput);
+  const { app, rateLimitDispose, logger } = createApp<TApp>(configInput);
 
-  const logger = configInput.observability?.logger ?? createNoopLogger();
   const appName = configInput.app?.name ?? DEFAULTS.app.name;
 
   let httpServer: ReturnType<typeof serve> | undefined;

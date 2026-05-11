@@ -9,7 +9,7 @@ import { proxyRoute } from 'halide';
 
 const productsProxy = proxyRoute({
   access: 'private',
-  path: '/api/products',
+  path: '/api/products/*',
   methods: ['get', 'post'],
   target: 'http://products.internal',
   proxyPath: '/products',

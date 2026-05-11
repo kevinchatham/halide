@@ -1,3 +1,4 @@
+import { styleText } from 'node:util';
 import type { AuthorizeFn } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
 
@@ -77,5 +78,50 @@ export function createNoopLogger<T = unknown>(): Logger<T> {
     error: (_scope: T) => {},
     info: (_scope: T) => {},
     warn: (_scope: T) => {},
+  };
+}
+
+/**
+ * Create a styled logger that outputs colored, level-prefixed messages.
+ * @typeParam T - The type of the log scope (defaults to unknown).
+ * @returns A {@link Logger} implementation with styled output.
+ */
+export function createDefaultLogger<T = unknown>(): Logger<T> {
+  const useColors = process.stdout.isTTY === true;
+  const format = (styles: Parameters<typeof styleText>[0], msg: string): string =>
+    useColors ? styleText(styles, msg) : msg;
+  const stringifyScope = (scope: unknown): string => {
+    if (!scope || typeof scope !== 'object') return '';
+    try {
+      return ` [${JSON.stringify(scope)}]`;
+    } catch {
+      return '';
+    }
+  };
+  return {
+    debug: (scope: T, ...args: unknown[]) => {
+      const scopeStr = stringifyScope(scope);
+      const msg = `[DEBUG]${scopeStr} ${args.map(String).join(' ')}`;
+      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
+      console.log(format(['gray', 'bold'], msg));
+    },
+    error: (scope: T, ...args: unknown[]) => {
+      const scopeStr = stringifyScope(scope);
+      const msg = `[ERROR]${scopeStr} ${args.map(String).join(' ')}`;
+      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
+      console.log(format(['red', 'bold'], msg));
+    },
+    info: (scope: T, ...args: unknown[]) => {
+      const scopeStr = stringifyScope(scope);
+      const msg = `[INFO]${scopeStr} ${args.map(String).join(' ')}`;
+      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
+      console.log(format(['cyan', 'bold'], msg));
+    },
+    warn: (scope: T, ...args: unknown[]) => {
+      const scopeStr = stringifyScope(scope);
+      const msg = `[WARN]${scopeStr} ${args.map(String).join(' ')}`;
+      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
+      console.log(format(['yellow', 'bold'], msg));
+    },
   };
 }

@@ -112,7 +112,7 @@ export type ObservabilityConfig<TApp = THalideApp> = {
    */
   requestId?: boolean;
   /**
-   * Logger instance. If not provided, a noop logger is used.
+   * Logger instance. If not provided, a styled default logger is used.
    */
   logger?: Logger<unknown>;
   /**

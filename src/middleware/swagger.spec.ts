@@ -216,4 +216,81 @@ describe('createOpenApiRoutes', () => {
 
     expect(JSON.stringify(body1)).toEqual(JSON.stringify(body2));
   });
+
+  it('merges external spec paths without appending method to path key', async () => {
+    const mockSpec = JSON.stringify({
+      info: { title: 'Mock API', version: '1.0.0' },
+      openapi: '3.1.0',
+      paths: {
+        '/users': { get: { summary: 'Get users' }, post: { summary: 'Create user' } },
+        '/users/{id}': { delete: { summary: 'Delete user' }, get: { summary: 'Get user' } },
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          json: () => Promise.resolve(JSON.parse(mockSpec)),
+          ok: true,
+        } as unknown as Response),
+      ),
+    );
+
+    const app = new Hono();
+    const proxyRoute = makeProxyRoute({
+      methods: ['get', 'post', 'delete'],
+      openapiSpec: { path: 'https://api.example.com/openapi.json' },
+    });
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+
+    const res = await app.request('/swagger/openapi.json');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(Object.keys(body.paths)).toEqual(['/users', '/users/{id}']);
+    expect(body.paths['/users'].get).toBeDefined();
+    expect(body.paths['/users'].post).toBeDefined();
+    expect(body.paths['/users/{id}'].get).toBeDefined();
+    expect(body.paths['/users/{id}'].delete).toBeDefined();
+  });
+
+  it('filters external spec operations by route methods', async () => {
+    const mockSpec = JSON.stringify({
+      info: { title: 'Mock API', version: '1.0.0' },
+      openapi: '3.1.0',
+      paths: {
+        '/items': {
+          delete: { summary: 'Delete item' },
+          get: { summary: 'Get items' },
+          post: { summary: 'Create item' },
+          put: { summary: 'Update item' },
+        },
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          json: () => Promise.resolve(JSON.parse(mockSpec)),
+          ok: true,
+        } as unknown as Response),
+      ),
+    );
+
+    const app = new Hono();
+    const proxyRoute = makeProxyRoute({
+      methods: ['get', 'delete'],
+      openapiSpec: { path: 'https://api.example.com/openapi.json' },
+    });
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+
+    const res = await app.request('/swagger/openapi.json');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.paths['/items'].get).toBeDefined();
+    expect(body.paths['/items'].delete).toBeDefined();
+    expect(body.paths['/items'].post).toBeUndefined();
+    expect(body.paths['/items'].put).toBeUndefined();
+  });
 });

@@ -19,29 +19,29 @@ export type ValidationResult = {
   valid: boolean;
 };
 
-/** Input type for route validation. */
+/** Input type for route validation. Partial API or proxy route. */
 type RouteInput<TApp = unknown> =
   | Partial<Extract<Route<TApp>, { type: 'api' }>>
   | Partial<Extract<Route<TApp>, { type: 'proxy' }>>;
 
-/** Input type for app config validation. */
+/** Input type for app config validation. Partial AppConfig. */
 type AppInput = Partial<AppConfig>;
 
-/** Input type for CORS config validation. */
+/** Input type for CORS config validation. Partial CorsConfig. */
 type CorsInput = Partial<CorsConfig>;
 
-/** Input type for auth config validation. */
+/** Input type for auth config validation. Partial SecurityAuthConfig. */
 type AuthInput = Partial<NonNullable<SecurityConfig['auth']>>;
 
-/** Input type for security config validation. */
+/** Input type for security config validation. Partial security fields. */
 type SecurityInput = {
   cors?: CorsInput;
   csp?: CspOptions;
   auth?: AuthInput;
-  rateLimit?: { windowMs?: number; maxRequests?: number };
+  rateLimit?: { windowMs?: number; maxRequests?: number; maxEntries?: number };
 };
 
-/** Input type for server config validation. */
+/** Input type for server config validation. Partial server config fields. */
 type ServerConfigInput<TApp = unknown> = {
   app?: AppInput;
   apiRoutes?: RouteInput<TApp>[];
@@ -183,6 +183,25 @@ function validateAuth(auth?: AuthInput): ValidationResult {
   return { errors, valid: errors.length === 0 };
 }
 
+/** Validate rate limit config, checking that maxEntries is a positive integer when provided. */
+function validateRateLimit(rateLimit?: {
+  windowMs?: number;
+  maxRequests?: number;
+  maxEntries?: number;
+}): ValidationResult {
+  const errors: ValidationError[] = [];
+  if (!rateLimit) return { errors, valid: true };
+  if (rateLimit.maxEntries !== undefined) {
+    if (!Number.isInteger(rateLimit.maxEntries) || rateLimit.maxEntries < 1) {
+      errors.push({
+        field: 'security.rateLimit.maxEntries',
+        message: 'rateLimit.maxEntries must be a positive integer',
+      });
+    }
+  }
+  return { errors, valid: errors.length === 0 };
+}
+
 /** Validate CSP directives use camelCase naming (reject kebab-case like `default-src`). */
 function validateCspDirectives(csp?: CspOptions): ValidationResult {
   const errors: ValidationError[] = [];
@@ -217,6 +236,10 @@ export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<T
     ).errors.map((e) => ({ errors: [e], valid: false })),
     ...validateCors(config.security?.cors).errors.map((e) => ({ errors: [e], valid: false })),
     ...validateAuth(config.security?.auth).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateRateLimit(config.security?.rateLimit).errors.map((e) => ({
+      errors: [e],
+      valid: false,
+    })),
     ...validateCspDirectives(config.security?.csp).errors.map((e) => ({
       errors: [e],
       valid: false,

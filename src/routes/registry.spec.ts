@@ -2,6 +2,13 @@ import { z } from 'zod';
 import type { ProxyRoute } from '../types/api';
 import { createTestApp, resolveOpenApiSpec } from './registry.helpers';
 
+vi.mock('../services/proxy', () => ({
+  buildRequestContextFromHono: vi
+    .fn()
+    .mockReturnValue({ body: undefined, method: 'get', params: {}, path: '', query: {} }),
+  createProxyService: vi.fn().mockReturnValue(async () => new Response('ok', { status: 200 })),
+}));
+
 describe('registerRoutes', () => {
   it('does nothing when routes is missing', async () => {
     const app = createTestApp({
@@ -11,6 +18,87 @@ describe('registerRoutes', () => {
 
     const res = await app.request('/nonexistent');
     expect(res.status).toBe(404);
+  });
+
+  describe('Proxy routes', () => {
+    it('forwards proxy requests with observe disabled', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () => new Response('ok', { status: 200 }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: false,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(200);
+    });
+
+    it('forwards proxy requests and collects response body', async () => {
+      const mockBody = new ReadableStream({
+        start(controller: ReadableStreamDefaultController<Uint8Array>): void {
+          controller.enqueue(new TextEncoder().encode('hello'));
+          controller.close();
+        },
+      });
+
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () => new Response(mockBody, { status: 200 }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: true,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(200);
+    });
+
+    it('returns response directly when body is empty', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () => new Response(null, { status: 204 }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: true,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(204);
+    });
   });
 
   describe('API routes', () => {

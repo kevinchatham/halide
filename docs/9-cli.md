@@ -29,15 +29,15 @@ Then it:
 ```ts
 import { createServer, apiRoute } from 'halide';
 
+const healthRoute = apiRoute({
+  access: 'public',
+  handler: async () => ({ status: 'ok' }),
+  method: 'get',
+  path: '/health',
+});
+
 const server = createServer({
-  apiRoutes: [
-    apiRoute({
-      access: 'public',
-      handler: async () => ({ status: 'ok' }),
-      method: 'get',
-      path: '/health',
-    }),
-  ],
+  apiRoutes: [healthRoute],
   app: {
     name: 'my-app',
     port: 3553,
@@ -45,9 +45,7 @@ const server = createServer({
   },
 });
 
-server.start((port) => {
-  console.log(`Server running on port ${port}`);
-});
+server.start();
 ```
 
 ### Generated scripts

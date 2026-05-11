@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono';
+import ipaddr from 'ipaddr.js';
 
 /** Configuration for rate limiting. */
 interface RateLimitConfig {
@@ -23,15 +24,14 @@ interface WindowEntry {
 /** Check if the socket IP matches a trusted proxy CIDR or exact IP. */
 function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]): boolean {
   if (!trustedProxies?.length || !ip) return false;
+  const addr = ipaddr.parse(ip);
   return trustedProxies.some((tp) => {
     if (tp.includes('/')) {
-      const parts = tp.split('/');
-      const net = parts[0]!;
-      const prefix = parts[1]!;
-      const prefixLen = Number.parseInt(prefix, 10);
-      return ip.startsWith(net.substring(0, net.length - (32 - prefixLen) / 8));
+      const [net, prefix] = tp.split('/');
+      const parsedNet = ipaddr.parse(net!);
+      return addr!.match(parsedNet, Number(prefix));
     }
-    return ip === tp;
+    return addr!.toString() === tp;
   });
 }
 
