@@ -29,7 +29,7 @@ describe('createServer', () => {
   });
 
   it('logs startup with custom app.name', async () => {
-    const infoMessages: string[] = [];
+    const logs: { scope: Record<string, unknown>; message: string }[] = [];
     const server = createServer({
       ...minimalConfig,
       app: { ...minimalConfig.app, name: 'my-app', port: getFreePort() },
@@ -37,19 +37,20 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+          info: (scope: unknown, ...messageArgs: unknown[]) =>
+            logs.push({ message: String(messageArgs[0]), scope: scope as Record<string, unknown> }),
           warn: () => {},
         },
       },
     });
     server.start();
     await server.stop();
-    expect(infoMessages.length).toBe(1);
-    expect(infoMessages[0]).toContain('my-app');
+    expect(logs.length).toBe(1);
+    expect(logs[0]!.scope.appName).toBe('my-app');
   });
 
   it('logs startup with default app.name', async () => {
-    const infoMessages: string[] = [];
+    const logs: { scope: Record<string, unknown>; message: string }[] = [];
     const server = createServer({
       ...minimalConfig,
       app: { ...minimalConfig.app, port: getFreePort() },
@@ -57,14 +58,15 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+          info: (scope: unknown, ...messageArgs: unknown[]) =>
+            logs.push({ message: String(messageArgs[0]), scope: scope as Record<string, unknown> }),
           warn: () => {},
         },
       },
     });
     server.start();
     await server.stop();
-    expect(infoMessages[0]).toContain('app');
+    expect(logs[0]!.scope.appName).toBe('app');
   });
 
   it('resolves port from process.env.PORT', async () => {

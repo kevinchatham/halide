@@ -56,6 +56,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
   const logger = configInput.observability?.logger ?? createNoopLogger();
   const app = new Hono<{ Variables: HalideVariables }>();
 
+  const appName = configInput.app?.name ?? DEFAULTS.app.name;
   const security = configInput.security;
   const corsConfig = security?.cors;
   const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
@@ -76,8 +77,8 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
 
   if (corsOrigin === '*' || (Array.isArray(corsOrigin) && corsOrigin.includes('*'))) {
     logger.warn(
-      {} as unknown,
-      `[${configInput.app?.name ?? DEFAULTS.app.name}] CORS wildcard origin detected. Consider restricting origins for production use.`,
+      { appName } as unknown,
+      `CORS wildcard origin detected. Consider restricting origins for production use.`,
     );
   }
 
@@ -99,10 +100,8 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
 
   if (openapiEnabled) {
     logger.warn(
-      {} as unknown,
-      `[${
-        configInput.app?.name ?? DEFAULTS.app.name
-      }] OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
+      { appName } as unknown,
+      `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
     );
     const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<
       import('../types.js').CspDirectives
@@ -167,6 +166,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
   const { app, rateLimitDispose } = createApp<TApp>(configInput);
 
   const logger = configInput.observability?.logger ?? createNoopLogger();
+  const appName = configInput.app?.name ?? DEFAULTS.app.name;
 
   let httpServer: ReturnType<typeof serve> | undefined;
   let isShuttingDown = false;
@@ -184,10 +184,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    logger.info(
-      {} as unknown,
-      `[${configInput.app?.name ?? DEFAULTS.app.name}] Received ${signal}, shutting down...`,
-    );
+    logger.info({ appName } as unknown, `Received ${signal}, shutting down...`);
     rateLimitDispose?.();
     const server = httpServer;
     if (server) {
@@ -211,10 +208,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
       if (httpServer) return;
       const port =
         Number.parseInt(process.env.PORT || '', 10) || (configInput.app?.port ?? DEFAULTS.app.port);
-      logger.info(
-        {} as unknown,
-        `[${configInput.app?.name ?? DEFAULTS.app.name}] Server starting on port ${port}`,
-      );
+      logger.info({ appName } as unknown, `Server starting on port ${port}`);
       httpServer = serve(
         {
           fetch: app.fetch,
@@ -227,10 +221,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
       );
       httpServer.on('error', (err: Error) => {
         readyReject(err);
-        logger.error(
-          {} as unknown,
-          `[${configInput.app?.name ?? DEFAULTS.app.name}] Failed to start: ${err.message}`,
-        );
+        logger.error({ appName } as unknown, `Failed to start: ${err.message}`);
         process.exit(1);
       });
       process.on('SIGINT', () => {
