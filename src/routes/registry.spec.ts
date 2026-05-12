@@ -46,16 +46,13 @@ describe('registerRoutes', () => {
     });
 
     it('forwards proxy requests and collects response body', async () => {
-      const mockBody = new ReadableStream({
-        start(controller: ReadableStreamDefaultController<Uint8Array>): void {
-          controller.enqueue(new TextEncoder().encode('hello'));
-          controller.close();
-        },
-      });
-
       const { createProxyService } = await import('../services/proxy');
       (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
-        async () => new Response(mockBody, { status: 200 }),
+        async () =>
+          new Response(null, {
+            headers: { 'Content-Type': 'text/plain' },
+            status: 200,
+          }),
       );
 
       const app = createTestApp({
