@@ -74,9 +74,11 @@ proxyRoute({
   timeout: 5000,                   // optional — ms, default: 60000
   identity: (ctx, app) => ({ 'x-user-id': app.claims?.sub }),  // optional
   transform: ({ method, body, headers }) => ({ body, headers }), // optional
+  forwardHeaders: ['accept', 'content-type'],  // optional — headers to forward (default: safe subset)
   authorize: (ctx, app) => true,  // auto-filled by factory
   observe: true,                   // optional
   openapi: { ... },                // optional
+  openapiSpec: { path: '/openapi.json' },  // optional — external spec source
 })
 ```
 
@@ -111,12 +113,6 @@ proxyPath: /backend
 Result:   http://products.internal/backend/users/123
 ```
 
-### Host Header Behavior
-
-The original `Host` header from the client request is **NOT** forwarded to the backend. Instead, the `host` header is derived from the target URL, which is the correct behavior for most backend services and CDNs. The original host value is preserved as `X-Forwarded-Host` for backend reference.
-
-This prevents routing issues with CDNs (like Akamai) that use the `host` header to route requests — forwarding the client's host header to the backend would cause 404 errors.
-
 ### Identity Headers
 
 The `identity` function receives `(ctx, app)` and returns a `Record<string, string>` of headers to inject into the proxied request. Only called when `app.claims` is defined (i.e., private routes with successful auth).
@@ -140,6 +136,14 @@ transform: ({ method, body, headers }) => ({
 ```
 
 If no transform is provided, the raw request body is forwarded as-is.
+
+### Forward Headers
+
+Controls which request headers are forwarded to upstream. Defaults to a safe subset: `accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-type`, `content-length`, `origin`, `user-agent`. Set to an empty array `[]` to forward no headers. Headers are matched case-insensitively.
+
+```typescript
+forwardHeaders: ['accept', 'content-type', 'x-custom'],
+```
 
 ### Host Header Behavior
 

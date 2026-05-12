@@ -12,14 +12,14 @@ Uses `hono/jwt` internally.
 security: {
   auth: {
     strategy: 'bearer',
-    secret: () => vaultClient.readSecret('jwt-signing-key'), // async function
+    secret: () => vaultClient.readSecret('jwt-signing-key'),  // sync or async function
     audience: 'my-app',
-    secretTtl: 60, // optional — TTL in seconds for caching the secret. Default: 60. Set to 0 to disable caching.
+    secretTtl: 60,  // optional — TTL in seconds for caching the secret. Default: 60.
   },
 }
 ```
 
-The `secret` field accepts a sync or async function. The result is cached for `secretTtl` seconds (default: 60) to avoid repeated calls. Set `secretTtl: 0` to disable caching and resolve on every request. `secretTtl` must be a non-negative integer (validator throws otherwise).
+The `secret` field accepts a sync or async function. The result is cached for `secretTtl` seconds (default: 60) to avoid repeated calls. Set `secretTtl: 0` to disable caching and resolve on every request.
 
 ### JWKS (remote key set, RS256)
 
@@ -30,7 +30,7 @@ security: {
   auth: {
     strategy: 'jwks',
     jwksUri: 'https://idp.example.com/.well-known/jwks.json',
-    audience: 'my-app',    // optional
+    audience: 'my-app',  // optional
   },
 }
 ```
@@ -57,7 +57,7 @@ apiRoute({
 });
 ```
 
-The `authorize` function receives `(ctx, app)` and returns `boolean | Promise<boolean>`. Failed authorization returns `403 Forbidden` with `{ error: 'Forbidden' }`.
+The `authorize` function receives `(ctx: RequestContext, app: TApp)` and returns `boolean | Promise<boolean>`. Failed authorization returns `403 Forbidden` with `{ error: 'Forbidden' }`.
 
 The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.
 
@@ -66,3 +66,11 @@ The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that
 - `app.claims` is populated only for private routes with successful auth
 - For public routes, `app.claims` will be `undefined` in handlers
 - Type claims via `THalideApp<TClaims>` — e.g., `type App = THalideApp<UserClaims>`
+
+## Claim Extractor
+
+```typescript
+type ClaimExtractor<TClaims = unknown> = (c: Context) => Promise<TClaims | null>;
+```
+
+The claim extractor is created from config (`createClaimExtractor`) and handles both bearer and JWKS strategies with secret caching.

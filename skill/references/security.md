@@ -2,7 +2,7 @@
 
 ## CORS
 
-Applied to all routes via `hono/cors`.
+Applied to all routes via `hono/cors` in `createApp()`.
 
 ```typescript
 security: {
@@ -32,7 +32,7 @@ security: {
 
 ## CSP
 
-Applied via `hono/secure-headers`. Always active — defaults to a restrictive policy if not specified.
+Applied via `hono/secure-headers` using `createSecurityMiddleware()`. Always active — defaults to a restrictive policy if not specified.
 
 ```typescript
 security: {
@@ -55,10 +55,6 @@ security: {
 ```
 
 **Gotcha:** CSP directive keys must use **camelCase** (`defaultSrc`), NOT kebab-case (`default-src`). The validator throws on kebab-case keys.
-
-### OpenAPI CSP Overrides
-
-When OpenAPI is enabled, the Swagger UI routes use relaxed CSP directives to allow Scalar UI to load external resources (scripts from `cdn.jsdelivr.net`, inline styles). A warning is logged at startup. Custom CSP settings do not apply to these routes.
 
 ### Available CSP Directives
 
@@ -105,9 +101,13 @@ imgSrc: ["'self'", 'data:']
 objectSrc: ["'none'"]
 scriptSrc: ["'self'"]
 scriptSrcAttr: ["'none'"]
-styleSrc: ["'self'", 'https:', "'unsafe-inline'"]
+styleSrc: ["'self'", 'https:']
 upgradeInsecureRequests: []
 ```
+
+### OpenAPI CSP Overrides
+
+When OpenAPI is enabled, the Swagger UI routes use relaxed CSP directives to allow Scalar UI to load external resources (scripts from `cdn.jsdelivr.net`, inline styles). A warning is logged at startup. Custom CSP settings do not apply to these routes.
 
 ## Rate Limiting
 
@@ -116,15 +116,19 @@ IP-based sliding window. Opt-in — not enabled unless `security.rateLimit` is c
 ```typescript
 security: {
   rateLimit: {
-    maxRequests: 100,    // default: 100
-    windowMs: 900000,    // default: 900000 (15 minutes)
+    maxRequests: 100,       // default: 100
+    windowMs: 900000,       // default: 900000 (15 minutes)
+    trustedProxies: ['10.0.0.0/8'],  // optional — trust x-forwarded-for from these IPs/CIDRs
+    maxEntries: 1000,       // optional — max store entries; oldest evicted when exceeded
   },
 }
 ```
 
-Client IP is determined from `x-forwarded-for` header (first value) or falls back to `'unknown'`. Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
+Client IP is extracted from `x-forwarded-for` (first value) when socket IP matches a trusted proxy, or falls back to socket IP. Returns `429 Too Many Requests` with `Retry-After` header. Uses an in-memory store with periodic cleanup.
 
-| Field         | Default  | Description                        |
-| ------------- | -------- | ---------------------------------- |
-| `maxRequests` | `100`    | Maximum requests per window        |
-| `windowMs`    | `900000` | Window duration in ms (15 minutes) |
+| Field            | Default     | Description                                            |
+| ---------------- | ----------- | ------------------------------------------------------ |
+| `maxRequests`    | `100`       | Maximum requests per window                            |
+| `windowMs`       | `900000`    | Window duration in ms (15 minutes)                     |
+| `trustedProxies` | `[]`        | Trusted proxy IPs/CIDRs for x-forwarded-for validation |
+| `maxEntries`     | `undefined` | Max store entries; oldest evicted when exceeded        |

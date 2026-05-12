@@ -1,33 +1,60 @@
 import type { Context, Next } from 'hono';
+import ipaddr from 'ipaddr.js';
 
 /** Configuration for rate limiting. */
 interface RateLimitConfig {
+  /** Maximum number of entries in the store. Oldest entries are evicted when exceeded. */
+  maxEntries?: number;
   /** Maximum requests allowed per window. */
   maxRequests: number;
+  /** Trusted proxy IPs/CIDRs for x-forwarded-for header validation. */
+  trustedProxies?: string[];
   /** Time window in milliseconds. */
   windowMs: number;
 }
 
-/** Internal storage for rate limit tracking. */
+/** Internal storage for rate limit tracking per client IP. */
 interface WindowEntry {
   /** Number of requests in current window. */
   count: number;
-  /** Timestamp when the window resets. */
+  /** Timestamp (Date.now()) when the window resets. */
   resetTime: number;
 }
 
-/** Extract client IP from request headers (supports X-Forwarded-For). */
-function getClientIp(c: Context): string {
-  const forwarded = c.req.header('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0];
-    if (first) return first.trim();
+/** Check if the socket IP matches a trusted proxy CIDR or exact IP. */
+function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]): boolean {
+  if (!trustedProxies?.length || !ip) return false;
+  const addr = ipaddr.parse(ip);
+  return trustedProxies.some((tp) => {
+    if (tp.includes('/')) {
+      const [net, prefix] = tp.split('/');
+      const parsedNet = ipaddr.parse(net!);
+      return addr!.match(parsedNet, Number(prefix));
+    }
+    return addr!.toString() === tp;
+  });
+}
+
+/** Extract client IP from request headers, falling back to socket IP. Uses X-Forwarded-For only when the socket IP is from a trusted proxy. */
+function getClientIp(c: Context, trustedProxies?: string[]): string {
+  const nodeReq = c.req as { socket?: { remoteAddress?: string } };
+  const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
+  if (isTrustedProxy(socketIp, trustedProxies)) {
+    const forwarded = c.req.header('x-forwarded-for');
+    if (forwarded) {
+      const first = forwarded.split(',')[0];
+      if (first) return first.trim();
+    }
   }
-  return 'unknown';
+  return socketIp;
 }
 
 /**
  * Create rate limiting middleware that restricts requests per client IP.
+ *
+ * Uses an in-memory store with periodic cleanup. Returns 429 when the client
+ * has exceeded its window quota. The dispose function clears the cleanup timer.
+ *
  * @param config - Rate limit configuration (maxRequests and windowMs).
  * @returns Object containing the middleware and a dispose function for cleanup.
  */
@@ -36,6 +63,13 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
   dispose: () => void;
 } {
   const store = new Map<string, WindowEntry>();
+
+  /** Evict oldest entry when store exceeds maxEntries. */
+  const evictOldest = (): void => {
+    if (!config.maxEntries || store.size < config.maxEntries) return;
+    const firstKey = store.keys().next().value!;
+    store.delete(firstKey);
+  };
 
   /** Remove expired entries from the rate limit store. */
   const sweep = (): void => {
@@ -54,11 +88,12 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
 
   /** Per-request rate limit check: returns 429 if the client IP has exceeded its window quota. */
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
-    const clientIp = getClientIp(c);
+    const clientIp = getClientIp(c, config.trustedProxies);
     const now = Date.now();
     const entry = store.get(clientIp);
 
     if (!entry || now > entry.resetTime) {
+      evictOldest();
       store.set(clientIp, {
         count: 1,
         resetTime: now + config.windowMs,

@@ -1,5 +1,5 @@
 import { defaultAuthorize } from '../config/defaults';
-import type { ProxyRoute, ProxyRouteInput } from '../types';
+import type { ProxyRoute, ProxyRouteInput } from '../types/api';
 
 /**
  * Factory function to create a proxy route configuration.

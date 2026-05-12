@@ -2,23 +2,38 @@ export { type CreateAppResult, createApp, createServer, type Server } from './co
 export { apiRoute } from './routes/apiRoute';
 export { proxyRoute } from './routes/proxyRoute';
 export type {
-  ApiRoute,
-  ApiRouteHandler,
   AppConfig,
-  AuthorizeFn,
-  ClaimExtractor,
-  CorsConfig,
-  CspDirectives,
-  CspOptions,
   Logger,
   ObservabilityConfig,
-  OpenApiConfig,
-  OpenApiRouteMeta,
-  ProxyRoute,
   RequestContext,
-  SecurityAuthConfig,
-  SecurityConfig,
+  ResponseContext,
   ServerConfig,
   THalideApp,
-  TransformFn,
 } from './types';
+export type {
+  ApiRoute,
+  ApiRouteHandler,
+  ApiRouteInput,
+  AuthorizeFn,
+  ProxyRoute,
+  ProxyRouteInput,
+  TransformFn,
+} from './types/api';
+export type {
+  CspDirectives,
+  CspDirectiveValue,
+  CspOptions,
+} from './types/csp';
+export type {
+  OpenApiConfig,
+  OpenApiOptions,
+  OpenApiRouteMeta,
+  OpenApiSource,
+  ResolvedOpenApiSpec,
+} from './types/openapi';
+export type {
+  ClaimExtractor,
+  CorsConfig,
+  SecurityAuthConfig,
+  SecurityConfig,
+} from './types/security';

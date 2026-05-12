@@ -29,7 +29,7 @@ describe('createServer', () => {
   });
 
   it('logs startup with custom app.name', async () => {
-    const infoMessages: string[] = [];
+    const logs: { scope: Record<string, unknown>; message: string }[] = [];
     const server = createServer({
       ...minimalConfig,
       app: { ...minimalConfig.app, name: 'my-app', port: getFreePort() },
@@ -37,19 +37,20 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+          info: (scope: unknown, ...messageArgs: unknown[]) =>
+            logs.push({ message: String(messageArgs[0]), scope: scope as Record<string, unknown> }),
           warn: () => {},
         },
       },
     });
     server.start();
     await server.stop();
-    expect(infoMessages.length).toBe(1);
-    expect(infoMessages[0]).toContain('my-app');
+    expect(logs.length).toBe(1);
+    expect(logs[0]!.scope.appName).toBe('my-app');
   });
 
   it('logs startup with default app.name', async () => {
-    const infoMessages: string[] = [];
+    const logs: { scope: Record<string, unknown>; message: string }[] = [];
     const server = createServer({
       ...minimalConfig,
       app: { ...minimalConfig.app, port: getFreePort() },
@@ -57,14 +58,15 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+          info: (scope: unknown, ...messageArgs: unknown[]) =>
+            logs.push({ message: String(messageArgs[0]), scope: scope as Record<string, unknown> }),
           warn: () => {},
         },
       },
     });
     server.start();
     await server.stop();
-    expect(infoMessages[0]).toContain('app');
+    expect(logs[0]!.scope.appName).toBe('app');
   });
 
   it('resolves port from process.env.PORT', async () => {
@@ -179,7 +181,7 @@ describe('createServer', () => {
     expect(receivedPort).toBe(port);
   });
 
-  it('logs shutdown message and exits on SIGTERM signal', async () => {
+  it('logs shutdown message and sets exitCode on SIGTERM signal', async () => {
     const infoMessages: string[] = [];
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
@@ -205,12 +207,13 @@ describe('createServer', () => {
     }
     await new Promise((resolve) => setImmediate(resolve));
     expect(infoMessages.some((msg) => msg.includes('SIGTERM'))).toBe(true);
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(process.exitCode).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     onSpy.mockRestore();
   });
 
-  it('logs shutdown message and exits on SIGINT signal', async () => {
+  it('logs shutdown message and sets exitCode on SIGINT signal', async () => {
     const infoMessages: string[] = [];
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const onSpy = vi.spyOn(process, 'on').mockImplementation(() => process);
@@ -236,7 +239,8 @@ describe('createServer', () => {
     }
     await new Promise((resolve) => setImmediate(resolve));
     expect(infoMessages.some((msg) => msg.includes('SIGINT'))).toBe(true);
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(process.exitCode).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
     onSpy.mockRestore();
   });

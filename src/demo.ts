@@ -14,18 +14,17 @@
 import { z } from 'zod';
 import { createServer, type Server } from './config/runtime'; // from 'halide';
 import { apiRoute, proxyRoute } from './index';
+import type { ServerConfig } from './types';
+import type { ApiRoute, ProxyRoute } from './types/api';
 import type {
-  ApiRoute,
   AppConfig,
   ObservabilityConfig,
-  OpenApiConfig,
-  ProxyRoute,
   RequestContext,
   ResponseContext,
-  SecurityConfig,
-  ServerConfig,
   THalideApp,
-} from './types'; // from 'halide'
+} from './types/app';
+import type { OpenApiConfig } from './types/openapi';
+import type { SecurityConfig } from './types/security';
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {
@@ -35,16 +34,17 @@ interface UserClaims {
   sub: string;
 }
 
-/** Bundled app context for this demo. */
+/** Bundled app context for this demo, combining UserClaims JWT payload with default log scope. */
 type DemoApp = THalideApp<UserClaims>;
 
-/** Zod schema validating the request body for creating a new user. */
+/** Zod schema validating the request body for creating a new user (email and name fields). */
 const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> = z.object({
   email: z.string().email(),
   name: z.string().min(1),
 });
 
 /** Inferred TypeScript type from {@link CreateUserSchema}. */
+/** Inferred TypeScript type from {@link CreateUserSchema}: `{ email: string; name: string }`. */
 type CreateUserSchema = z.infer<typeof CreateUserSchema>;
 
 /**

@@ -1,4 +1,4 @@
-import type { Logger } from '../types';
+import type { Logger } from '../types/app';
 import { createSecretCache } from './secretCache';
 
 const mockLogger: Logger<unknown> = {

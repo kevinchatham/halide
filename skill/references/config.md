@@ -7,14 +7,14 @@ The top-level configuration object passed to `createServer()`:
 ```typescript
 type App = THalideApp<UserClaims>;
 
-interface ServerConfig<TApp = THalideApp> {
-  app?: AppConfig; // optional — server can run as pure backend without static files
-  apiRoutes?: ApiRoute<TApp>[]; // optional array
-  proxyRoutes?: ProxyRoute<TApp>[]; // optional array
-  security?: SecurityConfig; // optional
-  observability?: ObservabilityConfig<TApp>; // optional
-  openapi?: OpenApiConfig; // optional
-}
+type ServerConfig<TApp = THalideApp> = {
+  observability?: ObservabilityConfig<TApp>;
+  apiRoutes?: ApiRoute<TApp, unknown, unknown>[];
+  proxyRoutes?: ProxyRoute<TApp>[];
+  security?: SecurityConfig;
+  app?: AppConfig;
+  openapi?: OpenApiConfig;
+};
 ```
 
 **Critical:** `ServerConfig` uses **separate arrays** — `apiRoutes` and `proxyRoutes`. There is no single `routes` array.
@@ -33,32 +33,37 @@ type THalideApp<TClaims = unknown, TLogScope = unknown> = {
 ## AppConfig (optional — for static file serving)
 
 ```typescript
-interface AppConfig {
-  root?: string; // optional — omit for pure backend mode
+type AppConfig = {
+  apiPrefix?: string; // default: '/api' — paths with this prefix get 404 instead of app fallback
+  fallback?: string; // default: 'index.html' — app fallback file for client-side routing
   name?: string; // default: 'app' — used in log messages
   port?: number; // default: 3553 — server listen port
-  fallback?: string; // default: 'index.html' — app fallback file
-  apiPrefix?: string; // default: '/api' — paths starting with this get 404 instead of app fallback. Set to '' to disable.
-}
+  root?: string; // optional — omit for pure backend mode
+};
 ```
 
 ## SecurityConfig
 
 ```typescript
-interface SecurityConfig {
+type SecurityConfig = {
   auth?: SecurityAuthConfig;
   cors?: CorsConfig;
   csp?: CspOptions;
-  rateLimit?: { maxRequests?: number; windowMs?: number };
-}
+  rateLimit?: {
+    maxRequests?: number; // default: 100
+    windowMs?: number; // default: 900000 (15 minutes)
+    trustedProxies?: string[]; // optional — trust x-forwarded-for from these IPs/CIDRs
+    maxEntries?: number; // optional — max store entries; oldest evicted
+  };
+};
 
-interface SecurityAuthConfig {
+type SecurityAuthConfig = {
+  audience?: string;
+  jwksUri?: string;
   strategy?: 'bearer' | 'jwks';
-  secret?: () => string | Promise<string>; // required for bearer
-  secretTtl?: number; // default: 60 (seconds). 0 to disable caching
-  jwksUri?: string; // required for jwks
-  audience?: string; // optional: validates aud claim
-}
+  secret?: () => string | Promise<string>;
+  secretTtl?: number; // default: 60 (seconds)
+};
 ```
 
 ## Key Types

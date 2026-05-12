@@ -1,24 +1,10 @@
-import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
-import { createNoopLogger } from '../config/defaults';
-import { createOpenApiRoutes } from '../middleware/swagger';
-import type { Logger, ServerConfig } from '../types';
-import { registerRoutes } from './registry';
+import { createTestApp } from './registry.helpers';
 
-const noopLogger: Logger<unknown> = createNoopLogger();
 const secret = 'test-secret';
 
 async function createValidToken(claims: Record<string, unknown>): Promise<string> {
   return sign(claims, secret, 'HS256');
-}
-
-type HalideVariables = { rawBody?: unknown };
-
-function createTestApp(config: ServerConfig): Hono<{ Variables: HalideVariables }> {
-  const app = new Hono<{ Variables: HalideVariables }>();
-  registerRoutes(app, config, noopLogger);
-  createOpenApiRoutes(config, app as unknown as Hono);
-  return app;
 }
 
 describe('registerRoutes — auth', () => {

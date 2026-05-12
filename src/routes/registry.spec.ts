@@ -1,20 +1,13 @@
-import { Hono } from 'hono';
 import { z } from 'zod';
-import { createNoopLogger } from '../config/defaults';
-import { createOpenApiRoutes } from '../middleware/swagger';
-import type { Logger, ServerConfig } from '../types';
-import { registerRoutes } from './registry';
+import type { ProxyRoute } from '../types/api';
+import { createTestApp, resolveOpenApiSpec } from './registry.helpers';
 
-const noopLogger: Logger<unknown> = createNoopLogger();
-
-type HalideVariables = { rawBody?: unknown };
-
-function createTestApp(config: ServerConfig): Hono<{ Variables: HalideVariables }> {
-  const app = new Hono<{ Variables: HalideVariables }>();
-  registerRoutes(app, config, noopLogger);
-  createOpenApiRoutes(config, app as unknown as Hono);
-  return app;
-}
+vi.mock('../services/proxy', () => ({
+  buildRequestContextFromHono: vi
+    .fn()
+    .mockReturnValue({ body: undefined, method: 'get', params: {}, path: '', query: {} }),
+  createProxyService: vi.fn().mockReturnValue(async () => new Response('ok', { status: 200 })),
+}));
 
 describe('registerRoutes', () => {
   it('does nothing when routes is missing', async () => {
@@ -25,6 +18,84 @@ describe('registerRoutes', () => {
 
     const res = await app.request('/nonexistent');
     expect(res.status).toBe(404);
+  });
+
+  describe('Proxy routes', () => {
+    it('forwards proxy requests with observe disabled', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () => new Response('ok', { status: 200 }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: false,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(200);
+    });
+
+    it('forwards proxy requests and collects response body', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () =>
+          new Response(null, {
+            headers: { 'Content-Type': 'text/plain' },
+            status: 200,
+          }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: true,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(200);
+    });
+
+    it('returns response directly when body is empty', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () => new Response(null, { status: 204 }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: true,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(204);
+    });
   });
 
   describe('API routes', () => {
@@ -191,5 +262,144 @@ describe('registerRoutes', () => {
       });
       expect(res.status).toBe(400);
     });
+  });
+});
+
+describe('resolveOpenApiSpec', () => {
+  it('returns empty array when no proxy routes have openapiSpec', async () => {
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    const result = await resolveOpenApiSpec(routes);
+    expect(result).toEqual([]);
+  });
+
+  it('resolves external spec from file path', async () => {
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        openapiSpec: { path: 'test/fixtures/test-spec.json' },
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    const result = await resolveOpenApiSpec(routes);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.spec).toHaveProperty('openapi');
+  });
+
+  it('resolves external spec from URL', async () => {
+    const mockSpec = JSON.stringify({
+      info: { title: 'Mock API', version: '1.0.0' },
+      openapi: '3.1.0',
+      paths: {},
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          json: () => Promise.resolve(JSON.parse(mockSpec)),
+          ok: true,
+        } as unknown as Response),
+      ),
+    );
+
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        openapiSpec: { path: 'https://api.example.com/openapi.json' },
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    const result = await resolveOpenApiSpec(routes);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.spec).toHaveProperty('openapi');
+    expect(result[0]?.spec).toHaveProperty('info');
+    expect((result[0]?.spec as { info: { title: string } }).info.title).toBe('Mock API');
+  });
+
+  it('skips routes without openapiSpec', async () => {
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        openapiSpec: { path: 'test/fixtures/test-spec.json' },
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+      {
+        access: 'public',
+        methods: ['get'],
+        path: '/api/orders',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    const result = await resolveOpenApiSpec(routes);
+    expect(result).toHaveLength(1);
+  });
+
+  it('throws on invalid JSON file content', async () => {
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        openapiSpec: { path: './README.md' },
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    await expect(resolveOpenApiSpec(routes)).rejects.toThrow('not valid JSON');
+  });
+
+  it('throws on unreachable URL', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          statusText: 'Not Found',
+        } as unknown as Response),
+      ),
+    );
+
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        openapiSpec: { path: 'https://example.invalid/nonexistent/openapi.json' },
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    await expect(resolveOpenApiSpec(routes)).rejects.toThrow('Failed to fetch OpenAPI spec');
+  });
+
+  it('treats file:// URLs as file paths', async () => {
+    const routes: ProxyRoute<unknown>[] = [
+      {
+        access: 'public',
+        methods: ['get'],
+        openapiSpec: { path: 'file://../../test/fixtures/test-spec.json' },
+        path: '/api/users',
+        target: 'https://api.example.com',
+        type: 'proxy',
+      } as ProxyRoute<unknown>,
+    ];
+    await expect(resolveOpenApiSpec(routes)).rejects.toThrow('ENOENT');
   });
 });

@@ -43,7 +43,7 @@ The handler receives two arguments:
 | `ctx`     | `RequestContext & { body: TBody }` | Method, path, headers, params, query, and validated body |
 | `app`     | `THalideApp`                       | Bundled app context with `claims` and `logger`           |
 
-`app` is a `THalideApp` object containing:
+`app` is a `THalideApp<TClaims, TLogScope>` object containing:
 
 - `claims` — decoded JWT claims (undefined for public routes)
 - `logger` — structured logger instance

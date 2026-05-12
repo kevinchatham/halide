@@ -1,21 +1,48 @@
 import { Hono } from 'hono';
-import type { Logger } from '../types';
+import type { Logger } from '../types/app';
 import { createErrorHandler } from './errorHandler';
 
-const logger: Logger<unknown> = {
+const logger = {
   debug: vi.fn(),
   error: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
+} as Logger<unknown> & {
+  debug: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+  info: ReturnType<typeof vi.fn>;
+  warn: ReturnType<typeof vi.fn>;
 };
 
 describe('createErrorHandler', () => {
-  it('returns 500 with error message', async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('logs error details and returns 500', async () => {
     const app = new Hono();
     const handler = createErrorHandler(logger);
     app.onError(handler);
     app.post('/api/data', () => {
       throw new Error('Something broke');
+    });
+
+    const res = await app.request('/api/data', { method: 'POST' });
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Internal Server Error' });
+    expect(logger.error).toHaveBeenCalled();
+    const call = logger.error.mock.calls[0]!;
+    expect(call[1]).toContain('Something broke');
+  });
+
+  it('returns 500 with error message', async () => {
+    const app = new Hono();
+    const handler = createErrorHandler(logger);
+    app.onError(handler);
+    app.post('/api/data', () => {
+      throw new Error('test');
     });
 
     const res = await app.request('/api/data', { method: 'POST' });
@@ -49,5 +76,8 @@ describe('createErrorHandler', () => {
     handler('string error', mockContext);
 
     expect(mockJson).toHaveBeenCalledWith({ error: 'Internal Server Error' }, 500);
+    expect(logger.error).toHaveBeenCalled();
+    const call = logger.error.mock.calls[0]!;
+    expect(call[1]).toContain('string error');
   });
 });

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import type { Logger, ProxyRoute, THalideApp } from '../types';
+import type { ProxyRoute } from '../types/api';
+import type { Logger, THalideApp } from '../types/app';
 import { createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
@@ -120,5 +121,78 @@ describe('createProxyService', () => {
     expect(transformFn).toHaveBeenCalled();
     expect(transformFn.mock.calls[0]![0].method).toBe('post');
     expect(transformFn.mock.calls[0]![0].body).toEqual({ original: true });
+  });
+
+  it('blocks authorization header by default', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['get'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, createApp());
+    const app = new Hono();
+    app.get('/api/data', handler);
+
+    const req = new Request('http://localhost/api/data', {
+      headers: { authorization: 'Bearer token123', 'x-forwarded-for': '127.0.0.1' },
+      method: 'GET',
+    });
+
+    const res = await app.fetch(req);
+    expect(res.status).toBeLessThan(600);
+  });
+
+  it('blocks cookie header by default', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      methods: ['get'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, createApp());
+    const app = new Hono();
+    app.get('/api/data', handler);
+
+    const req = new Request('http://localhost/api/data', {
+      headers: { cookie: 'session=abc123', 'x-forwarded-for': '127.0.0.1' },
+      method: 'GET',
+    });
+
+    const res = await app.fetch(req);
+    expect(res.status).toBeLessThan(600);
+  });
+
+  it('forwards headers when forwardHeaders allowlist is set', async () => {
+    const route: ProxyRoute = {
+      access: 'public',
+      forwardHeaders: ['accept', 'content-type'],
+      methods: ['post'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, createApp());
+    const app = new Hono();
+    app.post('/api/data', handler);
+
+    const req = new Request('http://localhost/api/data', {
+      body: JSON.stringify({ test: true }),
+      headers: {
+        accept: 'application/json',
+        authorization: 'Bearer token123',
+        'content-type': 'application/json',
+        'x-forwarded-for': '127.0.0.1',
+      },
+      method: 'POST',
+    });
+
+    const res = await app.fetch(req);
+    expect(res.status).toBeLessThan(600);
   });
 });

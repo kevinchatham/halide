@@ -271,7 +271,6 @@ describe('createApp', () => {
     const swaggerRes = await app.request('/swagger');
     expect(swaggerRes.status).toBe(200);
     const swaggerCsp = swaggerRes.headers.get('Content-Security-Policy') ?? '';
-    expect(swaggerCsp).toContain("'unsafe-inline'");
     expect(swaggerCsp).toContain('https://cdn.jsdelivr.net');
 
     const apiRes = await app.request('/api/test');
