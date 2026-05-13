@@ -19,7 +19,7 @@ export const DEFAULTS = {
   cors: {
     credentials: false,
     methods: ['get', 'post', 'put', 'delete', 'patch'] as string[],
-    origin: ['*'] as string[],
+    origin: [] as string[],
   },
   csp: {
     default: {

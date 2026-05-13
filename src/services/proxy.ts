@@ -27,6 +27,14 @@ export function getCachedAgent(
   return agent;
 }
 
+/** Destroy and clear all cached HTTP agents. Call on shutdown to release connections. */
+export function disposeProxyAgents(): void {
+  for (const [, agent] of agentCache) {
+    agent.destroy();
+  }
+  agentCache.clear();
+}
+
 /** Headers that cannot be modified by proxy transformations. */
 const READONLY_HEADERS: Set<string> = new Set([
   'host',

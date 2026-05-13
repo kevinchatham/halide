@@ -17,6 +17,9 @@ function isOptionalSchema(schema: unknown): boolean {
   return s._def?.typeName === 'ZodOptional' || s._def?.typeName === 'ZodNullable';
 }
 
+/** Fetch timeout in milliseconds for external OpenAPI spec URLs. */
+const OPENAPI_FETCH_TIMEOUT_MS = 10_000;
+
 /** Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file. */
 async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<string, unknown>> {
   let isUrl = false;
@@ -34,7 +37,8 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
   }
 
   if (isUrl) {
-    const response = await fetch(path);
+    const signal = AbortSignal.timeout(OPENAPI_FETCH_TIMEOUT_MS);
+    const response = await fetch(path, { signal });
     if (!response.ok) {
       throw new Error(`Failed to fetch OpenAPI spec from ${path}: ${response.statusText}`);
     }

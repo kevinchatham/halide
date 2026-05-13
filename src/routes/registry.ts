@@ -73,7 +73,7 @@ function registerApiRoute<TApp = unknown>(
     const forbidResponse = await checkAuthorization(c, route, appCtx, authBody);
     if (forbidResponse) return forbidResponse;
 
-    emitOnRequest(c, authBody, appCtx, observability, route.observe);
+    emitOnRequest(c, authBody, appCtx, observability, route.observe, logger);
 
     const body = await resolveBody(c, route);
 
@@ -95,6 +95,7 @@ function registerApiRoute<TApp = unknown>(
         route.observe,
         { handlerError, start, statusCode },
         result,
+        logger,
       );
     }
 
@@ -148,7 +149,7 @@ function registerProxyRoute<TApp = unknown>(
           });
         }
 
-        emitOnRequest(c, parsedBody, appCtx, observability, route.observe);
+        emitOnRequest(c, parsedBody, appCtx, observability, route.observe, logger);
 
         try {
           const proxyHandler = createProxyService(route, appCtx, parsedBody);
@@ -222,6 +223,7 @@ function registerProxyRoute<TApp = unknown>(
             route.observe,
             { handlerError, start, statusCode },
             proxyResponseBody,
+            logger,
           );
         }
       },

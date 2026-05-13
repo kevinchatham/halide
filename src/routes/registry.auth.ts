@@ -3,13 +3,21 @@ import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
 import type { ApiRoute, AuthorizeFn } from '../types/api';
-import type { ObservabilityConfig, THalideApp } from '../types/app';
+import type { Logger, ObservabilityConfig, THalideApp } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
+/** Maximum number of entries in the claim extractor cache. */
+const MAX_EXTRACTOR_CACHE = 100;
+
 /** Module-level cache for claim extractors keyed by auth strategy. */
 const claimExtractorCache = new Map<string, ClaimExtractor<unknown> | undefined>();
+
+/** Return the current number of entries in the claim extractor cache. Intended for testing. */
+export function getClaimExtractorCacheSize(): number {
+  return claimExtractorCache.size;
+}
 
 /** Create a JSON error response for authentication/authorization failures. */
 export function createAuthErrorResponse(status: number, message: string): Response {
@@ -68,7 +76,13 @@ export function createClaimExtractor<TApp = unknown>(
     };
   }
 
-  if (result) claimExtractorCache.set(key, result);
+  if (result) {
+    if (claimExtractorCache.size >= MAX_EXTRACTOR_CACHE) {
+      const firstKey = claimExtractorCache.keys().next().value;
+      if (firstKey) claimExtractorCache.delete(firstKey);
+    }
+    claimExtractorCache.set(key, result);
+  }
   return result as ClaimExtractor<THalideApp<TApp>['claims']> | undefined;
 }
 
@@ -138,6 +152,7 @@ export async function checkAuthorization<TApp>(
  * Emit the onRequest observability hook if configured and not disabled on the route.
  *
  * Skips the hook when `observe` is false or when no onRequest hook is configured.
+ * Wraps callback invocations in try/catch to prevent async errors from silently failing.
  *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param c - The Hono context.
@@ -145,6 +160,7 @@ export async function checkAuthorization<TApp>(
  * @param app - The bundled app context.
  * @param observability - The observability configuration.
  * @param observe - Whether observability is enabled for this specific route.
+ * @param logger - Logger instance for reporting hook errors.
  */
 export function emitOnRequest<TApp>(
   c: Context,
@@ -152,10 +168,26 @@ export function emitOnRequest<TApp>(
   app: TApp,
   observability: ObservabilityConfig<TApp> | undefined,
   observe: boolean | undefined,
+  logger?: Logger<unknown>,
 ): void {
   if (observability?.onRequest && observe !== false) {
     const ctx = buildRequestContextFromHono(c, body);
-    observability.onRequest(ctx, app);
+    try {
+      const result = observability.onRequest(ctx, app);
+      if (result instanceof Promise) {
+        result.catch((err) =>
+          logger?.error(
+            {} as unknown,
+            `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+      }
+    } catch (err) {
+      logger?.error(
+        {} as unknown,
+        `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }
 
@@ -174,6 +206,7 @@ interface ResponseEmitContext {
  *
  * Skips the hook when `observe` is false or when no onResponse hook is configured.
  * Computes the response duration from the start timestamp.
+ * Wraps callback invocations in try/catch to prevent async errors from silently failing.
  *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param c - The Hono context.
@@ -183,6 +216,7 @@ interface ResponseEmitContext {
  * @param observe - Whether observability is enabled for this specific route.
  * @param ctx - The response emit context with error, start time, and status code.
  * @param responseBody - The captured response body for logging.
+ * @param logger - Logger instance for reporting hook errors.
  */
 export function emitOnResponse<TApp>(
   c: Context,
@@ -192,15 +226,31 @@ export function emitOnResponse<TApp>(
   observe: boolean | undefined,
   ctx: ResponseEmitContext,
   responseBody?: unknown,
+  logger?: Logger<unknown>,
 ): void {
   if (observability?.onResponse && observe !== false) {
     const reqCtx = buildRequestContextFromHono(c, body);
-    observability.onResponse(reqCtx, app, {
-      body: responseBody,
-      durationMs: Date.now() - ctx.start,
-      error: ctx.handlerError,
-      statusCode: ctx.statusCode,
-    });
+    try {
+      const result = observability.onResponse(reqCtx, app, {
+        body: responseBody,
+        durationMs: Date.now() - ctx.start,
+        error: ctx.handlerError,
+        statusCode: ctx.statusCode,
+      });
+      if (result instanceof Promise) {
+        result.catch((err) =>
+          logger?.error(
+            {} as unknown,
+            `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+      }
+    } catch (err) {
+      logger?.error(
+        {} as unknown,
+        `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }
 

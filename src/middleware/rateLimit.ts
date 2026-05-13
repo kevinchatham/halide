@@ -1,6 +1,66 @@
 import type { Context, Next } from 'hono';
 import ipaddr from 'ipaddr.js';
 
+/** Minimal Redis client interface for rate limiting. */
+export interface RedisClient {
+  del(key: string): Promise<number>;
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, opts?: { EX?: number }): Promise<'OK'>;
+}
+
+/**
+ * Create a Redis-backed rate limit store implementation.
+ *
+ * Uses Redis for distributed rate limiting across multiple server instances.
+ * Each client IP gets a key with a TTL matching the window duration.
+ *
+ * @param client - A Redis client implementing the RedisClient interface.
+ * @param config - Rate limit configuration (maxRequests and windowMs).
+ * @returns Object containing the middleware and a dispose function.
+ */
+export function createRedisRateLimitStore(
+  client: RedisClient,
+  config: Omit<RateLimitConfig, 'maxEntries'>,
+): {
+  middleware: (c: Context, next: Next) => Promise<Response | undefined>;
+  dispose: () => void;
+} {
+  const windowSeconds = Math.ceil(config.windowMs / 1000);
+
+  const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
+    const clientIp = getClientIp(c, config.trustedProxies);
+    const key = `rate-limit:${clientIp}`;
+    const now = Date.now();
+
+    const current = await client.get(key);
+
+    if (!current || now > JSON.parse(current).resetTime) {
+      await client.set(key, JSON.stringify({ count: 1, resetTime: now + config.windowMs }), {
+        EX: windowSeconds,
+      });
+      await next();
+      return;
+    }
+
+    const entry = JSON.parse(current);
+    entry.count += 1;
+
+    if (entry.count > config.maxRequests) {
+      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      c.header('Retry-After', String(retryAfter));
+      return c.json({ error: 'Too Many Requests' }, 429);
+    }
+
+    await client.set(key, JSON.stringify(entry), { EX: windowSeconds });
+    await next();
+  };
+
+  return {
+    dispose: () => {},
+    middleware,
+  };
+}
+
 /**
  * Interface for rate limit storage backends.
  *

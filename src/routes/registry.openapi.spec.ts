@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import type { ProxyRoute } from '../types/api';
 import { createTestApp } from './registry.helpers';
+import { resolveOpenApiSpec } from './registry.openapi';
 
 describe('registerRoutes — openapi', () => {
   describe('OpenAPI metadata', () => {
@@ -213,6 +215,35 @@ describe('registerRoutes — openapi', () => {
       const spec = await specRes.json();
       const getItems = spec.paths['/items']?.get;
       expect(getItems?.responses['200'].description).toBe('Custom OK');
+    });
+  });
+
+  describe('OpenAPI spec resolution', () => {
+    it('throws error when fetch times out', async () => {
+      const fetchMock = vi.fn().mockReturnValue(
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('AbortError')), 50);
+        }),
+      );
+      const originalFetch = global.fetch;
+      global.fetch = fetchMock as typeof global.fetch;
+
+      try {
+        await resolveOpenApiSpec([
+          {
+            methods: ['get'],
+            openapiSpec: { path: 'http://localhost:9999/spec.json' },
+            path: '/test',
+            type: 'proxy',
+          } as ProxyRoute<unknown>,
+        ]);
+        // Should not reach here
+        expect(true).toBe(false);
+      } catch (err) {
+        expect(err).toBeInstanceOf(Error);
+      } finally {
+        global.fetch = originalFetch;
+      }
     });
   });
 });

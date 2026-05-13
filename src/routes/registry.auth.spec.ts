@@ -1,6 +1,11 @@
 import { sign } from 'hono/jwt';
-import { resetClaimExtractorCache } from './registry.auth';
-import { createTestApp } from './registry.helpers';
+import type { ServerConfig } from '../types/server-config';
+import {
+  createClaimExtractor,
+  getClaimExtractorCacheSize,
+  resetClaimExtractorCache,
+} from './registry.auth';
+import { createTestApp, noopLogger } from './registry.helpers';
 
 const secret = 'test-secret';
 
@@ -223,6 +228,30 @@ describe('registerRoutes — auth', () => {
 
       const res = await app.request('/profile');
       expect(res.status).toBe(200);
+    });
+  });
+
+  describe('claimExtractorCache', () => {
+    it('tracks cache size', () => {
+      expect(getClaimExtractorCacheSize()).toBe(0);
+    });
+
+    it('caches extractors by strategy key', () => {
+      const bearerConfig = {
+        apiRoutes: [],
+        security: { auth: { secret: () => 'bearer-secret', strategy: 'bearer' } },
+      } as ServerConfig;
+      const jwksConfig = {
+        apiRoutes: [],
+        security: {
+          auth: { jwksUri: 'https://auth.example.com/.well-known/jwks.json', strategy: 'jwks' },
+        },
+      } as ServerConfig;
+
+      createClaimExtractor(bearerConfig, noopLogger);
+      createClaimExtractor(jwksConfig, noopLogger);
+
+      expect(getClaimExtractorCacheSize()).toBe(2);
     });
   });
 });

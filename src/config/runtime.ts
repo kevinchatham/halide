@@ -8,6 +8,7 @@ import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
+import { disposeProxyAgents } from '../services/proxy.js';
 import type { AppConfig, HalideVariables, Logger } from '../types/app.js';
 import type { ServerConfig } from '../types/server-config.js';
 import { createDefaultLogger, DEFAULTS } from './defaults.js';
@@ -36,6 +37,8 @@ export interface CreateAppResult {
   app: Hono<{ Variables: HalideVariables }>;
   /** Logger instance used throughout the server. */
   logger: Logger<unknown>;
+  /** Function to dispose of proxy HTTP agent connections. */
+  proxyDispose: (() => void) | undefined;
   /** Function to dispose of rate limit resources. */
   rateLimitDispose: (() => void) | undefined;
 }
@@ -124,7 +127,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
 
   app.onError(createErrorHandler(logger));
 
-  return { app, logger, rateLimitDispose };
+  return { app, logger, proxyDispose: disposeProxyAgents, rateLimitDispose };
 }
 
 /**
@@ -154,7 +157,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
  * ```
  */
 export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): Server {
-  const { app, rateLimitDispose, logger } = createApp<TApp>(configInput);
+  const { app, proxyDispose, rateLimitDispose, logger } = createApp<TApp>(configInput);
 
   const appName = configInput.app?.name ?? DEFAULTS.app.name;
 
@@ -176,6 +179,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
     isShuttingDown = true;
     logger.info({ appName } as unknown, `Received ${signal}, shutting down...`);
     rateLimitDispose?.();
+    proxyDispose?.();
     const server = httpServer;
     if (server) {
       (server as import('node:http').Server).closeAllConnections?.();
@@ -225,6 +229,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
       if (isShuttingDown) return;
       isShuttingDown = true;
       rateLimitDispose?.();
+      proxyDispose?.();
       const server = httpServer;
       if (!server) {
         return;
