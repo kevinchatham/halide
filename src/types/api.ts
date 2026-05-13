@@ -65,6 +65,13 @@ export type ProxyRoute<TApp = THalideApp> = {
   methods: Array<'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options'>;
   /** HTTP agent to use for upstream connections. Pass `http.Agent({ keepAlive: true })` for connection pooling. */
   agent?: import('node:http').Agent;
+  /** Connection pool settings for the default agent. Applied when `agent` is not set. */
+  connection?: {
+    /** Maximum number of sockets per host. Default: 50. */
+    maxSockets?: number;
+    /** Maximum number of free sockets per host. Default: 10. */
+    maxFreeSockets?: number;
+  };
   /** Whether to fire observability hooks for this route. Defaults to true. */
   observe?: boolean;
   /** URL path pattern to match. Supports Hono-style path parameters and wildcards. */

@@ -173,4 +173,49 @@ describe('extractJwksClaims', () => {
     await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
     expect(result).toMatchObject(payload);
   });
+
+  it('only fetches JWKS once for concurrent requests to same URI', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const deferred = { resolved: false };
+
+    mockJwk.mockImplementation(
+      (): import('hono').MiddlewareHandler =>
+        async (c: import('hono').Context, next: import('hono').Next) => {
+          if (!deferred.resolved) {
+            await new Promise((r) => setTimeout(r, 50));
+            deferred.resolved = true;
+          }
+          c.set('jwtPayload', { role: 'admin', sub: 'user-123' });
+          await next();
+        },
+    );
+
+    const app = new Hono();
+
+    app.get('/test', async (c) => {
+      await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
+    });
+
+    app.get('/test2', async (c) => {
+      await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
+      return c.json({});
+    });
+
+    const req1 = new Request('http://localhost/test', {
+      headers: { authorization: 'Bearer some-token' },
+    });
+    const req2 = new Request('http://localhost/test2', {
+      headers: { authorization: 'Bearer some-token' },
+    });
+
+    const fetchCountBefore = mockJwk.mock.calls.length;
+    const [res1, res2] = await Promise.all([app.fetch(req1), app.fetch(req2)]);
+    const fetchCountAfter = mockJwk.mock.calls.length;
+
+    expect(res1.status).toBeLessThan(600);
+    expect(res2.status).toBeLessThan(600);
+    expect(fetchCountAfter - fetchCountBefore).toBe(1);
+  });
 });

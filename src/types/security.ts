@@ -53,6 +53,10 @@ export type SecurityAuthConfig = {
    * secret is an async function. Defaults to 60.
    */
   secretTtl?: number;
+  /**
+   * JWT algorithms accepted for bearer strategy. Defaults to ['HS256'].
+   */
+  algorithms?: string[];
 };
 
 /**

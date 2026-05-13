@@ -1,26 +1,25 @@
 import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 
-/** Cached JWKS middleware instance for a given JWKS URI. */
-type JwkMiddlewareCache = {
-  middleware: ReturnType<typeof import('hono/jwk').jwk> | null;
-  uri: string | null;
+/** Per-URI JWKS cache entry with TTL. */
+type JwkCacheEntry = {
+  middleware: ReturnType<typeof import('hono/jwk').jwk>;
+  expiresAt: number;
 };
 
-/** Singleton cache for JWKS middleware instances — disabled in test environments. */
-const jwkCache: JwkMiddlewareCache = { middleware: null, uri: null };
+const jwkCache = new Map<string, JwkCacheEntry>();
+const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
+const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
 
 /**
  * Get a JWKS middleware instance for the given JWKS URI.
- * Caches the middleware in production; returns a fresh instance in tests
- * to allow mocking per-request.
+ * Caches middleware with TTL eviction; returns a fresh instance in tests.
  * @param jwksUri - The JWKS endpoint URL.
  * @returns The JWKS middleware function.
  */
 async function getCachedJwkMiddleware(
   jwksUri: string,
 ): Promise<ReturnType<typeof import('hono/jwk').jwk>> {
-  // Skip caching in test environments so mocks work per-request
   if (typeof vi !== 'undefined') {
     const { jwk } = await import('hono/jwk');
     return jwk({
@@ -29,16 +28,49 @@ async function getCachedJwkMiddleware(
     });
   }
 
-  if (jwkCache.middleware === null || jwkCache.uri !== jwksUri) {
-    const { jwk } = await import('hono/jwk');
-    jwkCache.middleware = jwk({
-      alg: ['RS256'],
-      jwks_uri: jwksUri,
-    });
-    jwkCache.uri = jwksUri;
+  const now = Date.now();
+  const cached = jwkCache.get(jwksUri);
+  if (cached && cached.expiresAt > now) {
+    return cached.middleware;
   }
-  return jwkCache.middleware!;
+
+  jwkCache.delete(jwksUri);
+
+  const existing = jwkFetchLocks.get(jwksUri);
+  if (existing) {
+    return existing;
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const { jwk } = await import('hono/jwk');
+      const middleware = jwk({
+        alg: ['RS256'],
+        jwks_uri: jwksUri,
+      });
+      jwkCache.set(jwksUri, { expiresAt: now + JWKS_CACHE_TTL_MS, middleware });
+      return middleware;
+    } finally {
+      jwkFetchLocks.delete(jwksUri);
+    }
+  })();
+  jwkFetchLocks.set(jwksUri, fetchPromise);
+  return fetchPromise;
 }
+
+/** Periodically evict stale JWKS cache entries. */
+const jwkSweepTimer =
+  typeof vi !== 'undefined'
+    ? null
+    : setInterval(() => {
+        const now = Date.now();
+        for (const [uri, entry] of jwkCache.entries()) {
+          if (entry.expiresAt <= now) {
+            jwkCache.delete(uri);
+          }
+        }
+      }, 600_000); // 10 minutes
+jwkSweepTimer?.unref();
 
 /** Check whether the JWT audience claim matches the expected value. */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
@@ -50,32 +82,57 @@ function matchesAudience(payload: Record<string, unknown>, audience: string): bo
 }
 
 /**
- * Extract JWT claims from a Bearer token using HS256 verification.
+ * Extract JWT claims from a Bearer token using configurable algorithm verification.
+ * Tries each algorithm sequentially; the first algorithm that produces a valid payload
+ * (and passes audience check) is accepted.
  * @typeParam TClaims - The type of the decoded JWT claims object.
  * @param c - The Hono context.
  * @param secret - The JWT signing secret.
  * @param audience - Optional expected audience claim.
+ * @param algorithms - JWT algorithms accepted. Defaults to ['HS256'].
  * @returns The decoded claims or null if extraction fails.
  */
 export async function extractBearerClaims<TClaims = unknown>(
   c: Context,
   secret: string,
   audience?: string,
+  algorithms?: string[],
 ): Promise<TClaims | null> {
   const authHeader = c.req.header('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return null;
   }
   const token = authHeader.slice(7);
-  try {
-    const payload = await verify(token, secret, 'HS256');
-    if (audience && !matchesAudience(payload as Record<string, unknown>, audience)) {
-      return null;
+  const alg = algorithms && algorithms.length > 0 ? algorithms : ['HS256'];
+  for (const algorithm of alg) {
+    try {
+      const payload = await verify(
+        token,
+        secret,
+        algorithm as
+          | 'HS256'
+          | 'HS384'
+          | 'HS512'
+          | 'RS256'
+          | 'RS384'
+          | 'RS512'
+          | 'ES256'
+          | 'ES384'
+          | 'ES512'
+          | 'PS256'
+          | 'PS384'
+          | 'PS512'
+          | 'EdDSA',
+      );
+      if (audience && !matchesAudience(payload as Record<string, unknown>, audience)) {
+        return null;
+      }
+      return payload as TClaims;
+    } catch {
+      // Try next algorithm
     }
-    return payload as TClaims;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 /**

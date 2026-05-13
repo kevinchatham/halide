@@ -180,3 +180,68 @@ describe('validateServerConfig — auth', () => {
     ).not.toThrow();
   });
 });
+
+describe('validateServerConfig — auth warnings', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('warns when algorithms is set with jwks strategy', () => {
+    expect(() =>
+      validateServerConfig({
+        app: { root: '/var/www' },
+        security: {
+          auth: {
+            algorithms: ['RS256'],
+            jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+            strategy: 'jwks',
+          },
+        },
+      }),
+    ).not.toThrow();
+
+    // biome-ignore lint/suspicious/noConsole: test mocking for config warnings
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('auth.algorithms is ignored when strategy is jwks'),
+    );
+  });
+
+  it('does not warn when algorithms is set with bearer strategy', () => {
+    expect(() =>
+      validateServerConfig({
+        app: { root: '/var/www' },
+        security: {
+          auth: {
+            algorithms: ['HS256'],
+            secret: () => 'secret',
+            strategy: 'bearer',
+          },
+        },
+      }),
+    ).not.toThrow();
+
+    // biome-ignore lint/suspicious/noConsole: test mocking for config warnings
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('does not warn when algorithms is not set', () => {
+    expect(() =>
+      validateServerConfig({
+        app: { root: '/var/www' },
+        security: {
+          auth: {
+            jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+            strategy: 'jwks',
+          },
+        },
+      }),
+    ).not.toThrow();
+
+    // biome-ignore lint/suspicious/noConsole: test mocking for config warnings
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+});

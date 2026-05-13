@@ -5,6 +5,28 @@ import { DEFAULTS } from '../config/defaults';
 import type { ProxyRoute } from '../types/api';
 import type { Logger, RequestContext, THalideApp } from '../types/app';
 
+/** Module-level cache for pooled http.Agent instances keyed by target + pool settings. */
+const agentCache = new Map<string, http.Agent>();
+
+/** Return a pooled http.Agent for the given target and pool settings. */
+export function getCachedAgent(
+  target: string,
+  maxSockets?: number,
+  maxFreeSockets?: number,
+): http.Agent {
+  const key = `${target}|${maxSockets ?? 50}|${maxFreeSockets ?? 10}`;
+  let agent = agentCache.get(key);
+  if (!agent) {
+    agent = new http.Agent({
+      keepAlive: true,
+      maxFreeSockets: maxFreeSockets ?? 10,
+      maxSockets: maxSockets ?? 50,
+    });
+    agentCache.set(key, agent);
+  }
+  return agent;
+}
+
 /** Headers that cannot be modified by proxy transformations. */
 const READONLY_HEADERS: Set<string> = new Set([
   'host',
@@ -23,6 +45,7 @@ const DEFAULT_FORWARD_HEADERS: string[] = [
   'content-length',
   'origin',
   'user-agent',
+  'x-forwarded-for', // Proxy is a trusted intermediary; forward client IP to upstream
 ];
 
 /** Headers that can have multiple values and need special handling. */
@@ -229,7 +252,9 @@ export function createProxyService<TApp = unknown>(
 
     const signal = AbortSignal.timeout(timeoutMs);
 
-    const agent = route.agent ?? new http.Agent({ keepAlive: true });
+    const agent =
+      route.agent ??
+      getCachedAgent(target, route.connection?.maxSockets, route.connection?.maxFreeSockets);
     const proxyRequest = new Request(targetUrl, {
       agent,
       body,

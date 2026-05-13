@@ -12,12 +12,14 @@ export type ValidationError = {
   message: string;
 };
 
-/** Result of validation with collected errors. */
+/** Result of validation with collected errors and warnings. */
 export type ValidationResult = {
   /** List of accumulated validation errors. Empty when `valid` is true. */
   errors: ValidationError[];
   /** Whether validation passed (no errors). */
   valid: boolean;
+  /** Non-blocking warnings about config choices. */
+  warnings?: ValidationError[];
 };
 
 /** Input type for route validation. Partial API or proxy route. */
@@ -217,7 +219,25 @@ function validateAuth(auth?: AuthInput): ValidationResult {
     }
   }
 
-  return { errors, valid: errors.length === 0 };
+  if (auth?.algorithms !== undefined) {
+    if (!Array.isArray(auth.algorithms) || auth.algorithms.length === 0) {
+      errors.push({
+        field: 'auth.algorithms',
+        message: 'auth.algorithms must be a non-empty array of strings',
+      });
+    }
+  }
+
+  const warnings: ValidationError[] = [];
+  if (auth?.algorithms !== undefined && auth.strategy === 'jwks') {
+    warnings.push({
+      field: 'auth.algorithms',
+      message:
+        'auth.algorithms is ignored when strategy is jwks (algorithm is resolved from JWKS endpoint)',
+    });
+  }
+
+  return { errors, valid: errors.length === 0, warnings };
 }
 
 /** Validate rate limit config, checking that maxEntries is a positive integer when provided. */
@@ -273,7 +293,7 @@ export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<T
         message: issue.message,
       }));
 
-  // Collect custom validation errors
+  // Collect custom validation results (errors and warnings)
   const results: ValidationResult[] = [
     ...(zodErrors.length > 0 ? [{ errors: zodErrors, valid: false }] : []),
     validateAppConfig(config.app),
@@ -284,7 +304,7 @@ export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<T
       config.security,
     ).errors.map((e) => ({ errors: [e], valid: false })),
     ...validateCors(config.security?.cors).errors.map((e) => ({ errors: [e], valid: false })),
-    ...validateAuth(config.security?.auth).errors.map((e) => ({ errors: [e], valid: false })),
+    validateAuth(config.security?.auth),
     ...validateRateLimit(config.security?.rateLimit).errors.map((e) => ({
       errors: [e],
       valid: false,
@@ -296,10 +316,17 @@ export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<T
   ];
 
   const allErrors = results.flatMap((r) => r.errors);
+  const allWarnings = results.flatMap((r) => r.warnings ?? []);
   if (allErrors.length > 0) {
     throw new Error(
       'Configuration validation failed:\n' +
         allErrors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
     );
+  }
+  if (allWarnings.length > 0) {
+    for (const w of allWarnings) {
+      // biome-ignore lint/suspicious/noConsole: config warnings logged to stderr
+      console.warn(`[Halide] ${w.field}: ${w.message}`);
+    }
   }
 }

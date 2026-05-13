@@ -54,12 +54,17 @@ export function createClaimExtractor<TApp = unknown>(
     result = (c: Context): Promise<THalideApp<TApp>['claims'] | null> =>
       extractJwksClaims<THalideApp<TApp>['claims']>(c, jwksUri, audience);
   } else if (auth.secret) {
-    const { secret, audience, secretTtl } = auth;
+    const { secret, audience, secretTtl, algorithms } = auth;
     const ttl = secretTtl ?? DEFAULTS.auth.secretTtl;
     const cachedResolver = createSecretCache(ttl, logger);
     result = async (c: Context): Promise<THalideApp<TApp>['claims'] | null> => {
       const resolvedSecret = await cachedResolver(secret);
-      return extractBearerClaims<THalideApp<TApp>['claims']>(c, resolvedSecret, audience);
+      return extractBearerClaims<THalideApp<TApp>['claims']>(
+        c,
+        resolvedSecret,
+        audience,
+        algorithms,
+      );
     };
   }
 

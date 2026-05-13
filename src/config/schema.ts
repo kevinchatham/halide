@@ -33,6 +33,7 @@ export const cspSchema = z
 /** Zod schema for auth config — structural validation only. */
 export const authSchema = z
   .object({
+    algorithms: z.array(z.string()).optional(),
     audience: z.string().optional(),
     jwksUri: z.string().optional(),
     secret: z.function().optional(),

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
 import type { Logger, THalideApp } from '../types/app';
-import { createProxyService } from './proxy';
+import { createProxyService, getCachedAgent } from './proxy';
 
 const noopLogger: Logger<unknown> = {
   debug: (_scope: unknown) => {},
@@ -215,5 +215,31 @@ describe('createProxyService', () => {
 
     const res = await app.fetch(new Request('http://localhost/api/data', { method: 'GET' }));
     expect(res.status).toBeLessThan(600);
+  });
+});
+
+describe('getCachedAgent', () => {
+  it('returns the same agent for identical keys', () => {
+    const agent1 = getCachedAgent('https://api.example.com', 50, 10);
+    const agent2 = getCachedAgent('https://api.example.com', 50, 10);
+    expect(agent1).toBe(agent2);
+  });
+
+  it('returns different agents for different targets', () => {
+    const agent1 = getCachedAgent('https://api.example.com', 50, 10);
+    const agent2 = getCachedAgent('https://other.example.com', 50, 10);
+    expect(agent1).not.toBe(agent2);
+  });
+
+  it('returns different agents for different pool settings', () => {
+    const agent1 = getCachedAgent('https://api.example.com', 25, 5);
+    const agent2 = getCachedAgent('https://api.example.com', 50, 10);
+    expect(agent1).not.toBe(agent2);
+  });
+
+  it('returns the same agent when defaults are used', () => {
+    const agent1 = getCachedAgent('https://api.example.com');
+    const agent2 = getCachedAgent('https://api.example.com', 50, 10);
+    expect(agent1).toBe(agent2);
   });
 });
