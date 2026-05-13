@@ -10,6 +10,7 @@ export type {
 } from './types/api';
 export type {
   AppConfig,
+  HalideVariables,
   Logger,
   ObservabilityConfig,
   RequestContext,

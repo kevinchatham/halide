@@ -229,13 +229,13 @@ export function createProxyService<TApp = unknown>(
     const signal = AbortSignal.timeout(timeoutMs);
 
     const proxyRequest = new Request(targetUrl, {
+      agent: route.agent,
       body,
-      // @ts-expect-error - duplex is needed for streaming request bodies
       duplex: 'half',
       headers: headers as Record<string, string>,
       method: c.req.method,
       signal,
-    });
+    } as RequestInit & { agent?: import('node:http').Agent });
 
     return proxy(proxyRequest);
   };

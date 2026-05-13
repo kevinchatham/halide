@@ -44,6 +44,9 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
  *
  * Filters proxy routes that have `openapiSpec` configured and resolves each
  * spec by fetching from URL or reading a local JSON file.
+ *
+ * @param proxyRoutes - The proxy routes to check for external spec sources.
+ * @returns A list of resolved specs paired with their owning routes.
  */
 export async function resolveOpenApiSpec(
   proxyRoutes: ProxyRoute<unknown>[],
@@ -60,7 +63,14 @@ export async function resolveOpenApiSpec(
   return results;
 }
 
-/** Build OpenAPI describeRoute options from route metadata, including hidden flag and request body schema. */
+/**
+ * Build OpenAPI describeRoute options from route metadata, including hidden flag
+ * and request body schema.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param route - The API or proxy route to build options for.
+ * @returns Describe route options for hono-openapi.
+ */
 export function buildDescribeRouteOptions<TApp>(
   route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): DescribeRouteOptions {
@@ -79,7 +89,14 @@ export function buildDescribeRouteOptions<TApp>(
   return options;
 }
 
-/** Build OpenAPI request body configuration from route request schema, detecting optional wrappers. */
+/**
+ * Build OpenAPI request body configuration from route request schema, detecting
+ * optional wrappers.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param route - The route with a potential request schema.
+ * @returns Request body configuration or undefined when no schema exists.
+ */
 export function buildRequestBody<TApp>(
   route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): DescribeRouteOptions['requestBody'] {
@@ -97,7 +114,14 @@ export function buildRequestBody<TApp>(
   };
 }
 
-/** Build OpenAPI responses object from route metadata or response schema, defaulting to a 200 successful response. */
+/**
+ * Build OpenAPI responses object from route metadata or response schema,
+ * defaulting to a 200 successful response.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param route - The route to build response definitions for.
+ * @returns Responses map for hono-openapi describeRoute.
+ */
 export function buildResponses<TApp>(
   route: ApiRoute<TApp> | ProxyRoute<TApp>,
 ): ResponsesWithResolver {

@@ -101,6 +101,11 @@ export type AppConfig = {
 };
 
 /**
+ * Hono context variables used internally by Halide middleware.
+ */
+export type HalideVariables = { rawBody?: unknown };
+
+/**
  * Configuration for observability features: logging, request IDs, and lifecycle hooks.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
@@ -115,6 +120,12 @@ export type ObservabilityConfig<TApp = THalideApp> = {
    * Logger instance. If not provided, a styled default logger is used.
    */
   logger?: Logger<unknown>;
+  /**
+   * Maximum bytes to collect from proxy responses for observability logging.
+   * The full response is always piped through unmodified; this only limits
+   * what is captured for logging purposes. Defaults to 1024.
+   */
+  maxCollect?: number;
   /**
    * Hook called before each request is handled. Use for logging, metrics, or request tracing.
    */

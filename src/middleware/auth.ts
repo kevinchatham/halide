@@ -1,6 +1,45 @@
 import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 
+/** Cached JWKS middleware instance for a given JWKS URI. */
+type JwkMiddlewareCache = {
+  middleware: ReturnType<typeof import('hono/jwk').jwk> | null;
+  uri: string | null;
+};
+
+/** Singleton cache for JWKS middleware instances — disabled in test environments. */
+const jwkCache: JwkMiddlewareCache = { middleware: null, uri: null };
+
+/**
+ * Get a JWKS middleware instance for the given JWKS URI.
+ * Caches the middleware in production; returns a fresh instance in tests
+ * to allow mocking per-request.
+ * @param jwksUri - The JWKS endpoint URL.
+ * @returns The JWKS middleware function.
+ */
+async function getCachedJwkMiddleware(
+  jwksUri: string,
+): Promise<ReturnType<typeof import('hono/jwk').jwk>> {
+  // Skip caching in test environments so mocks work per-request
+  if (typeof vi !== 'undefined') {
+    const { jwk } = await import('hono/jwk');
+    return jwk({
+      alg: ['RS256'],
+      jwks_uri: jwksUri,
+    });
+  }
+
+  if (jwkCache.middleware === null || jwkCache.uri !== jwksUri) {
+    const { jwk } = await import('hono/jwk');
+    jwkCache.middleware = jwk({
+      alg: ['RS256'],
+      jwks_uri: jwksUri,
+    });
+    jwkCache.uri = jwksUri;
+  }
+  return jwkCache.middleware!;
+}
+
 /** Check whether the JWT audience claim matches the expected value. */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
   const aud = payload.aud;
@@ -58,11 +97,7 @@ export async function extractJwksClaims<TClaims = unknown>(
   }
   const _token = authHeader.slice(7);
   try {
-    const { jwk } = await import('hono/jwk');
-    const jwkMiddleware = jwk({
-      alg: ['RS256'],
-      jwks_uri: jwksUri,
-    });
+    const jwkMiddleware = await getCachedJwkMiddleware(jwksUri);
     await jwkMiddleware(c, async () => {});
     const payload = c.get('jwtPayload') as TClaims | undefined;
     if (!payload) return null;

@@ -8,7 +8,17 @@ import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
-/** Create a claim extractor from config, returning undefined when no auth is configured. */
+/**
+ * Create a claim extractor from config, returning undefined when no auth is
+ * configured.
+ *
+ * Selects between JWKS or bearer extraction based on the auth strategy.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param config - The server configuration containing auth settings.
+ * @param logger - Logger instance for error reporting.
+ * @returns A claim extractor function or undefined when auth is disabled.
+ */
 export function createClaimExtractor<TApp = unknown>(
   config: ServerConfig<TApp>,
   logger: THalideApp['logger'],
@@ -34,7 +44,18 @@ export function createClaimExtractor<TApp = unknown>(
   return undefined;
 }
 
-/** Extract JWT claims from request using the claim extractor, returning null response on failure. */
+/**
+ * Extract JWT claims from request using the claim extractor, returning null
+ * response on failure.
+ *
+ * Skips extraction for public routes or when no auth is configured.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param c - The Hono context.
+ * @param route - The route, which determines access level.
+ * @param claimExtractor - The configured claim extractor function.
+ * @returns The extracted claims and a response to return on authentication failure.
+ */
 export async function extractClaims<TApp>(
   c: Context,
   route: { access: string },
@@ -56,7 +77,19 @@ export async function extractClaims<TApp>(
   return { claims: extracted, response: null };
 }
 
-/** Check authorization by calling the route's authorize function, returning a 403 response if denied. */
+/**
+ * Check authorization by calling the route's authorize function, returning a
+ * 403 response if denied.
+ *
+ * Returns null immediately when no authorize function is configured on the route.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param c - The Hono context.
+ * @param route - The route with an optional authorize function.
+ * @param app - The bundled app context.
+ * @param body - The parsed request body for authorization checks.
+ * @returns A 403 response if authorization is denied, or null to continue processing.
+ */
 export async function checkAuthorization<TApp>(
   c: Context,
   route: { authorize?: AuthorizeFn<TApp> },
@@ -82,7 +115,18 @@ export async function checkAuthorization<TApp>(
   }
 }
 
-/** Emit the onRequest observability hook if configured and not disabled on the route. */
+/**
+ * Emit the onRequest observability hook if configured and not disabled on the route.
+ *
+ * Skips the hook when `observe` is false or when no onRequest hook is configured.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param c - The Hono context.
+ * @param body - The parsed request body.
+ * @param app - The bundled app context.
+ * @param observability - The observability configuration.
+ * @param observe - Whether observability is enabled for this specific route.
+ */
 export function emitOnRequest<TApp>(
   c: Context,
   body: unknown,
@@ -106,7 +150,21 @@ interface ResponseEmitContext {
   statusCode: number;
 }
 
-/** Emit the onResponse observability hook if configured and not disabled on the route. */
+/**
+ * Emit the onResponse observability hook if configured and not disabled on the route.
+ *
+ * Skips the hook when `observe` is false or when no onResponse hook is configured.
+ * Computes the response duration from the start timestamp.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param c - The Hono context.
+ * @param body - The parsed request body.
+ * @param app - The bundled app context.
+ * @param observability - The observability configuration.
+ * @param observe - Whether observability is enabled for this specific route.
+ * @param ctx - The response emit context with error, start time, and status code.
+ * @param responseBody - The captured response body for logging.
+ */
 export function emitOnResponse<TApp>(
   c: Context,
   body: unknown,
@@ -127,7 +185,15 @@ export function emitOnResponse<TApp>(
   }
 }
 
-/** Resolve request body, using request schema if available, otherwise parsing JSON for POST/PUT/PATCH. */
+/**
+ * Resolve request body, using request schema if available, otherwise parsing
+ * JSON for POST/PUT/PATCH methods.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param c - The Hono context.
+ * @param route - The API route, which may have a request schema.
+ * @returns The parsed request body or undefined.
+ */
 export function resolveBody<TApp>(c: Context, route: ApiRoute<TApp>): unknown {
   if (route.requestSchema) return (c.req as { valid: (format: string) => unknown }).valid('json');
   const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);

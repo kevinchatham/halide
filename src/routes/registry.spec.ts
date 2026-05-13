@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ProxyRoute } from '../types/api';
-import { createTestApp, resolveOpenApiSpec } from './registry.helpers';
+import { createTestApp } from './registry.helpers';
+import { resolveOpenApiSpec } from './registry.openapi';
 
 vi.mock('../services/proxy', () => ({
   buildRequestContextFromHono: vi
@@ -37,7 +38,7 @@ describe('registerRoutes', () => {
             path: '/proxy',
             target: 'https://api.example.com',
             type: 'proxy',
-          } as ProxyRoute<unknown>,
+          },
         ],
       });
 
@@ -65,7 +66,7 @@ describe('registerRoutes', () => {
             path: '/proxy',
             target: 'https://api.example.com',
             type: 'proxy',
-          } as ProxyRoute<unknown>,
+          },
         ],
       });
 
@@ -89,12 +90,41 @@ describe('registerRoutes', () => {
             path: '/proxy',
             target: 'https://api.example.com',
             type: 'proxy',
-          } as ProxyRoute<unknown>,
+          },
         ],
       });
 
       const res = await app.request('/proxy');
       expect(res.status).toBe(204);
+    });
+
+    it('uses configurable maxCollect from observability', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () =>
+          new Response(null, {
+            headers: { 'Content-Type': 'text/plain' },
+            status: 200,
+          }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        observability: { maxCollect: 512 },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: true,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(200);
     });
   });
 
@@ -274,7 +304,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toEqual([]);
@@ -289,7 +319,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toHaveLength(1);
@@ -320,7 +350,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toHaveLength(1);
@@ -338,14 +368,14 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
       {
         access: 'public',
         methods: ['get'],
         path: '/api/orders',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toHaveLength(1);
@@ -360,7 +390,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     await expect(resolveOpenApiSpec(routes)).rejects.toThrow('not valid JSON');
   });
@@ -384,7 +414,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     await expect(resolveOpenApiSpec(routes)).rejects.toThrow('Failed to fetch OpenAPI spec');
   });
@@ -398,7 +428,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     await expect(resolveOpenApiSpec(routes)).rejects.toThrow('ENOENT');
   });

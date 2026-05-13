@@ -4,7 +4,12 @@ import { DEFAULTS } from '../config/defaults';
 import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
 import type { ServerConfig } from '../types';
 import type { ApiRoute, ProxyRoute } from '../types/api';
-import type { ObservabilityConfig, RequestContext, THalideApp } from '../types/app';
+import type {
+  HalideVariables,
+  ObservabilityConfig,
+  RequestContext,
+  THalideApp,
+} from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import {
   checkAuthorization,
@@ -15,9 +20,6 @@ import {
   resolveBody,
 } from './registry.auth';
 import { buildDescribeRouteOptions } from './registry.openapi';
-
-/** Internal Hono variables type for storing raw request body. */
-type HalideVariables = { rawBody?: unknown };
 
 /** Hono method types that have direct app.* methods on the Hono app instance. */
 type HonoMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
@@ -163,7 +165,7 @@ function registerProxyRoute<TApp = unknown>(
             const reader = body.getReader();
             const writer = writable.getWriter();
             const collected: Uint8Array[] = [];
-            const maxCollect = 1024;
+            const maxCollect = observability?.maxCollect ?? 1024;
             let collectedBytes = 0;
 
             async function pipe(): Promise<void> {
@@ -257,6 +259,3 @@ export function registerRoutes<TApp = unknown>(
     }
   }
 }
-
-export { buildRequestContextFromHono } from '../services/proxy';
-export { resolveOpenApiSpec } from './registry.openapi';

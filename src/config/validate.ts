@@ -2,6 +2,7 @@ import type { Route } from '../types/api';
 import type { AppConfig } from '../types/app';
 import type { CspOptions } from '../types/csp';
 import type { CorsConfig, SecurityConfig } from '../types/security';
+import { serverConfigSchema } from './schema.js';
 
 /** A single validation error with field location and message. */
 export type ValidationError = {
@@ -101,19 +102,26 @@ function validateProxyRoute<TApp = unknown>(
 /** Validate a single route configuration, checking path, handler, and proxy requirements. */
 function validateRoute<TApp = unknown>(route: RouteInput<TApp>): ValidationResult {
   const errors: ValidationError[] = [];
+
+  // Determine route type (missing type = api, matching existing behavior)
+  const routeType = route.type ?? 'api';
+
   if (!route.path?.startsWith('/')) {
     errors.push({
       field: 'route.path',
-      message: `Route path must start with / (${route.type ?? 'api'}): ${route.path}`,
+      message: `Route path must start with / (${routeType}): ${route.path}`,
     });
   }
-  const isApiRoute = route.type === 'api' || route.type === undefined;
+
+  const isApiRoute = routeType === 'api';
   if (isApiRoute && !('handler' in route)) {
     errors.push({ field: 'route.handler', message: 'API route requires handler' });
   }
-  if (route.type === 'proxy') {
-    validateProxyRoute(route, errors);
+
+  if (routeType === 'proxy') {
+    validateProxyRoute(route as Partial<Extract<Route<TApp>, { type: 'proxy' }>>, errors);
   }
+
   return { errors, valid: errors.length === 0 };
 }
 
@@ -148,7 +156,10 @@ function validateSecurityForRoutes<TApp = unknown>(
 function validateCors(cors?: CorsInput): ValidationResult {
   const errors: ValidationError[] = [];
   if (!cors?.credentials) return { errors, valid: true };
-  if (cors.origin === '*' || (Array.isArray(cors.origin) && cors.origin.includes('*'))) {
+
+  const origin = cors.origin;
+  const isWildcard = origin === '*' || (Array.isArray(origin) && origin.includes('*'));
+  if (isWildcard) {
     errors.push({
       field: 'cors.origin',
       message: 'Wildcard origin cannot be used with credentials: true',
@@ -160,18 +171,43 @@ function validateCors(cors?: CorsInput): ValidationResult {
 /** Validate auth config, checking strategy-specific requirements and secretTtl range. */
 function validateAuth(auth?: AuthInput): ValidationResult {
   const errors: ValidationError[] = [];
-  if (auth?.strategy === 'bearer' && !auth.secret) {
-    errors.push({
-      field: 'auth.secret',
-      message: 'auth.secret is required when strategy is bearer',
-    });
+
+  if (auth?.strategy === 'bearer') {
+    // Check secret is present
+    if (!auth.secret) {
+      errors.push({
+        field: 'auth.secret',
+        message: 'auth.secret is required when strategy is bearer',
+      });
+    }
+    // Check secret is not empty string
+    if (auth.secret && typeof auth.secret === 'function') {
+      try {
+        const secretValue = auth.secret();
+        if (typeof secretValue === 'string' && secretValue === '') {
+          errors.push({
+            field: 'auth.secret',
+            message: 'auth.secret must not be empty for bearer strategy',
+          });
+        }
+      } catch {
+        // Async secret — defer to runtime
+      }
+    } else if (typeof auth.secret === 'string' && auth.secret === '') {
+      errors.push({
+        field: 'auth.secret',
+        message: 'auth.secret must not be empty for bearer strategy',
+      });
+    }
   }
+
   if (auth?.strategy === 'jwks' && !auth.jwksUri) {
     errors.push({
       field: 'auth.jwksUri',
       message: 'auth.jwksUri is required when strategy is jwks',
     });
   }
+
   if (auth?.secretTtl !== undefined) {
     if (!Number.isInteger(auth.secretTtl) || auth.secretTtl < 0) {
       errors.push({
@@ -180,6 +216,7 @@ function validateAuth(auth?: AuthInput): ValidationResult {
       });
     }
   }
+
   return { errors, valid: errors.length === 0 };
 }
 
@@ -220,13 +257,25 @@ function validateCspDirectives(csp?: CspOptions): ValidationResult {
 
 /**
  * Validate a server configuration object.
- * Throws descriptive errors for invalid configurations.
+ * Uses Zod schemas for type-safe validation, then applies custom cross-field
+ * validation rules that Zod cannot express.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration to validate.
  * @throws {Error} When validation fails with a message listing all errors.
  */
 export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<TApp>): void {
+  // Use Zod for structural validation of each section
+  const serverResult = serverConfigSchema.safeParse(config);
+  const zodErrors: ValidationError[] = serverResult.success
+    ? []
+    : serverResult.error.issues.map((issue) => ({
+        field: issue.path.join('.') || 'unknown',
+        message: issue.message,
+      }));
+
+  // Collect custom validation errors
   const results: ValidationResult[] = [
+    ...(zodErrors.length > 0 ? [{ errors: zodErrors, valid: false }] : []),
     validateAppConfig(config.app),
     ...validateRoutes(config.apiRoutes).errors.map((e) => ({ errors: [e], valid: false })),
     ...validateRoutes(config.proxyRoutes).errors.map((e) => ({ errors: [e], valid: false })),

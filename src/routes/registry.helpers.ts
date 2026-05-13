@@ -5,8 +5,6 @@ import type { ServerConfig } from '../types';
 import type { Logger } from '../types/app';
 import { registerRoutes } from './registry';
 
-export { resolveOpenApiSpec } from './registry';
-
 /** Logger instance that discards all log messages, used for testing. */
 export const noopLogger: Logger<unknown> = createNoopLogger();
 

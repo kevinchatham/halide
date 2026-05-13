@@ -63,6 +63,8 @@ export type ProxyRoute<TApp = THalideApp> = {
   access: 'public' | 'private';
   /** HTTP methods this proxy route handles. At least one is required. */
   methods: Array<'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options'>;
+  /** HTTP agent to use for upstream connections. Pass `http.Agent({ keepAlive: true })` for connection pooling. */
+  agent?: import('node:http').Agent;
   /** Whether to fire observability hooks for this route. Defaults to true. */
   observe?: boolean;
   /** URL path pattern to match. Supports Hono-style path parameters and wildcards. */

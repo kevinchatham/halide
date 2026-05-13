@@ -8,12 +8,9 @@ import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
-import type { AppConfig, Logger, ServerConfig } from '../types.js';
+import type { AppConfig, HalideVariables, Logger, ServerConfig } from '../types.js';
 import { createDefaultLogger, DEFAULTS } from './defaults.js';
 import { validateServerConfig } from './validate.js';
-
-/** Hono context variables used internally by Halide middleware. */
-type HalideVariables = { rawBody?: unknown };
 
 /**
  * Halide HTTP server with lifecycle management.

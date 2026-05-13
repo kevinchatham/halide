@@ -8,7 +8,7 @@ Creates and returns a Halide server. Validates the config before starting. Synch
 
 ### `createApp<TApp>(config): CreateAppResult`
 
-Creates a Hono app instance without starting an HTTP server. Returns `{ app, rateLimitDispose }`. Useful for testing or custom server setups. Synchronous — no `await` needed.
+Creates a Hono app instance without starting an HTTP server. Returns `{ app, logger, rateLimitDispose }`. Useful for testing or custom server setups. Synchronous — no `await` needed.
 
 ### `apiRoute<TApp, TBody, TResponse>(input): ApiRoute`
 
@@ -30,10 +30,11 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 
 ### `CreateAppResult`
 
-| Property           | Type                        | Description                                                                    |
-| ------------------ | --------------------------- | ------------------------------------------------------------------------------ |
-| `app`              | `Hono`                      | Hono app instance with all middleware and routes                               |
-| `rateLimitDispose` | `(() => void) \| undefined` | Cleanup function for rate limit timer (undefined if rate limiting not enabled) |
+| Property           | Type                        | Description                                                        |
+| ------------------ | --------------------------- | ------------------------------------------------------------------ |
+| `app`              | `Hono`                      | Hono app instance with all middleware and routes                   |
+| `logger`           | `Logger<unknown>`           | Logger instance used throughout the server                         |
+| `rateLimitDispose` | `(() => void) \| undefined` | Cleanup function for rate limit timer (undefined if not enabled)   |
 
 ## Exported types
 
@@ -41,7 +42,7 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `ServerConfig<TApp>`                      | Top-level configuration object                                                                         |
 | `Server`                                  | Running server instance (`ready`, `start`, `stop`)                                                     |
-| `CreateAppResult`                         | Return type of `createApp()` — `{ app, rateLimitDispose }`                                             |
+| `CreateAppResult`                         | Return type of `createApp()` — `{ app, logger, rateLimitDispose }`                                     |
 | `ApiRoute<TApp, TBody, TResponse>`        | API route definition                                                                                   |
 | `ApiRouteHandler<TApp, TBody, TResponse>` | `(ctx: RequestContext & { body: TBody }, app: TApp) => Promise<TResponse>`                             |
 | `ProxyRoute<TApp>`                        | Proxy route definition                                                                                 |
@@ -56,14 +57,14 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 | `CspOptions`                              | Content Security Policy directives container                                                           |
 | `CspDirectives`                           | CSP directive map (camelCase keys)                                                                     |
 | `CspDirectiveValue`                       | `string \| ContentSecurityPolicyOptionHandler` — value for a CSP directive                             |
+| `OpenApiOptions`                          | `{ title?, version?, description?, servers? }` — OpenAPI specification options                         |
+| `OpenApiSource`                           | `{ path: string }` — source of an OpenAPI spec (local file or URL)                                     |
 | `AppConfig`                               | Static file serving and port configuration                                                             |
 | `THalideApp<TClaims, TLogScope>`          | `{ claims: TClaims \| undefined, logger: Logger<TLogScope> }` — bundled app context passed to handlers |
 | `ObservabilityConfig<TApp>`               | Logger, request ID, lifecycle hooks                                                                    |
 | `OpenApiConfig`                           | OpenAPI toggle, path, and options                                                                      |
 | `OpenApiRouteMeta`                        | Per-route OpenAPI metadata (summary, tags, responses)                                                  |
-| `OpenApiSource`                           | `{ path: string }` — source of an OpenAPI spec (local file or URL)                                     |
 | `ResolvedOpenApiSpec`                     | `{ spec: Record<string, unknown>, route: ProxyRoute }` — resolved external spec                        |
 | `Logger`                                  | `{ debug, error, info, warn }` interface                                                               |
 | `ClaimExtractor<TClaims>`                 | `(c: Context) => Promise<TClaims \| null>` — function to extract claims from a Hono Context            |
 | `ResponseContext`                         | `{ statusCode, durationMs, error?, body? }` — response context passed to `onResponse` hook             |
-| `OpenApiOptions`                          | `{ title?, version?, description?, servers? }` — OpenAPI specification options                         |

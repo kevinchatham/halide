@@ -31,7 +31,7 @@ import { createServer, apiRoute } from 'halide';
 
 const healthRoute = apiRoute({
   access: 'public',
-  handler: async () => ({ status: 'ok' }),
+  handler: async (_ctx, _app) => ({ status: 'ok' }),
   method: 'get',
   path: '/health',
 });

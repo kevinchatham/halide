@@ -80,4 +80,21 @@ describe('createErrorHandler', () => {
     const call = logger.error.mock.calls[0]!;
     expect(call[1]).toContain('string error');
   });
+
+  it('respects error status code', async () => {
+    const app = new Hono();
+    const handler = createErrorHandler(logger);
+    app.onError(handler);
+    app.delete('/resource', () => {
+      const err = new Error('not found') as unknown as Error & { status: number };
+      err.status = 404;
+      throw err;
+    });
+
+    const res = await app.request('/resource', { method: 'DELETE' });
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Internal Server Error' });
+  });
 });

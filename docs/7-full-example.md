@@ -52,13 +52,13 @@ const server = createServer<App>({
     requestId: true,
     onRequest: (ctx, app) => {
       app.logger.info(
-        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' },
+        { requestId: 'request-id', service: 'bff' },
         `${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`,
       );
     },
     onResponse: (ctx, app, { statusCode, durationMs }) => {
       app.logger.info(
-        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' },
+        { requestId: 'request-id', service: 'bff' },
         `${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`,
       );
     },
@@ -68,12 +68,12 @@ const server = createServer<App>({
     apiRoute({
       access: 'public',
       path: '/health',
-      handler: async () => ({ status: 'ok' }),
+      handler: async (_ctx, _app) => ({ status: 'ok' }),
     }),
     apiRoute({
       access: 'public',
       path: '/config',
-      handler: async () => ({ environment: process.env.NODE_ENV }),
+      handler: async (_ctx, _app) => ({ environment: process.env.NODE_ENV }),
     }),
     apiRoute({
       access: 'private',
@@ -95,7 +95,7 @@ const server = createServer<App>({
       access: 'private',
       path: '/admin/settings',
       authorize: (_ctx, app) => app.claims?.role === 'admin',
-      handler: async () => ({ maintenance: false }),
+      handler: async (_ctx, _app) => ({ maintenance: false }),
     }),
   ],
 

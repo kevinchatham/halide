@@ -195,4 +195,25 @@ describe('createProxyService', () => {
     const res = await app.fetch(req);
     expect(res.status).toBeLessThan(600);
   });
+
+  it('passes agent to upstream request when configured', async () => {
+    const http = await import('node:http');
+    const customAgent = new http.Agent({ keepAlive: true });
+
+    const route: ProxyRoute = {
+      access: 'public',
+      agent: customAgent,
+      methods: ['get'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, createApp());
+    const app = new Hono();
+    app.get('/api/data', handler);
+
+    const res = await app.fetch(new Request('http://localhost/api/data', { method: 'GET' }));
+    expect(res.status).toBeLessThan(600);
+  });
 });

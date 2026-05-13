@@ -5,7 +5,7 @@
 - `npm run build` — tsup → dist/ (ESM + CJS + .d.ts). Prebuild hook runs `npm i`, `tsx scripts/update-readme.ts`, then `typecheck`. Postbuild copies `skill/` and `docs/` into dist/.
 - `npm run lint` — Biome check only (read-only).
 - `npm run lint:fix` — Biome `--write` + Prettier `--write`.
-- `npm run lint:watch` — nodemon reruns `build && halide:link` on `.ts`/`.json` changes in src/.
+- `npm run lint:watch` — nodemon reruns `lint:fix` on `.ts`/`.json` changes in src/.
 - `npm run typecheck` — `tsc --noEmit`.
 - `npm run test` — `vitest run --coverage`. Single file: `npx vitest run src/config/validate.spec.ts`.
 - `npm run test:watch` — `vitest` (watch mode).
@@ -27,9 +27,9 @@ Pre-commit order: `lint:fix` → `typecheck` → `test`. Coverage thresholds: 80
 - **Entry**: `src/index.ts` → re-exports `createServer`, `createApp`, `apiRoute`, `proxyRoute`, and types.
 - `ServerConfig` uses **separate arrays**: `apiRoutes` (type `'api'`) + `proxyRoutes` (type `'proxy'`), not a single `routes` array.
 - Auth config is nested: `security.auth.strategy` (`'bearer'` | `'jwks'`), not a top-level `auth` key.
-- API route handler signature: `(ctx, claims, logger)` — 3 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context).
+- API route handler signature: `(ctx, app)` — 2 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context). `app` bundles `{ claims, logger }`.
 - Auth uses `hono/jwt` (bearer) and `hono/jwk` (JWKS) — not `jose`.
-- Validation is imperative (`validateServerConfig` in `src/config/validate.ts`), not Zod — Zod only for route body validation and OpenAPI schemas.
+- Validation uses Zod schemas in `src/config/schema.ts` with custom cross-field validators in `src/config/validate.ts` — Zod only for route body validation and OpenAPI schemas.
 - CSP directives use camelCase (`defaultSrc`), not kebab-case (`default-src`) — validator throws on kebab.
 - Default logger is styled (colored in TTY, plain text otherwise) via `createDefaultLogger()` in `defaults.ts`. Falls back to plain `[LEVEL] message` when output is not a TTY. Use `createNoopLogger()` for silent output.
 - App `apiPrefix` defaults to `'/api'` — paths under that prefix get 404 instead of app fallback (set `apiPrefix: ''` to disable).

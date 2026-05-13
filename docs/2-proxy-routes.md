@@ -33,6 +33,7 @@ const productsProxy = proxyRoute({
 - **`transform({ method, body, headers })`** — called when present. `method` is the lowercase HTTP method. `body` is the already-parsed JSON from the request. Headers are normalized to lowercase keys. The transform result's body is JSON-stringified before forwarding. Without transform, the raw request body is forwarded as-is.
 - **`openapiSpec`** — provides an external OpenAPI spec source (local file path or URL) for documenting the proxied API in the Scalar UI. The spec is merged into the inline OpenAPI documentation.
 - **`forwardHeaders`** — controls which request headers are forwarded to upstream. Defaults to a safe subset: `accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-type`, `content-length`, `origin`, `user-agent`. Set to an empty array `[]` to forward no headers. Headers are matched case-insensitively.
+- **`agent`** — Node.js HTTP agent for upstream connections. Use `http.Agent({ keepAlive: true })` for connection pooling.
 
 ## Path rewriting
 

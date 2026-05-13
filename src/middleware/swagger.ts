@@ -2,7 +2,7 @@ import { Scalar } from '@scalar/hono-api-reference';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
-import { resolveOpenApiSpec } from '../routes/registry';
+import { resolveOpenApiSpec } from '../routes/registry.openapi';
 import type { ServerConfig } from '../types';
 import type { ProxyRoute } from '../types/api';
 import type { OpenApiOptions } from '../types/openapi';
@@ -96,7 +96,7 @@ async function buildInlineSpec(
   const swaggerPath = '/__internal-spec';
   (tempApp.get as (path: string, ...handlers: Array<unknown>) => Hono)(
     `${swaggerPath}/openapi.json`,
-    handler as (ctx: Context) => Promise<Response>,
+    handler,
   );
 
   try {

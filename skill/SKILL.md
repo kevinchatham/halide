@@ -35,34 +35,13 @@ description: Halide BFF framework — server creation, API/proxy routes, auth, s
 
 ```ts
 import type {
-  ApiRoute,
-  ApiRouteHandler,
-  ApiRouteInput,
-  AuthorizeFn,
-  ProxyRoute,
-  ProxyRouteInput,
-  TransformFn,
-  CspDirectiveValue,
-  CspDirectives,
-  CspOptions,
-  OpenApiConfig,
-  OpenApiOptions,
-  OpenApiRouteMeta,
-  OpenApiSource,
-  ResolvedOpenApiSpec,
-  ClaimExtractor,
-  CorsConfig,
-  SecurityAuthConfig,
-  SecurityConfig,
-  AppConfig,
-  Logger,
-  ObservabilityConfig,
-  RequestContext,
-  ResponseContext,
-  THalideApp,
-  ServerConfig,
-  Server,
-  CreateAppResult,
+  ApiRoute, ApiRouteHandler, ApiRouteInput, AuthorizeFn, ProxyRoute,
+  ProxyRouteInput, TransformFn, CspDirectiveValue, CspDirectives, CspOptions,
+  OpenApiConfig, OpenApiOptions, OpenApiRouteMeta, OpenApiSource,
+  ResolvedOpenApiSpec, ClaimExtractor, CorsConfig, SecurityAuthConfig,
+  SecurityConfig, AppConfig, Logger, ObservabilityConfig,
+  RequestContext, ResponseContext, THalideApp, ServerConfig,
+  Server, CreateAppResult,
 } from 'halide';
 import { createApp, createServer, apiRoute, proxyRoute } from 'halide';
 ```
@@ -74,15 +53,10 @@ import { createServer, apiRoute } from 'halide';
 
 const server = createServer({
   apiRoutes: [
-    apiRoute({
-      access: 'public',
-      path: '/health',
-      handler: async () => ({ status: 'ok' }),
-    }),
+    apiRoute({ access: 'public', path: '/health', handler: async () => ({ status: 'ok' }) }),
   ],
 });
-
-server.start((port) => console.log(`Server on port ${port}`));
+server.start();
 ```
 
 ## Key Gotchas
