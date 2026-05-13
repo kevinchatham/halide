@@ -5,6 +5,18 @@ import { resolver } from 'hono-openapi';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type { OpenApiSource, ResolvedOpenApiSpec } from '../types/openapi';
 
+/**
+ * Check whether a Zod schema is wrapped in ZodOptional or ZodNullable.
+ *
+ * Inspects the internal `typeName` property — stable across Zod 3.x releases.
+ * This is the only public way to detect optional wrappers without using
+ * `schema.unwrap()` which only works for ZodOptional.
+ */
+function isOptionalSchema(schema: unknown): boolean {
+  const s = schema as { _def?: { typeName?: string } };
+  return s._def?.typeName === 'ZodOptional' || s._def?.typeName === 'ZodNullable';
+}
+
 /** Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file. */
 async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<string, unknown>> {
   let isUrl = false;
@@ -103,8 +115,7 @@ export function buildRequestBody<TApp>(
   const schema = route.type === 'api' ? route.requestSchema : undefined;
   if (!schema) return undefined;
 
-  const typeName = (schema as { _def?: { typeName?: string } })._def?.typeName;
-  const isOptional = typeName === 'ZodOptional' || typeName === 'ZodNullable';
+  const isOptional = isOptionalSchema(schema);
 
   return {
     content: {

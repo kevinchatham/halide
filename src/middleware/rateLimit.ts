@@ -1,6 +1,59 @@
 import type { Context, Next } from 'hono';
 import ipaddr from 'ipaddr.js';
 
+/**
+ * Interface for rate limit storage backends.
+ *
+ * Implementations can use Redis, DynamoDB, or any other distributed store
+ * to share rate limit state across multiple server instances.
+ */
+interface RateLimitStore {
+  /** Remove the entry for the given key. */
+  delete(key: string): Promise<void>;
+  /** Retrieve the current window entry for a key, or undefined if not found. */
+  get(key: string): Promise<WindowEntry | undefined>;
+  /** Store a window entry for the given key. */
+  set(key: string, entry: WindowEntry): Promise<void>;
+  /** Remove expired entries from the store. Called periodically by the middleware. */
+  sweep(now: number): Promise<void>;
+}
+
+/**
+ * In-memory rate limit store implementation.
+ *
+ * Uses a Map with LRU eviction when maxEntries is configured.
+ * Suitable for single-instance deployments.
+ *
+ * @param maxEntries - Maximum number of entries. Oldest entries are evicted when exceeded.
+ * @returns A RateLimitStore implementation.
+ */
+function createMemoryStore(maxEntries?: number): RateLimitStore {
+  const store = new Map<string, WindowEntry>();
+
+  return {
+    async delete(key: string): Promise<void> {
+      store.delete(key);
+    },
+    async get(key: string): Promise<WindowEntry | undefined> {
+      return store.get(key);
+    },
+    async set(key: string, entry: WindowEntry): Promise<void> {
+      if (maxEntries && store.size >= maxEntries) {
+        const firstKey = store.keys().next().value;
+        if (firstKey) store.delete(firstKey);
+      }
+      store.set(key, entry);
+    },
+    async sweep(now: number): Promise<void> {
+      for (const [key, entry] of store.entries()) {
+        if (now > entry.resetTime) {
+          store.delete(key);
+        }
+      }
+    },
+  };
+}
+
 /** Configuration for rate limiting. */
 interface RateLimitConfig {
   /** Maximum number of entries in the store. Oldest entries are evicted when exceeded. */
@@ -62,39 +115,23 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
   middleware: (c: Context, next: Next) => Promise<Response | undefined>;
   dispose: () => void;
 } {
-  const store = new Map<string, WindowEntry>();
+  const store = createMemoryStore(config.maxEntries);
 
-  /** Evict oldest entry when store exceeds maxEntries. */
-  const evictOldest = (): void => {
-    if (!config.maxEntries || store.size < config.maxEntries) return;
-    const firstKey = store.keys().next().value!;
-    store.delete(firstKey);
-  };
-
-  /** Remove expired entries from the rate limit store. */
-  const sweep = (): void => {
+  const sweepInterval = Math.min(Math.max(config.windowMs * 2, 60_000), 1_800_000);
+  const timer = setInterval(() => {
     const now = Date.now();
-    for (const ip of store.keys()) {
-      const entry = store.get(ip);
-      if (entry && now > entry.resetTime) {
-        store.delete(ip);
-      }
-    }
-  };
-
-  const sweepInterval = Math.max(config.windowMs * 2, 60_000);
-  const timer = setInterval(sweep, sweepInterval);
+    void store.sweep(now);
+  }, sweepInterval);
   timer.unref();
 
   /** Per-request rate limit check: returns 429 if the client IP has exceeded its window quota. */
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
     const clientIp = getClientIp(c, config.trustedProxies);
     const now = Date.now();
-    const entry = store.get(clientIp);
+    const entry = await store.get(clientIp);
 
     if (!entry || now > entry.resetTime) {
-      evictOldest();
-      store.set(clientIp, {
+      await store.set(clientIp, {
         count: 1,
         resetTime: now + config.windowMs,
       });

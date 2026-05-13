@@ -33,6 +33,13 @@ export const DEFAULTS = {
       objectSrc: ["'none'"],
       scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
+      /**
+       * Includes `'self'` and `https:` to allow stylesheets from HTTPS CDNs
+       * (e.g., Google Fonts, Font Awesome, Bootstrap CDN). This is a known
+       * tradeoff: it permits any HTTPS-origin stylesheet but avoids breaking
+       * legitimate CDN-based styling. For stricter control, override this
+       * directive with specific CDN hostnames.
+       */
       styleSrc: ["'self'", 'https:'],
       upgradeInsecureRequests: [],
     },

@@ -8,7 +8,8 @@ import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
-import type { AppConfig, HalideVariables, Logger, ServerConfig } from '../types.js';
+import type { AppConfig, HalideVariables, Logger } from '../types/app.js';
+import type { ServerConfig } from '../types/server-config.js';
 import { createDefaultLogger, DEFAULTS } from './defaults.js';
 import { validateServerConfig } from './validate.js';
 
@@ -66,20 +67,13 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
     '*',
     cors({
       allowHeaders: corsConfig?.allowedHeaders,
-      allowMethods: corsMethods.map((m) => m.toUpperCase()),
+      allowMethods: corsMethods.map((m: string) => m.toUpperCase()),
       credentials: corsCredentials,
       exposeHeaders: corsConfig?.exposedHeaders,
       maxAge: corsConfig?.maxAge,
       origin: corsOrigin,
     }),
   );
-
-  if (corsOrigin === '*' || (Array.isArray(corsOrigin) && corsOrigin.includes('*'))) {
-    logger.warn(
-      { appName } as unknown,
-      `CORS wildcard origin detected. Consider restricting origins for production use.`,
-    );
-  }
 
   let rateLimitDispose: (() => void) | undefined;
 
@@ -103,7 +97,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
       `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
     );
     const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<
-      import('../types.js').CspDirectives
+      import('../types/csp.js').CspDirectives
     >;
     const swaggerPath = configInput.openapi?.path ?? DEFAULTS.openapi.path;
     app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));

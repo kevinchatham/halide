@@ -30,11 +30,11 @@ Factory that fills in `type: 'proxy'` and a default `authorize` function (always
 
 ### `CreateAppResult`
 
-| Property           | Type                        | Description                                                        |
-| ------------------ | --------------------------- | ------------------------------------------------------------------ |
-| `app`              | `Hono`                      | Hono app instance with all middleware and routes                   |
-| `logger`           | `Logger<unknown>`           | Logger instance used throughout the server                         |
-| `rateLimitDispose` | `(() => void) \| undefined` | Cleanup function for rate limit timer (undefined if not enabled)   |
+| Property           | Type                        | Description                                                      |
+| ------------------ | --------------------------- | ---------------------------------------------------------------- |
+| `app`              | `Hono`                      | Hono app instance with all middleware and routes                 |
+| `logger`           | `Logger<unknown>`           | Logger instance used throughout the server                       |
+| `rateLimitDispose` | `(() => void) \| undefined` | Cleanup function for rate limit timer (undefined if not enabled) |
 
 ## Exported types
 

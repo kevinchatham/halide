@@ -5,6 +5,7 @@ import type { SecurityConfig } from './security';
 
 /**
  * Complete configuration for a Halide server.
+ *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
 export type ServerConfig<TApp = THalideApp> = {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import type { ServerConfig } from '../types';
 import type { ProxyRoute } from '../types/api';
+import type { ServerConfig } from '../types/server-config';
 import { createOpenApiRoutes } from './swagger';
 
 function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerConfig {

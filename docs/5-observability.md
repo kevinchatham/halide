@@ -26,13 +26,13 @@ Per-route observability is controlled with the `observe` flag. Set `observe: fal
 
 ### Configuration fields
 
-| Field          | Default | Description                                                                                      |
-| -------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `requestId`    | `false` | Enable `x-request-id` header propagation.                                                        |
-| `logger`       | (none)  | Custom logger instance. Styled default logger used when omitted.                                 |
-| `maxCollect`   | `1024`  | Maximum bytes to collect from proxy responses for observability logging. Full response is unmodified. |
-| `onRequest`    | (none)  | Hook called before each request is handled.                                                      |
-| `onResponse`   | (none)  | Hook called after each response is sent.                                                         |
+| Field        | Default | Description                                                                                           |
+| ------------ | ------- | ----------------------------------------------------------------------------------------------------- |
+| `requestId`  | `false` | Enable `x-request-id` header propagation.                                                             |
+| `logger`     | (none)  | Custom logger instance. Styled default logger used when omitted.                                      |
+| `maxCollect` | `1024`  | Maximum bytes to collect from proxy responses for observability logging. Full response is unmodified. |
+| `onRequest`  | (none)  | Hook called before each request is handled.                                                           |
+| `onResponse` | (none)  | Hook called after each response is sent.                                                              |
 
 ## Logger interface
 

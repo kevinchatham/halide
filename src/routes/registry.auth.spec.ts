@@ -1,4 +1,5 @@
 import { sign } from 'hono/jwt';
+import { resetClaimExtractorCache } from './registry.auth';
 import { createTestApp } from './registry.helpers';
 
 const secret = 'test-secret';
@@ -8,6 +9,9 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
 }
 
 describe('registerRoutes — auth', () => {
+  beforeEach(() => {
+    resetClaimExtractorCache();
+  });
   describe('Authentication', () => {
     it('returns 401 for private routes without token', async () => {
       const app = await createTestApp({

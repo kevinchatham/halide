@@ -25,25 +25,36 @@ export function createSecretCache<TLogScope = unknown>(
   logger: Logger<TLogScope>,
 ): (fetcher: () => string | Promise<string>) => Promise<string> {
   let cache: CachedSecret | null = null;
+  let pendingPromise: Promise<string> | null = null;
 
   /** Resolve a JWT secret from the fetcher, using the cache when TTL has not expired. */
   return async function resolveSecret(fetcher: () => string | Promise<string>): Promise<string> {
     if (ttlSeconds <= 0) return fetcher();
 
     const now = Date.now();
-    if (cache && now < cache.expiresAt) return cache.value;
-
-    try {
-      const value = await fetcher();
-      cache = { expiresAt: now + ttlSeconds * 1000, value };
-      return value;
-    } catch (err) {
-      logger.error(
-        { error: 'secret_refresh_failed' } as unknown as TLogScope,
-        'Failed to refresh JWT secret from secret provider:',
-        err instanceof Error ? err.message : String(err),
-      );
-      throw err;
+    if (cache && now < cache.expiresAt) {
+      return cache.value;
     }
+
+    if (pendingPromise) return pendingPromise;
+
+    pendingPromise = (async () => {
+      const freshNow = Date.now();
+      try {
+        const value = await fetcher();
+        cache = { expiresAt: freshNow + ttlSeconds * 1000, value };
+        return value;
+      } catch (err) {
+        logger.error(
+          { error: 'secret_refresh_failed' } as unknown as TLogScope,
+          'Failed to refresh JWT secret from secret provider:',
+          err instanceof Error ? err.message : String(err),
+        );
+        throw err;
+      } finally {
+        pendingPromise = null;
+      }
+    })();
+    return pendingPromise;
   };
 }

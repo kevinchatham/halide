@@ -2,15 +2,6 @@ export { type CreateAppResult, createApp, createServer, type Server } from './co
 export { apiRoute } from './routes/apiRoute';
 export { proxyRoute } from './routes/proxyRoute';
 export type {
-  AppConfig,
-  Logger,
-  ObservabilityConfig,
-  RequestContext,
-  ResponseContext,
-  ServerConfig,
-  THalideApp,
-} from './types';
-export type {
   ApiRoute,
   ApiRouteHandler,
   ApiRouteInput,
@@ -19,6 +10,14 @@ export type {
   ProxyRouteInput,
   TransformFn,
 } from './types/api';
+export type {
+  AppConfig,
+  Logger,
+  ObservabilityConfig,
+  RequestContext,
+  ResponseContext,
+  THalideApp,
+} from './types/app';
 export type {
   CspDirectives,
   CspDirectiveValue,
@@ -37,3 +36,4 @@ export type {
   SecurityAuthConfig,
   SecurityConfig,
 } from './types/security';
+export type { ServerConfig } from './types/server-config';

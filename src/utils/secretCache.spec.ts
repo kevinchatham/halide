@@ -108,4 +108,39 @@ describe('createSecretCache', () => {
       'string error',
     );
   });
+
+  it('deduplicates concurrent calls — fetcher called once', async () => {
+    const fetcher = vi.fn().mockResolvedValue('secret-1');
+    const resolver = createSecretCache(60, mockLogger);
+
+    const [first, second] = await Promise.all([resolver(fetcher), resolver(fetcher)]);
+
+    expect(first).toBe('secret-1');
+    expect(second).toBe('secret-1');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('concurrent calls all reject together on failure', async () => {
+    const fetcher = vi.fn().mockRejectedValue(new Error('Vault unavailable'));
+    const resolver = createSecretCache(60, mockLogger);
+
+    const results = await Promise.allSettled([resolver(fetcher), resolver(fetcher)]);
+
+    expect(results.every((r) => r.status === 'rejected')).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows retry after concurrent failure', async () => {
+    const fetcher = vi.fn();
+    fetcher.mockRejectedValueOnce(new Error('Vault unavailable'));
+    fetcher.mockResolvedValueOnce('secret-1');
+    const resolver = createSecretCache(60, mockLogger);
+
+    await Promise.allSettled([resolver(fetcher), resolver(fetcher)]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    const result = await resolver(fetcher);
+    expect(result).toBe('secret-1');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });

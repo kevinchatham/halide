@@ -8,11 +8,28 @@ import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
+/** Module-level cache for claim extractors keyed by auth strategy. */
+const claimExtractorCache = new Map<string, ClaimExtractor<unknown> | undefined>();
+
+/** Create a JSON error response for authentication/authorization failures. */
+export function createAuthErrorResponse(status: number, message: string): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    headers: { 'Content-Type': 'application/json' },
+    status,
+  });
+}
+
+/** Clear the claim extractor cache. Intended for testing only. */
+export function resetClaimExtractorCache(): void {
+  claimExtractorCache.clear();
+}
+
 /**
  * Create a claim extractor from config, returning undefined when no auth is
  * configured.
  *
  * Selects between JWKS or bearer extraction based on the auth strategy.
+ * Results are cached by auth strategy key for reuse across calls.
  *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration containing auth settings.
@@ -26,22 +43,28 @@ export function createClaimExtractor<TApp = unknown>(
   const auth = config.security?.auth;
   if (!auth) return undefined;
 
+  const key = auth.strategy || 'none';
+  const cached = claimExtractorCache.get(key);
+  if (cached) return cached as ClaimExtractor<THalideApp<TApp>['claims']> | undefined;
+
+  let result: ClaimExtractor<unknown> | undefined;
+
   if (auth.strategy === 'jwks' && auth.jwksUri) {
     const { jwksUri, audience } = auth;
-    return (c: Context) => extractJwksClaims<THalideApp<TApp>['claims']>(c, jwksUri, audience);
-  }
-
-  if (auth.secret) {
+    result = (c: Context): Promise<THalideApp<TApp>['claims'] | null> =>
+      extractJwksClaims<THalideApp<TApp>['claims']>(c, jwksUri, audience);
+  } else if (auth.secret) {
     const { secret, audience, secretTtl } = auth;
     const ttl = secretTtl ?? DEFAULTS.auth.secretTtl;
     const cachedResolver = createSecretCache(ttl, logger);
-    return async (c: Context) => {
+    result = async (c: Context): Promise<THalideApp<TApp>['claims'] | null> => {
       const resolvedSecret = await cachedResolver(secret);
       return extractBearerClaims<THalideApp<TApp>['claims']>(c, resolvedSecret, audience);
     };
   }
 
-  return undefined;
+  if (result) claimExtractorCache.set(key, result);
+  return result as ClaimExtractor<THalideApp<TApp>['claims']> | undefined;
 }
 
 /**
@@ -68,10 +91,7 @@ export async function extractClaims<TApp>(
   if (extracted === null) {
     return {
       claims: undefined,
-      response: new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 401,
-      }),
+      response: createAuthErrorResponse(401, 'Unauthorized'),
     };
   }
   return { claims: extracted, response: null };
@@ -101,17 +121,11 @@ export async function checkAuthorization<TApp>(
     const ctx = buildRequestContextFromHono(c, body);
     const allowed = await route.authorize(ctx, app);
     if (!allowed) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 403,
-      });
+      return createAuthErrorResponse(403, 'Forbidden');
     }
     return null;
   } catch {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 403,
-    });
+    return createAuthErrorResponse(403, 'Forbidden');
   }
 }
 

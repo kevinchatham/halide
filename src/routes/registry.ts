@@ -2,7 +2,6 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute, validator } from 'hono-openapi';
 import { DEFAULTS } from '../config/defaults';
 import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
-import type { ServerConfig } from '../types';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type {
   HalideVariables,
@@ -11,6 +10,7 @@ import type {
   THalideApp,
 } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
+import type { ServerConfig } from '../types/server-config';
 import {
   checkAuthorization,
   createClaimExtractor,

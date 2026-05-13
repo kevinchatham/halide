@@ -3,9 +3,9 @@ import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
 import { resolveOpenApiSpec } from '../routes/registry.openapi';
-import type { ServerConfig } from '../types';
 import type { ProxyRoute } from '../types/api';
 import type { OpenApiOptions } from '../types/openapi';
+import type { ServerConfig } from '../types/server-config';
 
 /** Allowed HTTP methods for OpenAPI operations. */
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);

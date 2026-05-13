@@ -14,7 +14,6 @@
 import { z } from 'zod';
 import { createServer, type Server } from './config/runtime'; // from 'halide';
 import { apiRoute, proxyRoute } from './index';
-import type { ServerConfig } from './types';
 import type { ApiRoute, ProxyRoute } from './types/api';
 import type {
   AppConfig,
@@ -25,6 +24,7 @@ import type {
 } from './types/app';
 import type { OpenApiConfig } from './types/openapi';
 import type { SecurityConfig } from './types/security';
+import type { ServerConfig } from './types/server-config';
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {

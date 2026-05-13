@@ -1,15 +1,12 @@
 import { Hono } from 'hono';
 import { createNoopLogger } from '../config/defaults';
 import { createOpenApiRoutes } from '../middleware/swagger';
-import type { ServerConfig } from '../types';
-import type { Logger } from '../types/app';
+import type { HalideVariables, Logger } from '../types/app';
+import type { ServerConfig } from '../types/server-config';
 import { registerRoutes } from './registry';
 
 /** Logger instance that discards all log messages, used for testing. */
 export const noopLogger: Logger<unknown> = createNoopLogger();
-
-/** Hono variables type for storing raw request body during testing. */
-export type HalideVariables = { rawBody?: unknown };
 
 /**
  * Create a Hono application configured with routes and OpenAPI routes for testing.

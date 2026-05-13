@@ -1,3 +1,4 @@
+import http from 'node:http';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
@@ -228,14 +229,15 @@ export function createProxyService<TApp = unknown>(
 
     const signal = AbortSignal.timeout(timeoutMs);
 
+    const agent = route.agent ?? new http.Agent({ keepAlive: true });
     const proxyRequest = new Request(targetUrl, {
-      agent: route.agent,
+      agent,
       body,
       duplex: 'half',
       headers: headers as Record<string, string>,
       method: c.req.method,
       signal,
-    } as RequestInit & { agent?: import('node:http').Agent });
+    } as RequestInit & { agent?: http.Agent });
 
     return proxy(proxyRequest);
   };
