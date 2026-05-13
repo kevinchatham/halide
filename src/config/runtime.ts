@@ -1,8 +1,9 @@
 import { serve } from '@hono/node-server';
+import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { createErrorHandler } from '../middleware/errorHandler.js';
-import { createRateLimitMiddleware } from '../middleware/rateLimit.js';
+import { createRateLimitMiddleware, createRedisRateLimitStore } from '../middleware/rateLimit.js';
 import { createRequestIdMiddleware } from '../middleware/requestId.js';
 import { createSecurityMiddleware } from '../middleware/security.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
@@ -81,13 +82,32 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
   let rateLimitDispose: (() => void) | undefined;
 
   if (security?.rateLimit) {
-    const rateLimitConfig = security.rateLimit;
-    const { middleware, dispose } = createRateLimitMiddleware({
-      maxEntries: rateLimitConfig.maxEntries,
-      maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
-      trustedProxies: rateLimitConfig.trustedProxies,
-      windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
-    });
+    const rl = security.rateLimit;
+    let middleware: (c: Context, next: Next) => Promise<Response | undefined>;
+    let dispose: (() => void) | undefined;
+
+    if (rl.redisClient) {
+      const { middleware: redisMw, dispose: redisDispose } = createRedisRateLimitStore(
+        rl.redisClient,
+        {
+          maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+          trustedProxies: rl.trustedProxies,
+          windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
+        },
+      );
+      middleware = redisMw;
+      dispose = redisDispose;
+    } else {
+      const { middleware: memMw, dispose: memDispose } = createRateLimitMiddleware({
+        maxEntries: rl.maxEntries,
+        maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+        trustedProxies: rl.trustedProxies,
+        windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
+      });
+      middleware = memMw;
+      dispose = memDispose;
+    }
+
     app.use('*', middleware);
     rateLimitDispose = dispose;
   }

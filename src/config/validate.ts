@@ -175,31 +175,33 @@ function validateAuth(auth?: AuthInput): ValidationResult {
   const errors: ValidationError[] = [];
 
   if (auth?.strategy === 'bearer') {
-    // Check secret is present
-    if (!auth.secret) {
+    // Check secret is not an empty string
+    if (typeof auth.secret === 'string' && auth.secret === '') {
+      errors.push({
+        field: 'auth.secret',
+        message: 'auth.secret must not be empty for bearer strategy',
+      });
+    }
+    // Check secret is present (function or non-empty string)
+    else if (!auth.secret) {
       errors.push({
         field: 'auth.secret',
         message: 'auth.secret is required when strategy is bearer',
       });
     }
-    // Check secret is not empty string
-    if (auth.secret && typeof auth.secret === 'function') {
-      try {
-        const secretValue = auth.secret();
-        if (typeof secretValue === 'string' && secretValue === '') {
-          errors.push({
-            field: 'auth.secret',
-            message: 'auth.secret must not be empty for bearer strategy',
-          });
-        }
-      } catch {
-        // Async secret — defer to runtime
+    // Check function-based secret is not returning empty string
+    else if (typeof auth.secret === 'function') {
+      const secretValue = auth.secret();
+      if (secretValue instanceof Promise) {
+        secretValue.catch(() => {
+          // Async secret rejection — handled by validateAuthSecret
+        });
+      } else if (typeof secretValue === 'string' && secretValue === '') {
+        errors.push({
+          field: 'auth.secret',
+          message: 'auth.secret must not be empty for bearer strategy',
+        });
       }
-    } else if (typeof auth.secret === 'string' && auth.secret === '') {
-      errors.push({
-        field: 'auth.secret',
-        message: 'auth.secret must not be empty for bearer strategy',
-      });
     }
   }
 
@@ -240,6 +242,30 @@ function validateAuth(auth?: AuthInput): ValidationResult {
   return { errors, valid: errors.length === 0, warnings };
 }
 
+/** Validate an async auth secret by calling it and checking the resolved value. */
+export async function validateAuthSecret(auth?: AuthInput): Promise<ValidationResult> {
+  const errors: ValidationError[] = [];
+
+  if (auth?.strategy === 'bearer' && auth.secret && typeof auth.secret === 'function') {
+    const secretValue = auth.secret();
+    if (secretValue instanceof Promise) {
+      try {
+        const resolved = await secretValue;
+        if (typeof resolved === 'string' && resolved === '') {
+          errors.push({
+            field: 'auth.secret',
+            message: 'auth.secret must not be empty for bearer strategy',
+          });
+        }
+      } catch {
+        // Promise rejection — will be caught at the entry point
+      }
+    }
+  }
+
+  return { errors, valid: errors.length === 0 };
+}
+
 /** Validate rate limit config, checking that maxEntries is a positive integer when provided. */
 function validateRateLimit(rateLimit?: {
   windowMs?: number;
@@ -276,14 +302,14 @@ function validateCspDirectives(csp?: CspOptions): ValidationResult {
 }
 
 /**
- * Validate a server configuration object.
+ * Synchronously validate a server configuration object.
  * Uses Zod schemas for type-safe validation, then applies custom cross-field
  * validation rules that Zod cannot express.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration to validate.
  * @throws {Error} When validation fails with a message listing all errors.
  */
-export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<TApp>): void {
+export function validateServerConfigSync<TApp = unknown>(config: ServerConfigInput<TApp>): void {
   // Use Zod for structural validation of each section
   const serverResult = serverConfigSchema.safeParse(config);
   const zodErrors: ValidationError[] = serverResult.success
@@ -329,4 +355,60 @@ export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<T
       console.warn(`[Halide] ${w.field}: ${w.message}`);
     }
   }
+}
+
+/**
+ * Validate a server configuration object.
+ * Uses Zod schemas for type-safe validation, then applies custom cross-field
+ * validation rules that Zod cannot express. Returns a ValidationResult instead
+ * of throwing, allowing callers to handle validation errors programmatically.
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param config - The server configuration to validate.
+ * @returns A `ValidationResult` with any errors and warnings.
+ */
+export async function validateServerConfig<TApp = unknown>(
+  config: ServerConfigInput<TApp>,
+): Promise<ValidationResult> {
+  // Use Zod for structural validation of each section
+  const serverResult = serverConfigSchema.safeParse(config);
+  const zodErrors: ValidationError[] = serverResult.success
+    ? []
+    : serverResult.error.issues.map((issue) => ({
+        field: issue.path.join('.') || 'unknown',
+        message: issue.message,
+      }));
+
+  // Collect custom validation results (errors and warnings)
+  const results: ValidationResult[] = [
+    ...(zodErrors.length > 0 ? [{ errors: zodErrors, valid: false }] : []),
+    validateAppConfig(config.app),
+    ...validateRoutes(config.apiRoutes).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateRoutes(config.proxyRoutes).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateSecurityForRoutes(
+      [...(config.apiRoutes ?? []), ...(config.proxyRoutes ?? [])],
+      config.security,
+    ).errors.map((e) => ({ errors: [e], valid: false })),
+    ...validateCors(config.security?.cors).errors.map((e) => ({ errors: [e], valid: false })),
+    validateAuth(config.security?.auth),
+    ...validateRateLimit(config.security?.rateLimit).errors.map((e) => ({
+      errors: [e],
+      valid: false,
+    })),
+    ...validateCspDirectives(config.security?.csp).errors.map((e) => ({
+      errors: [e],
+      valid: false,
+    })),
+  ];
+
+  // Run async auth secret validation
+  const asyncResult = await validateAuthSecret(config.security?.auth);
+  results.push(asyncResult);
+
+  const allErrors = results.flatMap((r) => r.errors);
+  const allWarnings = results.flatMap((r) => r.warnings ?? []);
+  return {
+    errors: allErrors,
+    valid: allErrors.length === 0,
+    warnings: allWarnings,
+  };
 }

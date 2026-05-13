@@ -10,6 +10,16 @@ import type { ServerConfig } from '../types/server-config';
 /** Allowed HTTP methods for OpenAPI operations. */
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+/** Cached OpenAPI spec and shared resolution promise for concurrency guard. */
+let cachedSpec: Record<string, unknown> | null = null;
+let specResolution: Promise<void> | null = null;
+
+/** Reset the cached spec and resolution promise (used by tests). */
+export function resetOpenApiCache(): void {
+  cachedSpec = null;
+  specResolution = null;
+}
+
 /** Merge metadata overrides (summary, description, tags) onto an OpenAPI operation object. */
 function applyMetadata(
   operation: Record<string, unknown>,
@@ -152,27 +162,24 @@ export function createOpenApiRoutes<TApp = unknown>(config: ServerConfig<TApp>, 
   const hasExternalSpecs = proxyRoutes?.some((r) => r.openapiSpec) ?? false;
 
   if (hasExternalSpecs) {
-    let cachedSpec: Record<string, unknown> | null = null;
-
     app.get(`${swaggerPath}/openapi.json`, async (c) => {
       if (cachedSpec) {
         return c.json(cachedSpec);
       }
 
-      let specResolution: Promise<void> | null = null;
+      if (!specResolution) {
+        specResolution = (async (): Promise<void> => {
+          try {
+            const inlineSpec = await buildInlineSpec(app, options);
+            const resolved = await resolveOpenApiSpec(proxyRoutes as ProxyRoute<unknown>[]);
+            const mergedSpec = mergeExternalSpecs(inlineSpec, resolved);
+            cachedSpec = buildFinalSpec(mergedSpec, options);
+          } catch {
+            cachedSpec = {};
+          }
+        })();
+      }
 
-      const resolveSpec = async (): Promise<void> => {
-        try {
-          const inlineSpec = await buildInlineSpec(app, options);
-          const resolved = await resolveOpenApiSpec(proxyRoutes as ProxyRoute<unknown>[]);
-          const mergedSpec = mergeExternalSpecs(inlineSpec, resolved);
-          cachedSpec = buildFinalSpec(mergedSpec, options);
-        } catch {
-          cachedSpec = {};
-        }
-      };
-
-      specResolution = resolveSpec();
       await specResolution;
       return c.json(cachedSpec ?? {});
     });

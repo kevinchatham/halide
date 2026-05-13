@@ -79,5 +79,7 @@ export type SecurityConfig = {
     trustedProxies?: string[];
     /** Maximum number of entries in the rate limit store. Oldest entries are evicted when exceeded. */
     maxEntries?: number;
+    /** Redis client for distributed rate limiting. */
+    redisClient?: import('../middleware/rateLimit.js').RedisClient;
   };
 };

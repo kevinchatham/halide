@@ -36,7 +36,7 @@ export const authSchema = z
     algorithms: z.array(z.string()).optional(),
     audience: z.string().optional(),
     jwksUri: z.string().optional(),
-    secret: z.function().optional(),
+    secret: z.union([z.string(), z.function()]).optional(),
     secretTtl: z.number().optional(),
     strategy: z.enum(['bearer', 'jwks']).optional(),
   })

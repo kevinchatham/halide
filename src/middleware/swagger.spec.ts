@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
 import type { ServerConfig } from '../types/server-config';
-import { createOpenApiRoutes } from './swagger';
+import { createOpenApiRoutes, resetOpenApiCache } from './swagger';
 
 function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerConfig {
   return {
@@ -22,6 +22,9 @@ function makeProxyRoute(overrides: Partial<ProxyRoute> = {}): ProxyRoute {
 }
 
 describe('createOpenApiRoutes', () => {
+  beforeEach(() => {
+    resetOpenApiCache();
+  });
   it('does not register routes when openapi is disabled', async () => {
     const app = new Hono();
     const config: ServerConfig = { app: { root: '.' } };
