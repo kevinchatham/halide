@@ -1,5 +1,5 @@
 import type { ApiRoute, ProxyRoute } from './api';
-import type { AppConfig, ObservabilityConfig, THalideApp } from './app';
+import type { AppConfig, HalideContext, ObservabilityConfig } from './app';
 import type { OpenApiConfig } from './openapi';
 import type { SecurityConfig } from './security';
 
@@ -8,7 +8,7 @@ import type { SecurityConfig } from './security';
  *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ServerConfig<TApp = THalideApp> = {
+export type ServerConfig<TApp = HalideContext> = {
   /** Observability configuration: logging, request IDs, and lifecycle hooks. */
   observability?: ObservabilityConfig<TApp>;
   /** API route definitions. Each route maps a path+method to a handler function. */

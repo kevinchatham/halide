@@ -11,7 +11,7 @@ import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
 import { createAgentCache } from '../services/proxy.js';
-import type { AppConfig, HalideVariables, Logger } from '../types/app.js';
+import type { AppConfig, HalideContext, HalideVariables, Logger } from '../types/app.js';
 import type { ServerConfig } from '../types/server-config.js';
 import { createDefaultLogger, DEFAULTS } from './defaults.js';
 import { validateServerConfigSync } from './validate.js';
@@ -55,7 +55,9 @@ export interface CreateAppResult {
  * @param configInput - The server configuration.
  * @returns An object containing the Hono app and cleanup functions.
  */
-export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): CreateAppResult {
+export function createApp<TApp extends HalideContext = HalideContext>(
+  configInput: ServerConfig<TApp>,
+): CreateAppResult {
   const logger = configInput.observability?.logger ?? createDefaultLogger();
   validateServerConfigSync(configInput, logger);
 
@@ -180,7 +182,9 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
  * server.start();
  * ```
  */
-export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): Server {
+export function createServer<TApp extends HalideContext = HalideContext>(
+  configInput: ServerConfig<TApp>,
+): Server {
   const { app, proxyDispose, rateLimitDispose, logger } = createApp<TApp>(configInput);
 
   const appName = configInput.app?.name ?? DEFAULTS.app.name;

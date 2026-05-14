@@ -2,8 +2,8 @@ import http from 'node:http';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
-import type { ProxyRoute } from '../types/api';
-import type { Logger, RequestContext, THalideApp } from '../types/app';
+import type { HalideContext, ProxyRoute } from '../types/api';
+import type { Logger, RequestContext } from '../types/app';
 
 const MAX_AGENT_CACHE = 100;
 
@@ -152,14 +152,14 @@ function filterForwardHeaders(
 }
 
 /** Apply identity headers from JWT claims to the upstream request headers map, respecting readonly and multi-value constraints. */
-function applyIdentityHeaders<TApp>(
+function applyIdentityHeaders<TApp extends HalideContext>(
   headers: Record<string, string | undefined>,
   route: ProxyRoute<TApp>,
   app: TApp,
   c: Context,
   parsedBody: unknown,
 ): void {
-  const claims = (app as THalideApp).claims;
+  const claims = app.claims;
   if (!route.identity || !claims) return;
   const ctx = buildRequestContextFromHono(c, parsedBody);
   const identityHeaders = route.identity(ctx, app);
@@ -181,7 +181,7 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
 }
 
 /** Apply a configured body transformation, returning the transformed body or original request body, logging errors on failure. */
-function applyTransform<TApp>(
+function applyTransform<TApp extends HalideContext>(
   route: ProxyRoute<TApp>,
   parsedBody: unknown,
   c: Context,
@@ -212,7 +212,7 @@ function applyTransform<TApp>(
     }
     return body;
   } catch (err) {
-    logger?.error({} as unknown, err instanceof Error ? err.message : String(err));
+    logger?.error({}, err instanceof Error ? err.message : String(err));
     throw err;
   }
 }
@@ -229,13 +229,13 @@ function applyTransform<TApp>(
  * @param parsedBody - Optional pre-parsed request body.
  * @returns A function that handles the proxy request.
  */
-export function createProxyService<TApp = unknown>(
+export function createProxyService<TApp extends HalideContext = HalideContext>(
   route: ProxyRoute<TApp>,
   app: TApp,
   agentCache: AgentCache,
   parsedBody?: unknown,
 ): (c: Context) => Promise<Response> {
-  const logger = (app as THalideApp).logger;
+  const logger = app.logger;
   const target = route.target;
   const routePath = route.path;
   const rewritePath = route.proxyPath ?? routePath;

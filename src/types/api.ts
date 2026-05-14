@@ -1,5 +1,7 @@
 import type { ZodSchema } from 'zod';
-import type { RequestContext, THalideApp } from './app';
+import type { HalideContext, RequestContext } from './app';
+
+export type { HalideContext };
 
 /**
  * Metadata for OpenAPI/Scalar documentation generation on a route.
@@ -30,7 +32,7 @@ export type OpenApiSource = {
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.
  */
-export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = {
+export type ApiRoute<TApp = HalideContext, TBody = unknown, TResponse = unknown> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP method for this route. Defaults to GET. */
@@ -58,7 +60,7 @@ export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = 
  * Created via the {@link proxyRoute} factory function.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ProxyRoute<TApp = THalideApp> = {
+export type ProxyRoute<TApp = HalideContext> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP methods this proxy route handles. At least one is required. */
@@ -107,7 +109,7 @@ export type ProxyRoute<TApp = THalideApp> = {
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteHandler<TApp = THalideApp, TBody = unknown, TResponse = unknown> = (
+export type ApiRouteHandler<TApp = HalideContext, TBody = unknown, TResponse = unknown> = (
   /** Request context including path, method, headers, params, query, and body. */
   ctx: RequestContext & { body: TBody },
   /** Bundled app context with claims and logger. */
@@ -118,7 +120,7 @@ export type ApiRouteHandler<TApp = THalideApp, TBody = unknown, TResponse = unkn
  * Authorization function that determines if a request should be allowed.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type AuthorizeFn<TApp = THalideApp> = (
+export type AuthorizeFn<TApp = HalideContext> = (
   /** Normalized request context. */
   ctx: RequestContext,
   /** Bundled app context with claims and logger. */
@@ -165,7 +167,7 @@ export type ApiRouteInput<TApp, TBody = unknown, TResponse = unknown> = Omit<
  * Omits 'type' which is set automatically.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ProxyRouteInput<TApp = THalideApp> = Omit<ProxyRoute<TApp>, 'type'>;
+export type ProxyRouteInput<TApp = HalideContext> = Omit<ProxyRoute<TApp>, 'type'>;
 
 /**
  * Union of all route types.
@@ -173,6 +175,6 @@ export type ProxyRouteInput<TApp = THalideApp> = Omit<ProxyRoute<TApp>, 'type'>;
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.
  */
-export type Route<TApp = THalideApp, TBody = unknown, TResponse = unknown> =
+export type Route<TApp = HalideContext, TBody = unknown, TResponse = unknown> =
   | ApiRoute<TApp, TBody, TResponse>
   | ProxyRoute<TApp>;

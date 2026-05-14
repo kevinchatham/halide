@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
 import { resolveOpenApiSpec } from '../routes/registry.openapi';
-import type { ProxyRoute } from '../types/api';
+import type { HalideContext, ProxyRoute } from '../types/api';
 import type { OpenApiOptions } from '../types/openapi';
 import type { ServerConfig } from '../types/server-config';
 
@@ -30,7 +30,7 @@ export function resetOpenApiCache(state: SpecCacheState): void {
 /** Merge metadata overrides (summary, description, tags) onto an OpenAPI operation object. */
 function applyMetadata(
   operation: Record<string, unknown>,
-  metadata: ProxyRoute<unknown>['openapi'],
+  metadata: ProxyRoute<HalideContext>['openapi'],
 ): void {
   if (metadata?.summary) operation.summary = metadata.summary;
   if (metadata?.description) operation.description = metadata.description;
@@ -40,7 +40,7 @@ function applyMetadata(
 /** Merge external OpenAPI spec paths into the inline spec's paths map, respecting route method filtering. */
 function mergeExternalSpecs(
   inlineSpec: Record<string, unknown>,
-  resolvedSpecs: Array<{ spec: Record<string, unknown>; route: ProxyRoute<unknown> }>,
+  resolvedSpecs: Array<{ spec: Record<string, unknown>; route: ProxyRoute<HalideContext> }>,
 ): Record<string, unknown> {
   const paths = (inlineSpec['paths'] as Record<string, unknown>) ?? {};
 
@@ -63,7 +63,7 @@ function mergePathItem(
   externalPath: string,
   pathItem: Record<string, unknown>,
   routeMethods: string[],
-  metadata: ProxyRoute<unknown>['openapi'],
+  metadata: ProxyRoute<HalideContext>['openapi'],
   paths: Record<string, unknown>,
 ): void {
   if (!(externalPath in paths)) {
@@ -160,7 +160,7 @@ function buildFinalSpec(
  * @param app - The Hono application to register documentation routes on.
  * @param state - The spec cache state instance for test isolation.
  */
-export function createOpenApiRoutes<TApp = unknown>(
+export function createOpenApiRoutes<TApp extends HalideContext = HalideContext>(
   config: ServerConfig<TApp>,
   app: Hono,
   state: SpecCacheState = createSpecCacheState(),
@@ -183,7 +183,7 @@ export function createOpenApiRoutes<TApp = unknown>(
         state.specResolution = (async (): Promise<void> => {
           try {
             const inlineSpec = await buildInlineSpec(app, options);
-            const resolved = await resolveOpenApiSpec(proxyRoutes as ProxyRoute<unknown>[]);
+            const resolved = await resolveOpenApiSpec(proxyRoutes ?? []);
             const mergedSpec = mergeExternalSpecs(inlineSpec, resolved);
             state.cachedSpec = buildFinalSpec(mergedSpec, options);
           } catch {

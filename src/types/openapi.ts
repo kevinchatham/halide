@@ -1,4 +1,4 @@
-import type { ProxyRoute } from './api';
+import type { HalideContext, ProxyRoute } from './api';
 
 export type { OpenApiRouteMeta, OpenApiSource } from './api';
 
@@ -9,7 +9,7 @@ export type ResolvedOpenApiSpec = {
   /** The resolved OpenAPI spec as a plain object. */
   spec: Record<string, unknown>;
   /** The proxy route that owns this spec. */
-  route: ProxyRoute<unknown>;
+  route: ProxyRoute<HalideContext>;
 };
 
 /**

@@ -47,6 +47,19 @@ export type Logger<TLogScope = unknown> = {
 
 /**
  * Bundled app context type that combines claims and logger.
+ * Used as the generic constraint for route handlers and authorization functions.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ */
+export type HalideContext<TClaims = unknown, TLogScope = unknown> = {
+  /** Decoded JWT claims from the request (undefined if not authenticated). */
+  claims: TClaims | undefined;
+  /** Logger instance for recording observability events. */
+  logger: Logger<TLogScope>;
+};
+
+/**
+ * Bundled app context type that combines claims and logger.
  * Passed to handlers instead of separate claims and logger parameters.
  *
  * @example
@@ -62,12 +75,7 @@ export type Logger<TLogScope = unknown> = {
  * });
  * ```
  */
-export type THalideApp<TClaims = unknown, TLogScope = unknown> = {
-  /** Decoded JWT claims from the request (undefined if not authenticated). */
-  claims: TClaims | undefined;
-  /** Logger instance for recording observability events. */
-  logger: Logger<TLogScope>;
-};
+export type THalideApp<TClaims = unknown, TLogScope = unknown> = HalideContext<TClaims, TLogScope>;
 
 /**
  * Configuration for app hosting (static files and/or API backend).
@@ -109,7 +117,7 @@ export type HalideVariables = { rawBody?: unknown };
  * Configuration for observability features: logging, request IDs, and lifecycle hooks.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  */
-export type ObservabilityConfig<TApp = THalideApp> = {
+export type ObservabilityConfig<TApp = HalideContext> = {
   /**
    * Enable x-request-id header propagation. If an incoming request has an
    * x-request-id header, it is reused; otherwise a new UUID is generated.

@@ -191,17 +191,11 @@ export function emitOnRequest<TApp>(
       const result = observability.onRequest(ctx, app);
       if (result instanceof Promise) {
         result.catch((err) =>
-          logger?.error(
-            {} as unknown,
-            `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
-          ),
+          logger?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`),
         );
       }
     } catch (err) {
-      logger?.error(
-        {} as unknown,
-        `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      logger?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }
@@ -254,17 +248,11 @@ export function emitOnResponse<TApp>(
       });
       if (result instanceof Promise) {
         result.catch((err) =>
-          logger?.error(
-            {} as unknown,
-            `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
-          ),
+          logger?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`),
         );
       }
     } catch (err) {
-      logger?.error(
-        {} as unknown,
-        `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      logger?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

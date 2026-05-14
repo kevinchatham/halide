@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DescribeRouteOptions, ResponsesWithResolver } from 'hono-openapi';
 import { resolver } from 'hono-openapi';
-import type { ApiRoute, ProxyRoute } from '../types/api';
+import type { ApiRoute, HalideContext, ProxyRoute } from '../types/api';
 import type { OpenApiSource, ResolvedOpenApiSpec } from '../types/openapi';
 
 /**
@@ -64,15 +64,15 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
  * @param proxyRoutes - The proxy routes to check for external spec sources.
  * @returns A list of resolved specs paired with their owning routes.
  */
-export async function resolveOpenApiSpec(
-  proxyRoutes: ProxyRoute<unknown>[],
+export async function resolveOpenApiSpec<TApp extends HalideContext = HalideContext>(
+  proxyRoutes: ProxyRoute<TApp>[],
 ): Promise<ResolvedOpenApiSpec[]> {
   const results: ResolvedOpenApiSpec[] = [];
 
   for (const route of proxyRoutes) {
     if (route.openapiSpec) {
       const spec = await resolveOpenApiSource(route.openapiSpec);
-      results.push({ route, spec });
+      results.push({ route: route as ProxyRoute<HalideContext>, spec });
     }
   }
 

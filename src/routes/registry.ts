@@ -5,6 +5,7 @@ import type { AgentCache } from '../services/proxy';
 import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type {
+  HalideContext,
   HalideVariables,
   ObservabilityConfig,
   RequestContext,
@@ -48,7 +49,7 @@ function registerRouteOnApp(
 }
 
 /** Register an API route with validator, describeRoute, auth, and handler middleware. */
-function registerApiRoute<TApp = unknown>(
+function registerApiRoute<TApp extends HalideContext = HalideContext>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ApiRoute<TApp>,
   claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
@@ -108,7 +109,7 @@ function registerApiRoute<TApp = unknown>(
 }
 
 /** Register a proxy route with auth, observability, and proxy forwarding for each configured method. */
-function registerProxyRoute<TApp = unknown>(
+function registerProxyRoute<TApp extends HalideContext = HalideContext>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ProxyRoute<TApp>,
   claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
@@ -237,7 +238,7 @@ function registerProxyRoute<TApp = unknown>(
  * @param agentCache - The HTTP agent cache for proxy connections.
  * @param claimExtractorCache - The claim extractor cache instance.
  */
-export function registerRoutes<TApp = unknown>(
+export function registerRoutes<TApp extends HalideContext = HalideContext>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TApp>,
   logger: THalideApp['logger'],
