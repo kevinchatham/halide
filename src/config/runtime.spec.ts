@@ -67,6 +67,63 @@ describe('createApp', () => {
     expect(res.headers.get('access-control-allow-credentials')).toBe('true');
   });
 
+  it('rejects requests without Origin header when credentials: true', async () => {
+    const { app } = createApp({
+      ...minimalConfig,
+      security: {
+        auth: { secret: () => 'secret', strategy: 'bearer' },
+        cors: { credentials: true, origin: ['http://localhost:3000'] },
+      },
+    });
+    const res = await app.request('/nonexistent', { method: 'POST' });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects requests with unexpected Origin header when credentials: true', async () => {
+    const { app } = createApp({
+      ...minimalConfig,
+      security: {
+        auth: { secret: () => 'secret', strategy: 'bearer' },
+        cors: { credentials: true, origin: ['http://localhost:3000'] },
+      },
+    });
+    const res = await app.request('/nonexistent', {
+      headers: { origin: 'http://evil.example.com' },
+      method: 'POST',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows requests with matching Origin header when credentials: true', async () => {
+    const { app } = createApp({
+      ...minimalConfig,
+      security: {
+        auth: { secret: () => 'secret', strategy: 'bearer' },
+        cors: { credentials: true, origin: ['http://localhost:3000'] },
+      },
+    });
+    const res = await app.request('/nonexistent', {
+      headers: { origin: 'http://localhost:3000' },
+      method: 'POST',
+    });
+    expect(res.status).not.toBe(403);
+  });
+
+  it('does not apply CSRF when credentials is false', async () => {
+    const { app } = createApp({
+      ...minimalConfig,
+      security: {
+        auth: { secret: () => 'secret', strategy: 'bearer' },
+        cors: { origin: ['http://localhost:3000'] },
+      },
+    });
+    const res = await app.request('/nonexistent', {
+      headers: { origin: 'http://evil.example.com' },
+      method: 'POST',
+    });
+    expect(res.status).not.toBe(403);
+  });
+
   it('applies default CORS credentials as false', async () => {
     const { app } = createApp(minimalConfig);
     const res = await app.request('/nonexistent');

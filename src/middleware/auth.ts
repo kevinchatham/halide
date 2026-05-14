@@ -12,6 +12,19 @@ const jwkCache = new Map<string, JwkCacheEntry>();
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
 const jwkRefreshLocks = new Map<string, Promise<void>>();
 
+/** Enforce MAX_JWK_CACHE before inserting a new entry, evicting the oldest (FIFO). */
+function setJwkCacheEntry(
+  jwksUri: string,
+  expiresAt: number,
+  middleware: ReturnType<typeof import('hono/jwk').jwk>,
+): void {
+  if (jwkCache.size >= MAX_JWK_CACHE) {
+    const firstKey = jwkCache.keys().next().value;
+    if (firstKey) jwkCache.delete(firstKey);
+  }
+  jwkCache.set(jwksUri, { expiresAt, middleware });
+}
+
 /**
  * Get a JWKS middleware instance for the given JWKS URI.
  * Caches middleware with TTL eviction; returns a fresh instance in tests.
@@ -49,11 +62,7 @@ async function getCachedJwkMiddleware(
         alg: ['RS256'],
         jwks_uri: jwksUri,
       });
-      if (jwkCache.size >= MAX_JWK_CACHE) {
-        const firstKey = jwkCache.keys().next().value;
-        if (firstKey) jwkCache.delete(firstKey);
-      }
-      jwkCache.set(jwksUri, { expiresAt: now + JWKS_CACHE_TTL_MS, middleware });
+      setJwkCacheEntry(jwksUri, now + JWKS_CACHE_TTL_MS, middleware);
       return middleware;
     } finally {
       jwkFetchLocks.delete(jwksUri);
@@ -98,7 +107,7 @@ const jwkBackgroundRefreshTimer =
                   alg: ['RS256'],
                   jwks_uri: uri,
                 });
-                jwkCache.set(uri, { expiresAt: now + JWKS_CACHE_TTL_MS, middleware });
+                setJwkCacheEntry(uri, now + JWKS_CACHE_TTL_MS, middleware);
               } catch {
                 // Fire-and-forget: don't block other refreshes
               } finally {

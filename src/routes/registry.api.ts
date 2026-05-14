@@ -13,7 +13,7 @@ import type {
 } from '../types/app';
 import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
-import { resolveBody } from './body.js';
+import { parseJsonBody } from '../utils/parseJsonBody.js';
 import {
   checkAuthorization,
   emitOnRequest,
@@ -51,13 +51,26 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
     const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
     if (authResponse) return authResponse;
 
-    const body = route.requestSchema ? resolveBody(c, route) : undefined;
+    let body: unknown;
+    if (route.requestSchema) {
+      body = (c.req as { valid: (format: string) => unknown }).valid('json');
+    } else {
+      const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
+      if (methodsWithBody.has(c.req.method.toUpperCase())) {
+        const raw = c.req.raw;
+        if (raw.body) {
+          const parsed = await parseJsonBody(c);
+          if (parsed instanceof Response) return parsed;
+          body = parsed;
+        }
+      }
+    }
     const appCtx: TApp = { claims, logger } as TApp;
     const reqCtx = buildRequestContextFromHono(c, body) as RequestContext;
     const forbidResponse = await checkAuthorization(c, route, appCtx, body, reqCtx);
     if (forbidResponse) return forbidResponse;
 
-    emitOnRequest(c, body, appCtx, observability, route.observe, logger, reqCtx);
+    emitOnRequest({ app: appCtx, body, c, logger, observability, observe: route.observe }, reqCtx);
 
     let result: unknown;
     try {
@@ -70,15 +83,16 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
       throw err;
     } finally {
       emitOnResponse(
-        c,
-        body,
-        appCtx,
-        observability,
-        route.observe,
-        { handlerError, start, statusCode },
-        result,
-        undefined,
-        logger,
+        {
+          app: appCtx,
+          body,
+          c,
+          emitCtx: { handlerError, start, statusCode },
+          logger,
+          observability,
+          observe: route.observe,
+          responseBody: result,
+        },
         reqCtx,
       );
     }

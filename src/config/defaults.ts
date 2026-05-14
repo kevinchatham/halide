@@ -34,13 +34,11 @@ export const DEFAULTS = {
       scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
       /**
-       * Includes `'self'` and `https:` to allow stylesheets from HTTPS CDNs
-       * (e.g., Google Fonts, Font Awesome, Bootstrap CDN). This is a known
-       * tradeoff: it permits any HTTPS-origin stylesheet but avoids breaking
-       * legitimate CDN-based styling. For stricter control, override this
-       * directive with specific CDN hostnames.
+       * Only allows stylesheets from the same origin. To allow CDN-hosted
+       * stylesheets, override this directive with specific CDN hostnames
+       * (e.g., `["'self'", 'https://cdn.jsdelivr.net']`).
        */
-      styleSrc: ["'self'", 'https:'],
+      styleSrc: ["'self'"],
       upgradeInsecureRequests: [],
     },
     openapiOverrides: {

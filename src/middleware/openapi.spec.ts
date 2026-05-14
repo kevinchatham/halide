@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
 import type { ServerConfig } from '../types/server-config';
-import { createOpenApiRoutes, createSpecCacheState, resetOpenApiCache } from './swagger';
+import { createOpenApiRoutes, createSpecCacheState, resetOpenApiCache } from './openapi';
 
 function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerConfig {
   return {
@@ -22,7 +22,7 @@ function makeProxyRoute(overrides: Partial<ProxyRoute> = {}): ProxyRoute {
 }
 
 describe('createOpenApiRoutes', () => {
-  let specState: import('./swagger').SpecCacheState;
+  let specState: import('./openapi').SpecCacheState;
   beforeEach(() => {
     specState = createSpecCacheState();
     resetOpenApiCache(specState);

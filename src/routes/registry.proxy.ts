@@ -13,6 +13,7 @@ import type {
 } from '../types/app';
 import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
+import { parseJsonBody } from '../utils/parseJsonBody.js';
 import { collectProxyBody } from './proxy-body.js';
 import {
   checkAuthorization,
@@ -49,7 +50,8 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
 
       let parsedBody: unknown;
       if (route.transform) {
-        parsedBody = await c.req.json().catch(() => ({}));
+        parsedBody = await parseJsonBody(c);
+        if (parsedBody instanceof Response) return parsedBody;
         c.set('rawBody', parsedBody);
       }
 
@@ -61,7 +63,10 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
       const forbidResponse = await checkAuthorization(c, route, appCtx, parsedBody, reqCtx);
       if (forbidResponse) return forbidResponse;
 
-      emitOnRequest(c, parsedBody, appCtx, observability, route.observe, logger, reqCtx);
+      emitOnRequest(
+        { app: appCtx, body: parsedBody, c, logger, observability, observe: route.observe },
+        reqCtx,
+      );
 
       try {
         const proxyHandler = createProxyService(route, appCtx, agentCache, parsedBody);
@@ -113,15 +118,17 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
           statusCode = 502;
         }
         emitOnResponse(
-          c,
-          parsedBody,
-          appCtx,
-          observability,
-          route.observe,
-          { handlerError, start, statusCode },
-          proxyResponseBody,
-          proxyResponseBody !== undefined ? 'text' : undefined,
-          logger,
+          {
+            app: appCtx,
+            body: parsedBody,
+            bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
+            c,
+            emitCtx: { handlerError, start, statusCode },
+            logger,
+            observability,
+            observe: route.observe,
+            responseBody: proxyResponseBody,
+          },
           reqCtx,
         );
       }

@@ -2,7 +2,6 @@ import type { Context } from 'hono';
 import { MAX_EXTRACTOR_CACHE } from '../config/constants.js';
 import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
-import { buildRequestContextFromHono } from '../services/proxy';
 import type { AuthorizeFn } from '../types/api';
 import type { Logger, ObservabilityConfig, RequestContext, THalideApp } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
@@ -140,15 +139,15 @@ export async function extractClaims<TApp>(
  * @param route - The route with an optional authorize function.
  * @param app - The bundled app context.
  * @param body - The parsed request body for authorization checks.
- * @param ctx - Optional pre-built request context to avoid recreation.
+ * @param ctx - Pre-built request context to avoid recreation.
  * @returns A 403 response if authorization is denied, or null to continue processing.
  */
 export async function checkAuthorization<TApp>(
   c: Context,
   route: { authorize?: AuthorizeFn<TApp> },
   app: TApp,
-  body: unknown,
-  ctx: RequestContext = buildRequestContextFromHono(c, body),
+  _body: unknown,
+  ctx: RequestContext,
 ): Promise<Response | null> {
   if (!route.authorize) return null;
   try {
@@ -169,33 +168,26 @@ export async function checkAuthorization<TApp>(
  * Wraps callback invocations in try/catch to prevent async errors from silently failing.
  *
  * @typeParam TApp - The bundled app context type combining claims and logger.
- * @param c - The Hono context.
- * @param body - The parsed request body.
- * @param app - The bundled app context.
- * @param observability - The observability configuration.
- * @param observe - Whether observability is enabled for this specific route.
- * @param logger - Logger instance for reporting hook errors.
- * @param ctx - Optional pre-built request context to avoid recreation.
+ * @param config - The emit configuration.
+ * @param ctx - Pre-built request context.
  */
-export function emitOnRequest<TApp>(
-  c: Context,
-  body: unknown,
-  app: TApp,
-  observability: ObservabilityConfig<TApp> | undefined,
-  observe: boolean | undefined,
-  logger?: Logger<unknown>,
-  ctx: RequestContext = buildRequestContextFromHono(c, body),
-): void {
-  if (observability?.onRequest && observe !== false) {
+export function emitOnRequest<TApp>(config: EmitConfig<TApp>, ctx: RequestContext): void {
+  if (config.observability?.onRequest && config.observe !== false) {
     try {
-      const result = observability.onRequest(ctx, app);
+      const result = config.observability.onRequest(ctx, config.app);
       if (result instanceof Promise) {
         result.catch((err) =>
-          logger?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`),
+          config.logger?.error(
+            {},
+            `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
+          ),
         );
       }
     } catch (err) {
-      logger?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`);
+      config.logger?.error(
+        {},
+        `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }
@@ -210,6 +202,32 @@ interface ResponseEmitContext {
   statusCode: number;
 }
 
+/** Common emit configuration shared between onRequest and onResponse hooks. */
+interface EmitConfig<TApp> {
+  /** The bundled app context. */
+  app: TApp;
+  /** The parsed request body. */
+  body: unknown;
+  /** The Hono context. */
+  c: Context;
+  /** Logger instance for reporting hook errors. */
+  logger?: Logger<unknown>;
+  /** The observability configuration. */
+  observability: ObservabilityConfig<TApp> | undefined;
+  /** Whether observability is enabled for this specific route. */
+  observe: boolean | undefined;
+}
+
+/** Extended emit configuration for the onResponse hook. */
+interface ResponseEmitConfig<TApp> extends EmitConfig<TApp> {
+  /** Set to 'text' for proxy route response bodies. */
+  bodyType?: 'text' | 'binary';
+  /** The response emit context with error, start time, and status code. */
+  emitCtx: ResponseEmitContext;
+  /** The captured response body for logging. */
+  responseBody?: unknown;
+}
+
 /**
  * Emit the onResponse observability hook if configured and not disabled on the route.
  *
@@ -218,45 +236,32 @@ interface ResponseEmitContext {
  * Wraps callback invocations in try/catch to prevent async errors from silently failing.
  *
  * @typeParam TApp - The bundled app context type combining claims and logger.
- * @param c - The Hono context.
- * @param body - The parsed request body.
- * @param app - The bundled app context.
- * @param observability - The observability configuration.
- * @param observe - Whether observability is enabled for this specific route.
- * @param emitCtx - The response emit context with error, start time, and status code.
- * @param responseBody - The captured response body for logging.
- * @param bodyType - Set to `'text'` for proxy route response bodies, `undefined` for API routes (where response body is the handler's return value directly).
- * @param logger - Logger instance for reporting hook errors.
- * @param ctx - Optional pre-built request context to avoid recreation.
+ * @param config - The emit configuration.
+ * @param ctx - Pre-built request context.
  */
-export function emitOnResponse<TApp>(
-  c: Context,
-  body: unknown,
-  app: TApp,
-  observability: ObservabilityConfig<TApp> | undefined,
-  observe: boolean | undefined,
-  emitCtx: ResponseEmitContext,
-  responseBody?: unknown,
-  bodyType?: 'text' | 'binary',
-  logger?: Logger<unknown>,
-  ctx: RequestContext = buildRequestContextFromHono(c, body),
-): void {
-  if (observability?.onResponse && observe !== false) {
+export function emitOnResponse<TApp>(config: ResponseEmitConfig<TApp>, ctx: RequestContext): void {
+  if (config.observability?.onResponse && config.observe !== false) {
     try {
-      const result = observability.onResponse(ctx, app, {
-        body: responseBody,
-        bodyType,
-        durationMs: Date.now() - emitCtx.start,
-        error: emitCtx.handlerError,
-        statusCode: emitCtx.statusCode,
+      const result = config.observability.onResponse(ctx, config.app, {
+        body: config.responseBody,
+        bodyType: config.bodyType,
+        durationMs: Date.now() - config.emitCtx.start,
+        error: config.emitCtx.handlerError,
+        statusCode: config.emitCtx.statusCode,
       });
       if (result instanceof Promise) {
         result.catch((err) =>
-          logger?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`),
+          config.logger?.error(
+            {},
+            `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
+          ),
         );
       }
     } catch (err) {
-      logger?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`);
+      config.logger?.error(
+        {},
+        `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

@@ -130,18 +130,7 @@ function buildFinalSpec(
   options: OpenApiOptions | undefined,
 ): Record<string, unknown> {
   const inlineInfo = mergedSpec['info'] as Record<string, string | undefined> | undefined;
-  const info =
-    options?.title || options?.version || options?.description
-      ? {
-          title: options?.title ?? inlineInfo?.title ?? 'Halide API',
-          version: options?.version ?? inlineInfo?.version ?? '1.0.0',
-          ...(options?.description && { description: options.description }),
-          ...(!options?.description &&
-            inlineInfo?.description && {
-              description: inlineInfo.description,
-            }),
-        }
-      : inlineInfo;
+  const info = resolveOpenApiInfo(options, inlineInfo);
   return {
     ...mergedSpec,
     info,
@@ -225,4 +214,34 @@ export function createOpenApiRoutes<TApp extends HalideContext = HalideContext>(
       url: `${swaggerPath}/openapi.json`,
     }),
   );
+}
+
+/**
+ * Resolve OpenAPI info metadata, preferring options over inline defaults.
+ *
+ * When any of `title`, `version`, or `description` is provided in options,
+ * builds a new info object with options taking priority over inline info.
+ * Otherwise, passes through inline info as-is.
+ *
+ * @param options - OpenAPI options from config.
+ * @param inlineInfo - Inline info from the resolved spec.
+ * @returns The resolved info object, or undefined if no info is available.
+ */
+function resolveOpenApiInfo(
+  options?: OpenApiOptions,
+  inlineInfo?: Record<string, string | undefined>,
+): Record<string, string | undefined> | undefined {
+  if (options?.title || options?.version || options?.description) {
+    const info: Record<string, string | undefined> = {
+      title: options?.title ?? inlineInfo?.title ?? 'Halide API',
+      version: options?.version ?? inlineInfo?.version ?? '1.0.0',
+    };
+    if (options?.description) {
+      info.description = options.description;
+    } else if (inlineInfo?.description) {
+      info.description = inlineInfo.description;
+    }
+    return info;
+  }
+  return inlineInfo;
 }

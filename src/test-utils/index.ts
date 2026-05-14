@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { createNoopLogger } from '../config/defaults';
-import { createOpenApiRoutes } from '../middleware/swagger';
+import { createOpenApiRoutes } from '../middleware/openapi';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger } from '../types/app';

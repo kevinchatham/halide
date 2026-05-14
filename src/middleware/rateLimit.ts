@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import ipaddr from 'ipaddr.js';
+import { getClientIp } from '../utils/trustedProxies.js';
 
 /** Default maximum number of entries in the in-memory rate limit store. */
 const DEFAULT_MAX_ENTRIES = 10_000;
@@ -7,7 +7,10 @@ const DEFAULT_MAX_ENTRIES = 10_000;
 /** Minimal Redis client interface for rate limiting. */
 export interface RedisClient {
   del(key: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
   get(key: string): Promise<string | null>;
+  incr(key: string): Promise<number>;
+  pttl(key: string): Promise<number>;
   set(key: string, value: string, opts?: { EX?: number }): Promise<'OK'>;
 }
 
@@ -31,35 +34,32 @@ export function createRedisRateLimitStore(
   const windowSeconds = Math.ceil(config.windowMs / 1000);
 
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
-    const clientIp = getClientIp(c, config.trustedProxies);
+    const nodeReq = c.req as { socket?: { remoteAddress?: string } };
+    const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
+    const forwarded = c.req.header('x-forwarded-for');
+    const clientIp = getClientIp(socketIp, config.trustedProxies, forwarded);
     const key = `rate-limit:${clientIp}`;
-    const now = Date.now();
 
-    const current = await client.get(key);
+    const count = await client.incr(key);
 
-    if (!current || now > JSON.parse(current).resetTime) {
-      await client.set(key, JSON.stringify({ count: 1, resetTime: now + config.windowMs }), {
-        EX: windowSeconds,
-      });
-      await next();
-      return;
+    if (count === 1) {
+      await client.expire(key, windowSeconds);
     }
 
-    const entry = JSON.parse(current);
-    entry.count += 1;
-
-    if (entry.count > config.maxRequests) {
-      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+    if (count > config.maxRequests) {
+      const pttl = await client.pttl(key);
+      const retryAfter = pttl > 0 ? Math.ceil(pttl / 1000) : 1;
       c.header('Retry-After', String(retryAfter));
       return c.json({ error: 'Too Many Requests' }, 429);
     }
 
-    await client.set(key, JSON.stringify(entry), { EX: windowSeconds });
     await next();
   };
 
   return {
-    dispose: () => {},
+    dispose: () => {
+      // No-op: Redis keys are cleaned up by TTL.
+    },
     middleware,
   };
 }
@@ -137,34 +137,6 @@ interface WindowEntry {
   resetTime: number;
 }
 
-/** Check if the socket IP matches a trusted proxy CIDR or exact IP. */
-function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]): boolean {
-  if (!trustedProxies?.length || !ip) return false;
-  const addr = ipaddr.parse(ip);
-  return trustedProxies.some((tp) => {
-    if (tp.includes('/')) {
-      const [net, prefix] = tp.split('/');
-      const parsedNet = ipaddr.parse(net!);
-      return addr!.match(parsedNet, Number(prefix));
-    }
-    return addr!.toString() === tp;
-  });
-}
-
-/** Extract client IP from request headers, falling back to socket IP. Uses X-Forwarded-For only when the socket IP is from a trusted proxy. */
-function getClientIp(c: Context, trustedProxies?: string[]): string {
-  const nodeReq = c.req as { socket?: { remoteAddress?: string } };
-  const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
-  if (isTrustedProxy(socketIp, trustedProxies)) {
-    const forwarded = c.req.header('x-forwarded-for');
-    if (forwarded) {
-      const first = forwarded.split(',')[0];
-      if (first) return first.trim();
-    }
-  }
-  return socketIp;
-}
-
 /**
  * Create rate limiting middleware that restricts requests per client IP.
  *
@@ -189,7 +161,10 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
 
   /** Per-request rate limit check: returns 429 if the client IP has exceeded its window quota. */
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
-    const clientIp = getClientIp(c, config.trustedProxies);
+    const nodeReq = c.req as { socket?: { remoteAddress?: string } };
+    const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
+    const forwarded = c.req.header('x-forwarded-for');
+    const clientIp = getClientIp(socketIp, config.trustedProxies, forwarded);
     const now = Date.now();
     const entry = await store.get(clientIp);
 

@@ -101,10 +101,14 @@ export type ProxyRoute<TApp = HalideContext> = {
   /**
    * Headers to forward to upstream. Defaults to a safe subset
    * (accept, accept-encoding, accept-language, cache-control, content-type,
-   * origin, user-agent, x-forwarded-for); omits authorization and cookie
+   * origin, user-agent); omits authorization, cookie, and x-forwarded-for
    * headers. Set to an empty array `[]` to forward no headers at all.
+   * When `trustedProxies` is configured, x-forwarded-for is forwarded only
+   * if the immediate sender is a trusted proxy.
    */
   forwardHeaders?: string[];
+  /** Trusted proxy IPs/CIDRs for x-forwarded-for header validation. */
+  trustedProxies?: string[];
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
   /** External OpenAPI spec source for documenting the proxied API. */

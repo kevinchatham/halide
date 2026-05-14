@@ -1,0 +1,58 @@
+import { Hono } from 'hono';
+import { parseJsonBody } from './parseJsonBody';
+
+describe('parseJsonBody', () => {
+  function createApp(handler: (c: Parameters<typeof parseJsonBody>[0]) => Promise<unknown>): Hono {
+    const app = new Hono();
+    app.post('/test', async (c) => {
+      const body = await handler(c);
+      if (body instanceof Response) return body;
+      return c.json({ parsed: body });
+    });
+    return app;
+  }
+
+  it('parses valid JSON', async () => {
+    const app = createApp((c) => parseJsonBody(c));
+    const res = await app.request('/test', {
+      body: JSON.stringify({ key: 'value' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.parsed).toEqual({ key: 'value' });
+  });
+
+  it('returns 400 on malformed JSON', async () => {
+    const app = createApp((c) => parseJsonBody(c));
+    const res = await app.request('/test', {
+      body: '{invalid json}',
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Invalid JSON in request body' });
+  });
+
+  it('returns 400 on non-JSON content', async () => {
+    const app = createApp((c) => parseJsonBody(c));
+    const res = await app.request('/test', {
+      body: 'not json at all',
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 on empty body with JSON content type', async () => {
+    const app = createApp((c) => parseJsonBody(c));
+    const res = await app.request('/test', {
+      body: '',
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    expect(res.status).toBe(400);
+  });
+});

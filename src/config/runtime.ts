@@ -1,13 +1,15 @@
+import type { ServerResponse } from 'node:http';
 import { serve } from '@hono/node-server';
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { csrf } from 'hono/csrf';
 import { createErrorHandler } from '../middleware/errorHandler.js';
+import type { SpecCacheState } from '../middleware/openapi.js';
+import { createOpenApiRoutes } from '../middleware/openapi.js';
 import { createRateLimitMiddleware, createRedisRateLimitStore } from '../middleware/rateLimit.js';
 import { createRequestIdMiddleware } from '../middleware/requestId.js';
 import { createSecurityMiddleware } from '../middleware/security.js';
-import type { SpecCacheState } from '../middleware/swagger.js';
-import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
 import { createAgentCache } from '../services/proxy.js';
@@ -82,6 +84,11 @@ export function createApp<TApp extends HalideContext = HalideContext>(
       origin: corsOrigin,
     }),
   );
+
+  if (corsCredentials) {
+    const origins = Array.isArray(corsOrigin) ? corsOrigin : [corsOrigin];
+    app.use('*', csrf({ origin: origins }));
+  }
 
   let rateLimitDispose: (() => void) | undefined;
 
@@ -194,6 +201,8 @@ export function createServer<TApp extends HalideContext = HalideContext>(
   let readyResolve!: () => void;
   let readyReject!: (err: Error) => void;
 
+  const activeRequests = new Set<ServerResponse>();
+
   const ready = new Promise<void>((resolve, reject) => {
     readyResolve = resolve;
     readyReject = reject;
@@ -201,21 +210,24 @@ export function createServer<TApp extends HalideContext = HalideContext>(
 
   void ready.catch(() => {});
 
-  /** Shared shutdown logic: dispose resources and close the HTTP server. */
+  /** Shared shutdown logic: dispose resources, drain connections, and close the HTTP server. */
   const shutdownServer = async (exitCode?: number): Promise<void> => {
     rateLimitDispose?.();
     proxyDispose?.();
     const server = httpServer;
     if (server) {
-      (server as import('node:http').Server).closeAllConnections?.();
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => {
-          if (err) {
-            reject(err);
-          } else {
+      const http = server as import('node:http').Server;
+      http.closeAllConnections?.();
+      http.close();
+      await new Promise<void>((resolve) => {
+        const checkDrain = (): void => {
+          if (activeRequests.size === 0) {
             resolve();
+          } else {
+            setTimeout(checkDrain, 100);
           }
-        });
+        };
+        checkDrain();
       });
     }
     if (exitCode !== undefined) {
@@ -248,6 +260,12 @@ export function createServer<TApp extends HalideContext = HalideContext>(
           onReady?.(port);
         },
       );
+      const http = httpServer as import('node:http').Server;
+      http.on('request', (_req, res) => {
+        activeRequests.add(res);
+        res.on('finish', () => activeRequests.delete(res));
+        res.on('close', () => activeRequests.delete(res));
+      });
       httpServer.on('error', (err: Error) => {
         readyReject(err);
         logger.error({ appName } as unknown, `Failed to start: ${err.message}`);

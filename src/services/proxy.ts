@@ -6,6 +6,7 @@ import { MAX_AGENT_CACHE } from '../config/constants.js';
 import { DEFAULTS } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
+import { isTrustedProxy } from '../utils/trustedProxies.js';
 
 /** Cached HTTP agent pool with bounded size. */
 export class AgentCache {
@@ -117,11 +118,34 @@ const DEFAULT_FORWARD_HEADERS: string[] = [
   'content-type',
   'origin',
   'user-agent',
-  'x-forwarded-for', // Proxy is a trusted intermediary; forward client IP to upstream
 ];
 
 /** Headers that can have multiple values and need special handling. */
 const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
+
+/** Extract the first IP from an x-forwarded-for header when the sender is a trusted proxy. */
+function appendForwardedFor(
+  headers: Record<string, string>,
+  forwardHeaders: string[],
+  trustedProxies: string[] | undefined,
+  socketIp: string | undefined,
+  originalHeaders: Record<string, string | undefined>,
+): void {
+  if (
+    forwardHeaders.includes('x-forwarded-for') &&
+    trustedProxies &&
+    socketIp &&
+    isTrustedProxy(socketIp, trustedProxies)
+  ) {
+    const forwarded = originalHeaders['x-forwarded-for'];
+    if (forwarded) {
+      const first = forwarded.split(',')[0];
+      if (first) {
+        headers['x-forwarded-for'] = first.trim();
+      }
+    }
+  }
+}
 
 /** Serialize a query parameter value to string or string array, JSON-encoding non-string values. */
 export function serializeQueryParam(v: unknown): string | string[] {
@@ -176,9 +200,10 @@ function normalizeHeaders(headers: Record<string, unknown>): {
 function filterForwardHeaders(
   headers: Record<string, string | undefined>,
   forwardHeaders?: string[],
+  trustedProxies?: string[],
+  socketIp?: string,
 ): Record<string, string> {
   if (forwardHeaders === undefined) {
-    // Default allowlist
     const allowed = new Set(DEFAULT_FORWARD_HEADERS.map((h) => h.toLowerCase()));
     const filtered: Record<string, string> = {};
     for (const [key, value] of Object.entries(headers)) {
@@ -186,11 +211,11 @@ function filterForwardHeaders(
         filtered[key] = value;
       }
     }
+    appendForwardedFor(filtered, DEFAULT_FORWARD_HEADERS, trustedProxies, socketIp, headers);
     return filtered;
   }
 
   if (forwardHeaders.length === 0) {
-    // Explicit empty array — forward no headers
     return {};
   }
 
@@ -201,6 +226,7 @@ function filterForwardHeaders(
       filtered[key] = value;
     }
   }
+  appendForwardedFor(filtered, forwardHeaders, trustedProxies, socketIp, headers);
   return filtered;
 }
 
@@ -294,6 +320,25 @@ export function createProxyService<TApp extends HalideContext = HalideContext>(
   const rewritePath = route.proxyPath ?? routePath;
   const timeoutMs = route.timeout ?? DEFAULTS.proxy.timeoutMs;
 
+  if (!target || target === '') {
+    throw new Error(`Proxy route "${routePath}" requires a non-empty target URL`);
+  }
+  let parsedTarget: URL;
+  try {
+    parsedTarget = new URL(target);
+    if (!['http:', 'https:'].includes(parsedTarget.protocol)) {
+      throw new Error(
+        `Proxy route "${routePath}" target must use http: or https: protocol, got "${parsedTarget.protocol}"`,
+      );
+    }
+  } catch (err) {
+    const msg =
+      err instanceof Error && err.message.startsWith('Proxy route')
+        ? err.message
+        : `Proxy route "${routePath}" has an invalid target URL: "${target}"`;
+    throw new Error(msg);
+  }
+
   return async (c: Context): Promise<Response> => {
     const isWildcard = routePath.endsWith('/*');
     const prefix = isWildcard ? routePath.slice(0, -2) : routePath;
@@ -316,7 +361,14 @@ export function createProxyService<TApp extends HalideContext = HalideContext>(
     delete allHeaders['host'];
     delete allHeaders['Host'];
 
-    const filteredHeaders = filterForwardHeaders(allHeaders, route.forwardHeaders);
+    const nodeReq = c.req as { socket?: { remoteAddress?: string } };
+    const socketIp = nodeReq.socket?.remoteAddress;
+    const filteredHeaders = filterForwardHeaders(
+      allHeaders,
+      route.forwardHeaders,
+      route.trustedProxies,
+      socketIp,
+    );
     const headers: Record<string, string | undefined> = { ...filteredHeaders };
     headers['x-forwarded-host'] = c.req.header('host') ?? '';
 

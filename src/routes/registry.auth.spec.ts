@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
+import { createOpenApiRoutes } from '../middleware/openapi';
 import { createSecurityMiddleware } from '../middleware/security';
-import { createOpenApiRoutes } from '../middleware/swagger';
 import { createAgentCache } from '../services/proxy';
 import { createTestApp, noopLogger } from '../test-utils/index.js';
 import type { HalideVariables } from '../types/app';
