@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { CspOptions } from './csp';
+import type { CspDirectives } from './csp';
 
 /**
  * Function that extracts JWT claims from a request context.
@@ -67,8 +67,8 @@ export type SecurityConfig = {
   auth?: SecurityAuthConfig;
   /** CORS configuration for cross-origin requests. */
   cors?: CorsConfig;
-  /** Content Security Policy configuration. */
-  csp?: CspOptions;
+  /** Content Security Policy directives. */
+  csp?: CspDirectives;
   /** Rate limiting configuration. */
   rateLimit?: {
     /** Maximum requests allowed per window. Defaults to 100. */

@@ -83,7 +83,7 @@ describe('createApp', () => {
   it('applies custom CSP directives', async () => {
     const { app } = createApp({
       ...minimalConfig,
-      security: { csp: { directives: { defaultSrc: ["'none'"], scriptSrc: ["'none'"] } } },
+      security: { csp: { defaultSrc: ["'none'"], scriptSrc: ["'none'"] } },
     });
     const res = await app.request('/nonexistent');
     const csp = res.headers.get('Content-Security-Policy') ?? '';

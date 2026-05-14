@@ -7,6 +7,10 @@ vi.mock('../services/proxy', () => ({
   buildRequestContextFromHono: vi
     .fn()
     .mockReturnValue({ body: undefined, method: 'get', params: {}, path: '', query: {} }),
+  createAgentCache: () => ({
+    dispose: () => {},
+    getAgent: () => null as unknown as import('node:http').Agent,
+  }),
   createProxyService: vi.fn().mockReturnValue(async () => new Response('ok', { status: 200 })),
 }));
 

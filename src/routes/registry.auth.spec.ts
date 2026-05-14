@@ -1,10 +1,6 @@
 import { sign } from 'hono/jwt';
 import type { ServerConfig } from '../types/server-config';
-import {
-  createClaimExtractor,
-  getClaimExtractorCacheSize,
-  resetClaimExtractorCache,
-} from './registry.auth';
+import { createClaimExtractor, NOOP_EXTRACTOR_CACHE } from './registry.auth';
 import { createTestApp, noopLogger } from './registry.helpers';
 
 const secret = 'test-secret';
@@ -15,7 +11,7 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
 
 describe('registerRoutes — auth', () => {
   beforeEach(() => {
-    resetClaimExtractorCache();
+    NOOP_EXTRACTOR_CACHE.reset();
   });
   describe('Authentication', () => {
     it('returns 401 for private routes without token', async () => {
@@ -233,7 +229,7 @@ describe('registerRoutes — auth', () => {
 
   describe('claimExtractorCache', () => {
     it('tracks cache size', () => {
-      expect(getClaimExtractorCacheSize()).toBe(0);
+      expect(NOOP_EXTRACTOR_CACHE.size).toBe(0);
     });
 
     it('caches extractors by strategy key', () => {
@@ -251,7 +247,7 @@ describe('registerRoutes — auth', () => {
       createClaimExtractor(bearerConfig, noopLogger);
       createClaimExtractor(jwksConfig, noopLogger);
 
-      expect(getClaimExtractorCacheSize()).toBe(2);
+      expect(NOOP_EXTRACTOR_CACHE.size).toBe(2);
     });
   });
 });

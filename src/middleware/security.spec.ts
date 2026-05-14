@@ -3,13 +3,13 @@ import { createSecurityMiddleware } from './security';
 
 describe('createSecurityMiddleware', () => {
   it('creates middleware with default directives', () => {
-    const handler = createSecurityMiddleware({ directives: undefined });
+    const handler = createSecurityMiddleware({});
     expect(typeof handler).toBe('function');
   });
 
   it('applies secureHeaders with default directives', async () => {
     const app = new Hono();
-    app.use('*', createSecurityMiddleware({ directives: undefined }));
+    app.use('*', createSecurityMiddleware({}));
     app.get('/test', (c) => c.json({ ok: true }));
 
     const res = await app.request('/test');
@@ -23,10 +23,8 @@ describe('createSecurityMiddleware', () => {
     app.use(
       '*',
       createSecurityMiddleware({
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'none'"],
-        },
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'none'"],
       }),
     );
     app.get('/test', (c) => c.json({ ok: true }));
@@ -39,7 +37,7 @@ describe('createSecurityMiddleware', () => {
 
   it('calls next after applying secureHeaders', async () => {
     const app = new Hono();
-    app.use('*', createSecurityMiddleware({ directives: undefined }));
+    app.use('*', createSecurityMiddleware({}));
     app.get('/test', (c) => c.json({ ok: true }));
 
     const res = await app.request('/test');
@@ -52,7 +50,7 @@ describe('createSecurityMiddleware', () => {
     app.use(
       '*',
       createSecurityMiddleware(
-        { directives: undefined },
+        {},
         {
           connectSrc: ["'self'", 'https:'],
           scriptSrc: ["'self'", 'https://cdn.jsdelivr.net', "'unsafe-inline'"],

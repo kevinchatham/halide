@@ -194,9 +194,7 @@ const security: SecurityConfig = {
     origin: ['http://localhost:4200'],
   },
   csp: {
-    directives: {
-      defaultSrc: ["'self'"],
-    },
+    defaultSrc: ["'self'"],
   },
   rateLimit: {
     maxRequests: 100,

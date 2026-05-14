@@ -2,22 +2,47 @@ import type { Context } from 'hono';
 import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
-import type { ApiRoute, AuthorizeFn } from '../types/api';
+import type { AuthorizeFn } from '../types/api';
 import type { Logger, ObservabilityConfig, THalideApp } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
 /** Maximum number of entries in the claim extractor cache. */
-const MAX_EXTRACTOR_CACHE = 100;
+const MAX_EXTRACTOR_CACHE = 50;
 
-/** Module-level cache for claim extractors keyed by auth strategy. */
-const claimExtractorCache = new Map<string, ClaimExtractor<unknown> | undefined>();
+/** Cache for claim extractors keyed by auth strategy. */
+export class ClaimExtractorCache {
+  private readonly cache = new Map<string, ClaimExtractor<unknown> | undefined>();
 
-/** Return the current number of entries in the claim extractor cache. Intended for testing. */
-export function getClaimExtractorCacheSize(): number {
-  return claimExtractorCache.size;
+  get(key: string): ClaimExtractor<unknown> | undefined {
+    return this.cache.get(key);
+  }
+
+  set(key: string, value: ClaimExtractor<unknown> | undefined): void {
+    if (this.cache.size >= MAX_EXTRACTOR_CACHE) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  reset(): void {
+    this.cache.clear();
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
 }
+
+/** Create a ClaimExtractorCache instance. */
+export function createClaimExtractorCache(): ClaimExtractorCache {
+  return new ClaimExtractorCache();
+}
+
+/** No-op claim extractor cache for use when no auth is configured. */
+export const NOOP_EXTRACTOR_CACHE = new ClaimExtractorCache();
 
 /** Create a JSON error response for authentication/authorization failures. */
 export function createAuthErrorResponse(status: number, message: string): Response {
@@ -25,11 +50,6 @@ export function createAuthErrorResponse(status: number, message: string): Respon
     headers: { 'Content-Type': 'application/json' },
     status,
   });
-}
-
-/** Clear the claim extractor cache. Intended for testing only. */
-export function resetClaimExtractorCache(): void {
-  claimExtractorCache.clear();
 }
 
 /**
@@ -42,17 +62,19 @@ export function resetClaimExtractorCache(): void {
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration containing auth settings.
  * @param logger - Logger instance for error reporting.
+ * @param cache - The claim extractor cache instance.
  * @returns A claim extractor function or undefined when auth is disabled.
  */
 export function createClaimExtractor<TApp = unknown>(
   config: ServerConfig<TApp>,
   logger: THalideApp['logger'],
+  cache: ClaimExtractorCache = NOOP_EXTRACTOR_CACHE,
 ): ClaimExtractor<THalideApp<TApp>['claims']> | undefined {
   const auth = config.security?.auth;
   if (!auth) return undefined;
 
   const key = auth.strategy || 'none';
-  const cached = claimExtractorCache.get(key);
+  const cached = cache.get(key);
   if (cached) return cached as ClaimExtractor<THalideApp<TApp>['claims']> | undefined;
 
   let result: ClaimExtractor<unknown> | undefined;
@@ -77,11 +99,7 @@ export function createClaimExtractor<TApp = unknown>(
   }
 
   if (result) {
-    if (claimExtractorCache.size >= MAX_EXTRACTOR_CACHE) {
-      const firstKey = claimExtractorCache.keys().next().value;
-      if (firstKey) claimExtractorCache.delete(firstKey);
-    }
-    claimExtractorCache.set(key, result);
+    cache.set(key, result);
   }
   return result as ClaimExtractor<THalideApp<TApp>['claims']> | undefined;
 }
@@ -252,21 +270,4 @@ export function emitOnResponse<TApp>(
       );
     }
   }
-}
-
-/**
- * Resolve request body, using request schema if available, otherwise parsing
- * JSON for POST/PUT/PATCH methods.
- *
- * @typeParam TApp - The bundled app context type combining claims and logger.
- * @param c - The Hono context.
- * @param route - The API route, which may have a request schema.
- * @returns The parsed request body or undefined.
- */
-export function resolveBody<TApp>(c: Context, route: ApiRoute<TApp>): unknown {
-  if (route.requestSchema) return (c.req as { valid: (format: string) => unknown }).valid('json');
-  const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
-  return methodsWithBody.has(c.req.method.toUpperCase())
-    ? c.req.json().catch(() => undefined)
-    : undefined;
 }

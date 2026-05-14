@@ -1,6 +1,7 @@
 import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute, validator } from 'hono-openapi';
 import { DEFAULTS } from '../config/defaults';
+import type { AgentCache } from '../services/proxy';
 import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type {
@@ -11,13 +12,14 @@ import type {
 } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
+import { resolveBody } from './body.js';
 import {
   checkAuthorization,
   createClaimExtractor,
   emitOnRequest,
   emitOnResponse,
   extractClaims,
-  resolveBody,
+  NOOP_EXTRACTOR_CACHE,
 } from './registry.auth';
 import { buildDescribeRouteOptions } from './registry.openapi';
 
@@ -112,6 +114,7 @@ function registerProxyRoute<TApp = unknown>(
   claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
   observability: ObservabilityConfig<TApp> | undefined,
   logger: THalideApp['logger'],
+  agentCache: AgentCache,
 ): void {
   for (const method of route.methods) {
     registerRouteOnApp(
@@ -152,7 +155,7 @@ function registerProxyRoute<TApp = unknown>(
         emitOnRequest(c, parsedBody, appCtx, observability, route.observe, logger);
 
         try {
-          const proxyHandler = createProxyService(route, appCtx, parsedBody);
+          const proxyHandler = createProxyService(route, appCtx, agentCache, parsedBody);
           const response = await proxyHandler(c);
           statusCode = response.status;
 
@@ -241,13 +244,17 @@ function registerProxyRoute<TApp = unknown>(
  * @param app - The Hono application to register routes on.
  * @param config - The server configuration containing routes.
  * @param logger - Logger instance for observability.
+ * @param agentCache - The HTTP agent cache for proxy connections.
+ * @param claimExtractorCache - The claim extractor cache instance.
  */
 export function registerRoutes<TApp = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TApp>,
   logger: THalideApp['logger'],
+  agentCache: AgentCache,
+  claimExtractorCache: import('./registry.auth').ClaimExtractorCache = NOOP_EXTRACTOR_CACHE,
 ): void {
-  const claimExtractor = createClaimExtractor<TApp>(config, logger);
+  const claimExtractor = createClaimExtractor<TApp>(config, logger, claimExtractorCache);
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {
@@ -257,7 +264,7 @@ export function registerRoutes<TApp = unknown>(
 
   if (config.proxyRoutes) {
     for (const route of config.proxyRoutes) {
-      registerProxyRoute(app, route, claimExtractor, config.observability, logger);
+      registerProxyRoute(app, route, claimExtractor, config.observability, logger, agentCache);
     }
   }
 }

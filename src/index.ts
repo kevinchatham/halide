@@ -21,7 +21,6 @@ export type {
 export type {
   CspDirectives,
   CspDirectiveValue,
-  CspOptions,
 } from './types/csp';
 export type {
   OpenApiConfig,

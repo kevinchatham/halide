@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
 import type { Logger, THalideApp } from '../types/app';
-import { createProxyService, getCachedAgent } from './proxy';
+import { createAgentCache, createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
   debug: (_scope: unknown) => {},
@@ -16,6 +16,7 @@ const createApp = (claims?: unknown): THalideApp => ({
 });
 
 describe('createProxyService', () => {
+  const agentCache = createAgentCache();
   it('creates a handler function', () => {
     const route: ProxyRoute = {
       access: 'public',
@@ -25,7 +26,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -38,7 +39,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -52,7 +53,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -66,7 +67,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -83,7 +84,7 @@ describe('createProxyService', () => {
     };
 
     const app = createApp({ role: 'admin', sub: 'user-123' });
-    const handler = createProxyService(route, app);
+    const handler = createProxyService(route, app, agentCache);
 
     const honoApp = new Hono();
     honoApp.get('/api/users', handler);
@@ -107,7 +108,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp(), { original: true });
+    const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
     const app = new Hono<{ Variables: { rawBody?: unknown } }>();
     app.post('/api/data', handler);
@@ -132,7 +133,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     const app = new Hono();
     app.get('/api/data', handler);
 
@@ -154,7 +155,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     const app = new Hono();
     app.get('/api/data', handler);
 
@@ -177,7 +178,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     const app = new Hono();
     app.post('/api/data', handler);
 
@@ -209,7 +210,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     const app = new Hono();
     app.get('/api/data', handler);
 
@@ -218,28 +219,29 @@ describe('createProxyService', () => {
   });
 });
 
-describe('getCachedAgent', () => {
+describe('AgentCache', () => {
+  const ac = createAgentCache();
   it('returns the same agent for identical keys', () => {
-    const agent1 = getCachedAgent('https://api.example.com', 50, 10);
-    const agent2 = getCachedAgent('https://api.example.com', 50, 10);
+    const agent1 = ac.getAgent('https://api.example.com', 50, 10);
+    const agent2 = ac.getAgent('https://api.example.com', 50, 10);
     expect(agent1).toBe(agent2);
   });
 
   it('returns different agents for different targets', () => {
-    const agent1 = getCachedAgent('https://api.example.com', 50, 10);
-    const agent2 = getCachedAgent('https://other.example.com', 50, 10);
+    const agent1 = ac.getAgent('https://api.example.com', 50, 10);
+    const agent2 = ac.getAgent('https://other.example.com', 50, 10);
     expect(agent1).not.toBe(agent2);
   });
 
   it('returns different agents for different pool settings', () => {
-    const agent1 = getCachedAgent('https://api.example.com', 25, 5);
-    const agent2 = getCachedAgent('https://api.example.com', 50, 10);
+    const agent1 = ac.getAgent('https://api.example.com', 25, 5);
+    const agent2 = ac.getAgent('https://api.example.com', 50, 10);
     expect(agent1).not.toBe(agent2);
   });
 
   it('returns the same agent when defaults are used', () => {
-    const agent1 = getCachedAgent('https://api.example.com');
-    const agent2 = getCachedAgent('https://api.example.com', 50, 10);
+    const agent1 = ac.getAgent('https://api.example.com');
+    const agent2 = ac.getAgent('https://api.example.com', 50, 10);
     expect(agent1).toBe(agent2);
   });
 });

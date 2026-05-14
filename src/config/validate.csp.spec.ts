@@ -5,8 +5,7 @@ describe('validateServerConfig — csp', () => {
     const result = await validateServerConfig({
       app: { root: '/var/www' },
       security: {
-        // @ts-expect-error - intentionally passing kebab-case for runtime validation test
-        csp: { directives: { 'default-src': ["'self'"] } },
+        csp: { 'default-src': ["'self'"] },
       },
     });
     expect(result.valid).toBe(false);

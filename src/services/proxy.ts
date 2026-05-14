@@ -5,34 +5,45 @@ import { DEFAULTS } from '../config/defaults';
 import type { ProxyRoute } from '../types/api';
 import type { Logger, RequestContext, THalideApp } from '../types/app';
 
-/** Module-level cache for pooled http.Agent instances keyed by target + pool settings. */
-const agentCache = new Map<string, http.Agent>();
+const MAX_AGENT_CACHE = 100;
 
-/** Return a pooled http.Agent for the given target and pool settings. */
-export function getCachedAgent(
-  target: string,
-  maxSockets?: number,
-  maxFreeSockets?: number,
-): http.Agent {
-  const key = `${target}|${maxSockets ?? 50}|${maxFreeSockets ?? 10}`;
-  let agent = agentCache.get(key);
-  if (!agent) {
-    agent = new http.Agent({
-      keepAlive: true,
-      maxFreeSockets: maxFreeSockets ?? 10,
-      maxSockets: maxSockets ?? 50,
-    });
-    agentCache.set(key, agent);
+/** Cached HTTP agent pool with bounded size. */
+export class AgentCache {
+  private readonly cache = new Map<string, http.Agent>();
+
+  getAgent(target: string, maxSockets?: number, maxFreeSockets?: number): http.Agent {
+    const key = `${target}|${maxSockets ?? 50}|${maxFreeSockets ?? 10}`;
+    let agent = this.cache.get(key);
+    if (!agent) {
+      if (this.cache.size >= MAX_AGENT_CACHE) {
+        const firstKey = this.cache.keys().next().value;
+        if (firstKey) {
+          const evicted = this.cache.get(firstKey);
+          evicted?.destroy();
+          this.cache.delete(firstKey);
+        }
+      }
+      agent = new http.Agent({
+        keepAlive: true,
+        maxFreeSockets: maxFreeSockets ?? 10,
+        maxSockets: maxSockets ?? 50,
+      });
+      this.cache.set(key, agent);
+    }
+    return agent;
   }
-  return agent;
+
+  dispose(): void {
+    for (const [, agent] of this.cache) {
+      agent.destroy();
+    }
+    this.cache.clear();
+  }
 }
 
-/** Destroy and clear all cached HTTP agents. Call on shutdown to release connections. */
-export function disposeProxyAgents(): void {
-  for (const [, agent] of agentCache) {
-    agent.destroy();
-  }
-  agentCache.clear();
+/** Create an AgentCache instance. */
+export function createAgentCache(): AgentCache {
+  return new AgentCache();
 }
 
 /** Headers that cannot be modified by proxy transformations. */
@@ -221,6 +232,7 @@ function applyTransform<TApp>(
 export function createProxyService<TApp = unknown>(
   route: ProxyRoute<TApp>,
   app: TApp,
+  agentCache: AgentCache,
   parsedBody?: unknown,
 ): (c: Context) => Promise<Response> {
   const logger = (app as THalideApp).logger;
@@ -262,7 +274,7 @@ export function createProxyService<TApp = unknown>(
 
     const agent =
       route.agent ??
-      getCachedAgent(target, route.connection?.maxSockets, route.connection?.maxFreeSockets);
+      agentCache.getAgent(target, route.connection?.maxSockets, route.connection?.maxFreeSockets);
     const proxyRequest = new Request(targetUrl, {
       agent,
       body,

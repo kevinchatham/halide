@@ -10,6 +10,7 @@ type JwkCacheEntry = {
 const jwkCache = new Map<string, JwkCacheEntry>();
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
 const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
+const MAX_JWK_CACHE = 100;
 
 /**
  * Get a JWKS middleware instance for the given JWKS URI.
@@ -34,12 +35,12 @@ async function getCachedJwkMiddleware(
     return cached.middleware;
   }
 
-  jwkCache.delete(jwksUri);
-
   const existing = jwkFetchLocks.get(jwksUri);
   if (existing) {
     return existing;
   }
+
+  jwkCache.delete(jwksUri);
 
   const fetchPromise = (async () => {
     try {
@@ -48,6 +49,10 @@ async function getCachedJwkMiddleware(
         alg: ['RS256'],
         jwks_uri: jwksUri,
       });
+      if (jwkCache.size >= MAX_JWK_CACHE) {
+        const firstKey = jwkCache.keys().next().value;
+        if (firstKey) jwkCache.delete(firstKey);
+      }
       jwkCache.set(jwksUri, { expiresAt: now + JWKS_CACHE_TTL_MS, middleware });
       return middleware;
     } finally {

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
 import type { Logger, THalideApp } from '../types/app';
-import { createProxyService } from './proxy';
+import { createAgentCache, createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
   debug: (_scope: unknown) => {},
@@ -16,6 +16,7 @@ const createApp = (claims?: unknown): THalideApp => ({
 });
 
 describe('createProxyService — errors', () => {
+  const agentCache = createAgentCache();
   it('handles proxy errors gracefully', async () => {
     const route: ProxyRoute = {
       access: 'public',
@@ -26,7 +27,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
 
     const app = new Hono();
     app.get('/api/fail', handler);
@@ -58,7 +59,7 @@ describe('createProxyService — errors', () => {
     };
 
     const appWithErrorLogger: THalideApp = { claims: undefined, logger: errorLogger };
-    const handler = createProxyService(route, appWithErrorLogger, { original: true });
+    const handler = createProxyService(route, appWithErrorLogger, agentCache, { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -89,7 +90,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp(), { original: true });
+    const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -119,7 +120,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp(), { original: true });
+    const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -149,7 +150,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp(), { original: true });
+    const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
     const app = new Hono();
     app.post('/api/data', handler);
@@ -174,7 +175,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
 
     const app = new Hono();
     app.get('/api/*', handler);
@@ -194,7 +195,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
 
     const app = new Hono();
     app.get('/api/*', handler);
@@ -213,7 +214,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
 
     const app = new Hono();
     app.get('/api/users', handler);
@@ -234,7 +235,7 @@ describe('createProxyService — errors', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
 
     const app = new Hono();
     app.get('/api/users', handler);

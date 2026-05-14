@@ -53,11 +53,3 @@ export type CspDirectives = {
   /** Controls the sources for Web Workers. */
   workerSrc?: CspDirectiveValue[];
 };
-
-/**
- * Configuration options for Content Security Policy.
- */
-export type CspOptions = {
-  /** CSP directives to apply. See {@link CspDirectives}. */
-  directives?: CspDirectives;
-};

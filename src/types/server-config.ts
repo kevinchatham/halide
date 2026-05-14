@@ -15,7 +15,12 @@ export type ServerConfig<TApp = THalideApp> = {
   apiRoutes?: ApiRoute<TApp, unknown, unknown>[];
   /** Proxy route definitions. Each route forwards requests to an upstream target. */
   proxyRoutes?: ProxyRoute<TApp>[];
-  /** Security configuration: auth, CORS, CSP, rate limiting. */
+  /**
+   * Security configuration: auth, CORS, CSP, rate limiting.
+   *
+   * Required when any route has `access: 'private'`. The `auth` field must be
+   * configured with a valid strategy (bearer with `secret`, or jwks with `jwksUri`).
+   */
   security?: SecurityConfig;
   /** App hosting configuration (static files and/or API backend). Optional when not serving static files. */
   app?: AppConfig;

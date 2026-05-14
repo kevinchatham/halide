@@ -181,7 +181,7 @@ describe('extractJwksClaims', () => {
 
     mockJwk.mockImplementation(
       (): import('hono').MiddlewareHandler =>
-        async (c: import('hono').Context, next: import('hono').Next) => {
+        async (c: import('hono').Context, next: import('hono').Next): Promise<void> => {
           if (!deferred.resolved) {
             await new Promise((r) => setTimeout(r, 50));
             deferred.resolved = true;

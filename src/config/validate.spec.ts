@@ -16,18 +16,16 @@ describe('validateServerConfig', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors.at(0)?.field).toBe('auth.secret');
+    expect(result.errors.at(0)?.field).toBe('security.auth.secret');
   });
 
-  it('rejects config with empty secret', async () => {
+  it('accepts config with function secret (sync validation deferred to request time)', async () => {
     const result = await validateServerConfig({
       security: {
         auth: { secret: () => '', strategy: 'bearer' },
       },
     });
-    expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(1);
-    expect(result.errors.at(0)?.field).toBe('auth.secret');
+    expect(result.valid).toBe(true);
   });
 
   it('rejects config with empty string secret', async () => {
@@ -38,7 +36,7 @@ describe('validateServerConfig', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors.at(0)?.field).toBe('auth.secret');
+    expect(result.errors.at(0)?.field).toBe('security.auth.secret');
   });
 
   it('accepts full valid config', async () => {
@@ -47,7 +45,7 @@ describe('validateServerConfig', () => {
       security: {
         auth: { secret: () => 'secret123', strategy: 'bearer' },
         cors: { credentials: true, origin: ['http://localhost:3000'] },
-        csp: { directives: { defaultSrc: ["'self'"] } },
+        csp: { defaultSrc: ["'self'"] },
       },
     });
     expect(result.valid).toBe(true);

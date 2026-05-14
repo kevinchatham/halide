@@ -11,13 +11,20 @@ import type { ServerConfig } from '../types/server-config';
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Cached OpenAPI spec and shared resolution promise for concurrency guard. */
-let cachedSpec: Record<string, unknown> | null = null;
-let specResolution: Promise<void> | null = null;
+export interface SpecCacheState {
+  cachedSpec: Record<string, unknown> | null;
+  specResolution: Promise<void> | null;
+}
+
+/** Create a fresh spec cache state for isolation. */
+export function createSpecCacheState(): SpecCacheState {
+  return { cachedSpec: null, specResolution: null };
+}
 
 /** Reset the cached spec and resolution promise (used by tests). */
-export function resetOpenApiCache(): void {
-  cachedSpec = null;
-  specResolution = null;
+export function resetOpenApiCache(state: SpecCacheState): void {
+  state.cachedSpec = null;
+  state.specResolution = null;
 }
 
 /** Merge metadata overrides (summary, description, tags) onto an OpenAPI operation object. */
@@ -151,8 +158,13 @@ function buildFinalSpec(
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param config - The server configuration containing OpenAPI settings.
  * @param app - The Hono application to register documentation routes on.
+ * @param state - The spec cache state instance for test isolation.
  */
-export function createOpenApiRoutes<TApp = unknown>(config: ServerConfig<TApp>, app: Hono): void {
+export function createOpenApiRoutes<TApp = unknown>(
+  config: ServerConfig<TApp>,
+  app: Hono,
+  state: SpecCacheState = createSpecCacheState(),
+): void {
   const openapiConfig = config.openapi;
   if (!openapiConfig?.enabled) return;
 
@@ -163,25 +175,25 @@ export function createOpenApiRoutes<TApp = unknown>(config: ServerConfig<TApp>, 
 
   if (hasExternalSpecs) {
     app.get(`${swaggerPath}/openapi.json`, async (c) => {
-      if (cachedSpec) {
-        return c.json(cachedSpec);
+      if (state.cachedSpec) {
+        return c.json(state.cachedSpec);
       }
 
-      if (!specResolution) {
-        specResolution = (async (): Promise<void> => {
+      if (!state.specResolution) {
+        state.specResolution = (async (): Promise<void> => {
           try {
             const inlineSpec = await buildInlineSpec(app, options);
             const resolved = await resolveOpenApiSpec(proxyRoutes as ProxyRoute<unknown>[]);
             const mergedSpec = mergeExternalSpecs(inlineSpec, resolved);
-            cachedSpec = buildFinalSpec(mergedSpec, options);
+            state.cachedSpec = buildFinalSpec(mergedSpec, options);
           } catch {
-            cachedSpec = {};
+            state.cachedSpec = {};
           }
         })();
       }
 
-      await specResolution;
-      return c.json(cachedSpec ?? {});
+      await state.specResolution;
+      return c.json(state.cachedSpec ?? {});
     });
   } else {
     app.get(`${swaggerPath}/openapi.json`, ((c: Context) => {

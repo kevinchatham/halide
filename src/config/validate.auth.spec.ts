@@ -12,7 +12,7 @@ describe('validateServerConfig — auth', () => {
     expect(result.errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          field: 'auth.secret',
+          field: 'security.auth.secret',
           message: expect.stringContaining('required'),
         }),
       ]),
@@ -38,7 +38,7 @@ describe('validateServerConfig — auth', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toEqual(
-      expect.arrayContaining([expect.objectContaining({ field: 'auth.jwksUri' })]),
+      expect.arrayContaining([expect.objectContaining({ field: 'security.auth.jwksUri' })]),
     );
   });
 
@@ -153,7 +153,7 @@ describe('validateServerConfig — auth', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toEqual(
-      expect.arrayContaining([expect.objectContaining({ field: 'auth.secretTtl' })]),
+      expect.arrayContaining([expect.objectContaining({ field: 'security.auth.secretTtl' })]),
     );
   });
 
@@ -166,7 +166,20 @@ describe('validateServerConfig — auth', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toEqual(
-      expect.arrayContaining([expect.objectContaining({ field: 'auth.secretTtl' })]),
+      expect.arrayContaining([expect.objectContaining({ field: 'security.auth.secretTtl' })]),
+    );
+  });
+
+  it('rejects non-integer secretTtl', async () => {
+    const result = await validateServerConfig({
+      app: { root: '/var/www' },
+      security: {
+        auth: { secret: () => 'secret', secretTtl: 1.5, strategy: 'bearer' },
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'security.auth.secretTtl' })]),
     );
   });
 
@@ -198,13 +211,8 @@ describe('validateServerConfig — auth', () => {
       },
     });
     expect(result.valid).toBe(false);
-    expect(result.errors).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          field: 'auth.secret',
-          message: expect.stringContaining('empty'),
-        }),
-      ]),
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ field: 'auth.secret', message: expect.stringContaining('empty') }),
     );
   });
 
@@ -218,7 +226,7 @@ describe('validateServerConfig — auth', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('handles async secret rejection gracefully', async () => {
+  it('rejects async secret that rejects', async () => {
     const result = await validateServerConfig({
       app: { root: '/var/www' },
       security: {
@@ -230,7 +238,12 @@ describe('validateServerConfig — auth', () => {
         },
       },
     });
-    // Rejection is caught and deferred — sync validation still passes
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        field: 'auth.secret',
+        message: expect.stringContaining('rejected'),
+      }),
+    );
   });
 });

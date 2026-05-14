@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { createAgentCache } from '../services/proxy';
 import { registerRoutes } from './registry';
 import { createTestApp, noopLogger } from './registry.helpers';
 
@@ -93,6 +94,7 @@ describe('registerRoutes — observability', () => {
           observability: { onResponse },
         },
         noopLogger,
+        createAgentCache(),
       );
 
       await app.request('/items');
@@ -134,6 +136,7 @@ describe('registerRoutes — observability', () => {
       const onResponse = vi.fn();
 
       const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
       await registerRoutes(
         app,
         {
@@ -149,6 +152,7 @@ describe('registerRoutes — observability', () => {
           observability: { onRequest, onResponse },
         },
         errorLogger as unknown as typeof noopLogger,
+        agentCache,
       );
 
       const res = await app.request('/items');
@@ -170,6 +174,7 @@ describe('registerRoutes — observability', () => {
       const onResponse = vi.fn();
 
       const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
       await registerRoutes(
         app,
         {
@@ -185,6 +190,7 @@ describe('registerRoutes — observability', () => {
           observability: { onRequest, onResponse },
         },
         errorLogger as unknown as typeof noopLogger,
+        agentCache,
       );
 
       const res = await app.request('/items');
@@ -202,6 +208,7 @@ describe('registerRoutes — observability', () => {
       const onResponse = vi.fn().mockReturnValue(Promise.reject(new Error('response hook failed')));
 
       const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
       await registerRoutes(
         app,
         {
@@ -217,6 +224,7 @@ describe('registerRoutes — observability', () => {
           observability: { onRequest, onResponse },
         },
         errorLogger as unknown as typeof noopLogger,
+        agentCache,
       );
 
       const res = await app.request('/items');

@@ -6,14 +6,15 @@ import { createErrorHandler } from '../middleware/errorHandler.js';
 import { createRateLimitMiddleware, createRedisRateLimitStore } from '../middleware/rateLimit.js';
 import { createRequestIdMiddleware } from '../middleware/requestId.js';
 import { createSecurityMiddleware } from '../middleware/security.js';
+import type { SpecCacheState } from '../middleware/swagger.js';
 import { createOpenApiRoutes } from '../middleware/swagger.js';
 import { createAppHandler } from '../routes/app.js';
 import { registerRoutes } from '../routes/registry.js';
-import { disposeProxyAgents } from '../services/proxy.js';
+import { createAgentCache } from '../services/proxy.js';
 import type { AppConfig, HalideVariables, Logger } from '../types/app.js';
 import type { ServerConfig } from '../types/server-config.js';
 import { createDefaultLogger, DEFAULTS } from './defaults.js';
-import { validateServerConfig } from './validate.js';
+import { validateServerConfigSync } from './validate.js';
 
 /**
  * Halide HTTP server with lifecycle management.
@@ -55,10 +56,11 @@ export interface CreateAppResult {
  * @returns An object containing the Hono app and cleanup functions.
  */
 export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): CreateAppResult {
-  validateServerConfig(configInput);
-
   const logger = configInput.observability?.logger ?? createDefaultLogger();
+  validateServerConfigSync(configInput, logger);
+
   const app = new Hono<{ Variables: HalideVariables }>();
+  const agentCache = createAgentCache();
 
   const appName = configInput.app?.name ?? DEFAULTS.app.name;
   const security = configInput.security;
@@ -133,9 +135,11 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes(app, configInput, logger);
+  registerRoutes(app, configInput, logger, agentCache);
 
-  createOpenApiRoutes(configInput, app as unknown as Hono);
+  const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
+
+  createOpenApiRoutes(configInput, app as unknown as Hono, specCacheState);
 
   if (configInput.app?.root) {
     const { staticMiddleware, appFallback } = createAppHandler(
@@ -147,7 +151,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
 
   app.onError(createErrorHandler(logger));
 
-  return { app, logger, proxyDispose: disposeProxyAgents, rateLimitDispose };
+  return { app, logger, proxyDispose: () => agentCache.dispose(), rateLimitDispose };
 }
 
 /**
@@ -193,11 +197,8 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
 
   void ready.catch(() => {});
 
-  /** Gracefully shut down the server on SIGINT/SIGTERM. */
-  const shutdown = async (signal: string): Promise<void> => {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    logger.info({ appName } as unknown, `Received ${signal}, shutting down...`);
+  /** Shared shutdown logic: dispose resources and close the HTTP server. */
+  const shutdownServer = async (exitCode?: number): Promise<void> => {
     rateLimitDispose?.();
     proxyDispose?.();
     const server = httpServer;
@@ -213,7 +214,17 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
         });
       });
     }
-    process.exitCode = 0;
+    if (exitCode !== undefined) {
+      process.exitCode = exitCode;
+    }
+  };
+
+  /** Gracefully shut down the server on SIGINT/SIGTERM. */
+  const shutdown = async (signal: string): Promise<void> => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    logger.info({ appName } as unknown, `Received ${signal}, shutting down...`);
+    await shutdownServer(0);
   };
 
   return {
@@ -236,7 +247,6 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
       httpServer.on('error', (err: Error) => {
         readyReject(err);
         logger.error({ appName } as unknown, `Failed to start: ${err.message}`);
-        process.exit(1);
       });
       process.on('SIGINT', () => {
         void shutdown('SIGINT');
@@ -248,22 +258,8 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
     stop: async () => {
       if (isShuttingDown) return;
       isShuttingDown = true;
-      rateLimitDispose?.();
-      proxyDispose?.();
-      const server = httpServer;
-      if (!server) {
-        return;
-      }
-      (server as import('node:http').Server).closeAllConnections?.();
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
+      if (!httpServer) return;
+      await shutdownServer();
     },
   };
 }
