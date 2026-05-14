@@ -16,7 +16,7 @@ describe('validateServerConfig', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors.at(0)?.field).toBe('security.auth.secret');
+    expect(result.errors.at(0)?.field).toBe('security.auth');
   });
 
   it('accepts config with function secret (sync validation deferred to request time)', async () => {

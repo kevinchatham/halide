@@ -2,11 +2,10 @@ import http from 'node:http';
 import net from 'node:net';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
+import { MAX_AGENT_CACHE } from '../config/constants.js';
 import { DEFAULTS } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
-
-const MAX_AGENT_CACHE = 100;
 
 /** Cached HTTP agent pool with bounded size. */
 export class AgentCache {
@@ -339,6 +338,18 @@ export function createProxyService<TApp extends HalideContext = HalideContext>(
       signal,
     } as RequestInit & { agent?: http.Agent });
 
-    return proxy(proxyRequest);
+    const proxyPromise = proxy(proxyRequest);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          reject(
+            new DOMException(`Upstream request timed out after ${timeoutMs}ms`, 'TimeoutError'),
+          );
+        },
+        { once: true },
+      );
+    });
+    return Promise.race([proxyPromise, timeoutPromise]);
   };
 }

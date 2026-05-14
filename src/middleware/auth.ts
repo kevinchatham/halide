@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
+import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE } from '../config/constants.js';
 
 /** Per-URI JWKS cache entry with TTL. */
 type JwkCacheEntry = {
@@ -10,8 +11,6 @@ type JwkCacheEntry = {
 const jwkCache = new Map<string, JwkCacheEntry>();
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
 const jwkRefreshLocks = new Map<string, Promise<void>>();
-const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
-const MAX_JWK_CACHE = 100;
 
 /**
  * Get a JWKS middleware instance for the given JWKS URI.

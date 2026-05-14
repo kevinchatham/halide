@@ -13,6 +13,7 @@ import type {
 } from '../types/app';
 import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
+import { collectProxyBody } from './proxy-body.js';
 import {
   checkAuthorization,
   emitOnRequest,
@@ -76,63 +77,29 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
         c.req.raw?.signal?.addEventListener('abort', () => abortController.abort());
 
         if (body) {
-          const { readable, writable } = new TransformStream();
-          const reader = body.getReader();
-          const writer = writable.getWriter();
-          const collected: Uint8Array[] = [];
           const maxCollect = observability?.maxCollect ?? 1024;
-          let collectedBytes = 0;
+          const {
+            response: pipedResponse,
+            body: responseBodyText,
+            error: collectedPipeError,
+          } = await collectProxyBody(response, abortController.signal, maxCollect);
 
-          async function pipe(): Promise<void> {
-            try {
-              while (true) {
-                if (abortController.signal.aborted) break;
-                const { done, value } = await reader.read();
-                if (done) break;
-                if (abortController.signal.aborted) break;
-                if (collectedBytes < maxCollect && value) {
-                  const slice = value.slice(0, Math.max(0, maxCollect - collectedBytes));
-                  collected.push(slice);
-                  collectedBytes += slice.length;
-                }
-                await writer.write(value);
-              }
-              await writer.close();
-            } catch (err) {
-              pipeError = err instanceof Error ? err : new Error(String(err));
-              await writer.close();
+          if (abortController.signal.aborted) {
+            handlerError = new Error('Client disconnected');
+            statusCode = 499;
+            return;
+          } else {
+            proxyResponseBody = responseBodyText;
+            if (collectedPipeError) {
+              pipeError = collectedPipeError;
             }
           }
 
-          if (abortController.signal.aborted) {
-            reader.cancel();
-            writer.abort();
-            handlerError = new Error('Client disconnected');
-            statusCode = 499;
-            return;
-          }
-
-          const pipePromise = pipe();
-
-          const responseBodyText =
-            collected.length > 0
-              ? await new Response(new Blob(collected as BlobPart[])).text()
-              : undefined;
-
-          await pipePromise;
-
-          if (abortController.signal.aborted) {
-            handlerError = new Error('Client disconnected');
-            statusCode = 499;
-            return;
-          }
-
-          proxyResponseBody = responseBodyText;
           const responseInit: ResponseInit = {
-            headers: response.headers,
-            status: response.status,
+            headers: pipedResponse.headers,
+            status: pipedResponse.status,
           };
-          return new Response(readable as ReadableStream<Uint8Array>, responseInit);
+          return new Response(pipedResponse.body as ReadableStream<Uint8Array>, responseInit);
         }
 
         return response;
@@ -153,6 +120,7 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
           route.observe,
           { handlerError, start, statusCode },
           proxyResponseBody,
+          proxyResponseBody !== undefined ? 'text' : undefined,
           logger,
           reqCtx,
         );

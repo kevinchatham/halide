@@ -51,15 +51,13 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
     const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
     if (authResponse) return authResponse;
 
-    const authBody = route.requestSchema ? resolveBody(c, route) : undefined;
+    const body = route.requestSchema ? resolveBody(c, route) : undefined;
     const appCtx: TApp = { claims, logger } as TApp;
-    const reqCtx = buildRequestContextFromHono(c, authBody) as RequestContext;
-    const forbidResponse = await checkAuthorization(c, route, appCtx, authBody, reqCtx);
+    const reqCtx = buildRequestContextFromHono(c, body) as RequestContext;
+    const forbidResponse = await checkAuthorization(c, route, appCtx, body, reqCtx);
     if (forbidResponse) return forbidResponse;
 
-    emitOnRequest(c, authBody, appCtx, observability, route.observe, logger, reqCtx);
-
-    const body = await resolveBody(c, route);
+    emitOnRequest(c, body, appCtx, observability, route.observe, logger, reqCtx);
 
     let result: unknown;
     try {
@@ -79,6 +77,7 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
         route.observe,
         { handlerError, start, statusCode },
         result,
+        undefined,
         logger,
         reqCtx,
       );

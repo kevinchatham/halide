@@ -28,6 +28,15 @@ export type ResponseContext = {
   error?: Error;
   /** Response body, if available. */
   body?: unknown;
+  /**
+   * Indicates the format of the body field.
+   * - 'text': body is a string (common for API responses, proxy body collection).
+   * - 'binary': body may be raw bytes (e.g., image/png, application/octet-stream).
+   * Binary body content collected through the proxy body collector is decoded as text
+   * and may be garbled for non-text responses.
+   * Undefined when no body was collected.
+   */
+  bodyType?: 'text' | 'binary';
 };
 
 /**

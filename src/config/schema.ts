@@ -23,20 +23,65 @@ export const corsSchema = z
   })
   .strict();
 
-/** Zod schema for CSP directives — structural validation only. */
-export const cspSchema = z.record(z.string(), z.array(z.string())).optional();
+/** Zod schema for CSP directives — strict camelCase directive keys only. */
+export const cspSchema = z
+  .object({
+    baseUri: z.array(z.string()).optional(),
+    childSrc: z.array(z.string()).optional(),
+    connectSrc: z.array(z.string()).optional(),
+    defaultSrc: z.array(z.string()).optional(),
+    fontSrc: z.array(z.string()).optional(),
+    formAction: z.array(z.string()).optional(),
+    frameAncestors: z.array(z.string()).optional(),
+    frameSrc: z.array(z.string()).optional(),
+    imgSrc: z.array(z.string()).optional(),
+    manifestSrc: z.array(z.string()).optional(),
+    mediaSrc: z.array(z.string()).optional(),
+    objectSrc: z.array(z.string()).optional(),
+    sandbox: z.array(z.string()).optional(),
+    scriptSrc: z.array(z.string()).optional(),
+    scriptSrcAttr: z.array(z.string()).optional(),
+    scriptSrcElem: z.array(z.string()).optional(),
+    styleSrc: z.array(z.string()).optional(),
+    styleSrcAttr: z.array(z.string()).optional(),
+    styleSrcElem: z.array(z.string()).optional(),
+    upgradeInsecureRequests: z.array(z.string()).optional(),
+    workerSrc: z.array(z.string()).optional(),
+  })
+  .strict()
+  .optional();
 
-/** Zod schema for auth config — structural validation only. */
-export const authSchema = z
+/** Zod schema for bearer auth config. */
+const bearerAuthSchema = z
   .object({
     algorithms: z.array(z.string()).optional(),
     audience: z.string().optional(),
-    jwksUri: z.string().optional(),
-    secret: z.union([z.string(), z.function()]).optional(),
+    secret: z.union([z.string(), z.function()]),
     secretTtl: z.number().optional(),
-    strategy: z.enum(['bearer', 'jwks']).optional(),
+    strategy: z.literal('bearer').optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (typeof data.secret === 'string' && data.secret === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'auth.secret must not be empty for bearer strategy',
+        path: ['secret'],
+      });
+    }
+  });
+
+/** Zod schema for JWKS auth config. */
+const jwksAuthSchema = z
+  .object({
+    audience: z.string().optional(),
+    jwksUri: z.string(),
+    strategy: z.literal('jwks'),
   })
   .strict();
+
+/** Zod schema for auth config — discriminated union for bearer vs JWKS. */
+export const authSchema = z.union([bearerAuthSchema, jwksAuthSchema]).optional();
 
 /** Zod schema for API route — structural validation only. */
 export const apiRouteSchema = z.object({
@@ -128,20 +173,6 @@ export const serverConfigSchema = z
       });
     }
 
-    // CSP kebab-case detection
-    if (data.security?.csp) {
-      const kebabPattern = /^[a-z]+-[a-z]/;
-      for (const key of Object.keys(data.security.csp)) {
-        if (kebabPattern.test(key)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `CSP directive '${key}' uses kebab-case. Use camelCase instead (e.g., 'defaultSrc' not 'default-src').`,
-            path: ['security', 'csp', key],
-          });
-        }
-      }
-    }
-
     // Port range
     if (data.app?.port !== undefined) {
       if (!Number.isInteger(data.app.port) || data.app.port < 1 || data.app.port > 65535) {
@@ -225,34 +256,9 @@ export const serverConfigSchema = z
       }
     }
 
-    // Auth strategy requirements
-    if (data.security?.auth?.strategy === 'bearer') {
-      const secret = data.security.auth.secret;
-      if (typeof secret === 'string' && secret === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'auth.secret must not be empty for bearer strategy',
-          path: ['security', 'auth', 'secret'],
-        });
-      } else if (!secret) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'auth.secret is required when strategy is bearer',
-          path: ['security', 'auth', 'secret'],
-        });
-      }
-    }
-
-    if (data.security?.auth?.strategy === 'jwks' && !data.security.auth.jwksUri) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'auth.jwksUri is required when strategy is jwks',
-        path: ['security', 'auth', 'jwksUri'],
-      });
-    }
-
-    if (data.security?.auth?.secretTtl !== undefined) {
-      if (!Number.isInteger(data.security.auth.secretTtl) || data.security.auth.secretTtl < 0) {
+    const auth = data.security?.auth as { secretTtl?: unknown; algorithms?: unknown } | undefined;
+    if (auth?.secretTtl !== undefined) {
+      if (!Number.isInteger(auth.secretTtl) || (auth.secretTtl as number) < 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'auth.secretTtl must be a non-negative integer (seconds)',
@@ -261,11 +267,8 @@ export const serverConfigSchema = z
       }
     }
 
-    if (data.security?.auth?.algorithms !== undefined) {
-      if (
-        !Array.isArray(data.security.auth.algorithms) ||
-        data.security.auth.algorithms.length === 0
-      ) {
+    if (auth?.algorithms !== undefined) {
+      if (!Array.isArray(auth.algorithms) || (auth.algorithms as string[]).length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'auth.algorithms must be a non-empty array of strings',

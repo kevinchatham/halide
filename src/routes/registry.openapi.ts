@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DescribeRouteOptions, ResponsesWithResolver } from 'hono-openapi';
 import { resolver } from 'hono-openapi';
+import { OPENAPI_FETCH_TIMEOUT_MS } from '../config/constants.js';
 import type { ApiRoute, HalideContext, ProxyRoute } from '../types/api';
 import type { OpenApiSource, ResolvedOpenApiSpec } from '../types/openapi';
 
@@ -16,9 +17,6 @@ function isOptionalSchema(schema: unknown): boolean {
   const s = schema as { _def?: { typeName?: string } };
   return s._def?.typeName === 'ZodOptional' || s._def?.typeName === 'ZodNullable';
 }
-
-/** Fetch timeout in milliseconds for external OpenAPI spec URLs. */
-const OPENAPI_FETCH_TIMEOUT_MS = 10_000;
 
 /** Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file. */
 async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<string, unknown>> {

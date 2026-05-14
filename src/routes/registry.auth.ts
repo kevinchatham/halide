@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { MAX_EXTRACTOR_CACHE } from '../config/constants.js';
 import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
@@ -7,9 +8,6 @@ import type { Logger, ObservabilityConfig, RequestContext, THalideApp } from '..
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
-
-/** Maximum number of entries in the claim extractor cache. */
-const MAX_EXTRACTOR_CACHE = 50;
 
 /** Cache for claim extractors keyed by auth strategy. */
 export class ClaimExtractorCache {
@@ -227,6 +225,7 @@ interface ResponseEmitContext {
  * @param observe - Whether observability is enabled for this specific route.
  * @param emitCtx - The response emit context with error, start time, and status code.
  * @param responseBody - The captured response body for logging.
+ * @param bodyType - Set to `'text'` for proxy route response bodies, `undefined` for API routes (where response body is the handler's return value directly).
  * @param logger - Logger instance for reporting hook errors.
  * @param ctx - Optional pre-built request context to avoid recreation.
  */
@@ -238,6 +237,7 @@ export function emitOnResponse<TApp>(
   observe: boolean | undefined,
   emitCtx: ResponseEmitContext,
   responseBody?: unknown,
+  bodyType?: 'text' | 'binary',
   logger?: Logger<unknown>,
   ctx: RequestContext = buildRequestContextFromHono(c, body),
 ): void {
@@ -245,6 +245,7 @@ export function emitOnResponse<TApp>(
     try {
       const result = observability.onResponse(ctx, app, {
         body: responseBody,
+        bodyType,
         durationMs: Date.now() - emitCtx.start,
         error: emitCtx.handlerError,
         statusCode: emitCtx.statusCode,
