@@ -136,21 +136,11 @@ function registerProxyRoute<TApp = unknown>(
         }
 
         const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
-        if (authResponse) {
-          return new Response(authResponse.body, {
-            headers: authResponse.headers,
-            status: authResponse.status,
-          });
-        }
+        if (authResponse) return authResponse;
 
         const appCtx: TApp = { claims, logger } as TApp;
         const forbidResponse = await checkAuthorization(c, route, appCtx, parsedBody);
-        if (forbidResponse) {
-          return new Response(forbidResponse.body, {
-            headers: forbidResponse.headers,
-            status: forbidResponse.status,
-          });
-        }
+        if (forbidResponse) return forbidResponse;
 
         emitOnRequest(c, parsedBody, appCtx, observability, route.observe, logger);
 

@@ -45,11 +45,8 @@ export function createClaimExtractorCache(): ClaimExtractorCache {
 export const NOOP_EXTRACTOR_CACHE = new ClaimExtractorCache();
 
 /** Create a JSON error response for authentication/authorization failures. */
-export function createAuthErrorResponse(status: number, message: string): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    headers: { 'Content-Type': 'application/json' },
-    status,
-  });
+export function createAuthErrorResponse(c: Context, status: number, message: string): Response {
+  return c.json({ error: message }, { status: status as 400 | 401 | 403 | 404 | 500 } as const);
 }
 
 /**
@@ -128,7 +125,7 @@ export async function extractClaims<TApp>(
   if (extracted === null) {
     return {
       claims: undefined,
-      response: createAuthErrorResponse(401, 'Unauthorized'),
+      response: createAuthErrorResponse(c, 401, 'Unauthorized'),
     };
   }
   return { claims: extracted, response: null };
@@ -158,11 +155,11 @@ export async function checkAuthorization<TApp>(
     const ctx = buildRequestContextFromHono(c, body);
     const allowed = await route.authorize(ctx, app);
     if (!allowed) {
-      return createAuthErrorResponse(403, 'Forbidden');
+      return createAuthErrorResponse(c, 403, 'Forbidden');
     }
     return null;
   } catch {
-    return createAuthErrorResponse(403, 'Forbidden');
+    return createAuthErrorResponse(c, 403, 'Forbidden');
   }
 }
 

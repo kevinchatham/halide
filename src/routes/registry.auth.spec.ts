@@ -1,5 +1,11 @@
+import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
+import { createSecurityMiddleware } from '../middleware/security';
+import { createOpenApiRoutes } from '../middleware/swagger';
+import { createAgentCache } from '../services/proxy';
+import type { HalideVariables } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
+import { registerRoutes } from './registry';
 import { createClaimExtractor, NOOP_EXTRACTOR_CACHE } from './registry.auth';
 import { createTestApp, noopLogger } from './registry.helpers';
 
@@ -248,6 +254,74 @@ describe('registerRoutes — auth', () => {
       createClaimExtractor(jwksConfig, noopLogger);
 
       expect(NOOP_EXTRACTOR_CACHE.size).toBe(2);
+    });
+  });
+
+  describe('CSP headers on auth error responses', () => {
+    it('includes CSP header on 401 auth error', async () => {
+      const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
+
+      app.use('*', createSecurityMiddleware({ defaultSrc: ["'self'"] }));
+      registerRoutes(
+        app,
+        {
+          apiRoutes: [
+            {
+              access: 'private',
+              handler: async () => ({ ok: true }),
+              path: '/profile',
+              type: 'api',
+            },
+          ],
+          app: { root: '/var/www' },
+          security: { auth: { secret: () => secret, strategy: 'bearer' } },
+        },
+        noopLogger,
+        agentCache,
+      );
+      createOpenApiRoutes({} as ServerConfig, app as unknown as Hono);
+
+      const res = await app.request('/profile');
+      expect(res.status).toBe(401);
+      const csp = res.headers.get('Content-Security-Policy');
+      expect(csp).toContain("'self'");
+    });
+
+    it('includes CSP header on 403 authorization error', async () => {
+      const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
+
+      app.use('*', createSecurityMiddleware({ defaultSrc: ["'none'"] }));
+      registerRoutes(
+        app,
+        {
+          apiRoutes: [
+            {
+              access: 'private',
+              authorize: async () => false,
+              handler: async () => ({ ok: true }),
+              path: '/restricted',
+              type: 'api',
+            },
+          ],
+          app: { root: '/var/www' },
+          security: {
+            auth: { secret: () => secret, strategy: 'bearer' },
+          },
+        },
+        noopLogger,
+        agentCache,
+      );
+      createOpenApiRoutes({} as ServerConfig, app as unknown as Hono);
+
+      const token = await createValidToken({ role: 'admin', sub: 'user-123' });
+      const res = await app.request('/restricted', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(403);
+      const csp = res.headers.get('Content-Security-Policy');
+      expect(csp).toContain("'none'");
     });
   });
 });

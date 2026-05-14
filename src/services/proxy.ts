@@ -254,7 +254,8 @@ export function createProxyService<TApp = unknown>(
       const suffix = c.req.path.startsWith(prefix) ? c.req.path.slice(prefix.length) : '';
       rewrittenPath = rewritePrefix + suffix;
     } else {
-      rewrittenPath = c.req.path.replace(new RegExp(`^${routePath}`), rewritePath);
+      const escapedPath = routePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      rewrittenPath = c.req.path.replace(new RegExp(`^${escapedPath}`), rewritePath);
     }
     const targetUrl = new URL(rewrittenPath, target).toString();
 
