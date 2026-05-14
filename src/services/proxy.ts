@@ -61,7 +61,6 @@ const DEFAULT_FORWARD_HEADERS: string[] = [
   'accept-language',
   'cache-control',
   'content-type',
-  'content-length',
   'origin',
   'user-agent',
   'x-forwarded-for', // Proxy is a trusted intermediary; forward client IP to upstream

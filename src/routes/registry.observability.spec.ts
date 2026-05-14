@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { createAgentCache } from '../services/proxy';
+import { createTestApp, noopLogger } from '../test-utils/index.js';
 import { registerRoutes } from './registry';
-import { createTestApp, noopLogger } from './registry.helpers';
 
 type HalideVariables = { rawBody?: unknown };
 

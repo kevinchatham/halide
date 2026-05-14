@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { createNoopLogger } from '../config/defaults';
 import { createOpenApiRoutes } from '../middleware/swagger';
+import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
-import { registerRoutes } from './registry';
 
 /** Logger instance that discards all log messages, used for testing. */
 export const noopLogger: Logger<unknown> = createNoopLogger();

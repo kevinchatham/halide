@@ -3,11 +3,11 @@ import { sign } from 'hono/jwt';
 import { createSecurityMiddleware } from '../middleware/security';
 import { createOpenApiRoutes } from '../middleware/swagger';
 import { createAgentCache } from '../services/proxy';
+import { createTestApp, noopLogger } from '../test-utils/index.js';
 import type { HalideVariables } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { registerRoutes } from './registry';
 import { createClaimExtractor, NOOP_EXTRACTOR_CACHE } from './registry.auth';
-import { createTestApp, noopLogger } from './registry.helpers';
 
 const secret = 'test-secret';
 

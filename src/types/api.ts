@@ -95,7 +95,7 @@ export type ProxyRoute<TApp = HalideContext> = {
   identity?: (ctx: RequestContext, app: TApp) => Record<string, string> | undefined;
   /** Transform function to modify the request body/headers before forwarding. */
   transform?: TransformFn;
-  /** Headers to forward to upstream. Defaults to a safe subset; omit authorization, cookie, x-forwarded-for. */
+  /** Headers to forward to upstream. Defaults to a safe subset; omits authorization and cookie headers. Includes x-forwarded-for since the proxy is a trusted intermediary. */
   forwardHeaders?: string[];
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { createTestApp } from '../test-utils/index.js';
 import type { ProxyRoute } from '../types/api';
-import { createTestApp } from './registry.helpers';
 import { resolveOpenApiSpec } from './registry.openapi';
 
 vi.mock('../services/proxy', () => ({

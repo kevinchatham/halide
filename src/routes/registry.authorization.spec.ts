@@ -1,4 +1,4 @@
-import { createTestApp } from './registry.helpers';
+import { createTestApp } from '../test-utils/index.js';
 
 describe('registerRoutes — authorization', () => {
   describe('Authorization', () => {

@@ -155,6 +155,9 @@ function registerProxyRoute<TApp extends HalideContext = HalideContext>(
           }
 
           const body = response.body;
+          const abortController = new AbortController();
+          c.req.raw?.signal?.addEventListener('abort', () => abortController.abort());
+
           if (body) {
             const { readable, writable } = new TransformStream();
             const reader = body.getReader();
@@ -166,8 +169,10 @@ function registerProxyRoute<TApp extends HalideContext = HalideContext>(
             async function pipe(): Promise<void> {
               try {
                 while (true) {
+                  if (abortController.signal.aborted) break;
                   const { done, value } = await reader.read();
                   if (done) break;
+                  if (abortController.signal.aborted) break;
                   if (collectedBytes < maxCollect && value) {
                     const slice = value.slice(0, Math.max(0, maxCollect - collectedBytes));
                     collected.push(slice);
@@ -182,6 +187,14 @@ function registerProxyRoute<TApp extends HalideContext = HalideContext>(
               }
             }
 
+            if (abortController.signal.aborted) {
+              reader.cancel();
+              writer.abort();
+              handlerError = new Error('Client disconnected');
+              statusCode = 499;
+              return;
+            }
+
             const pipePromise = pipe();
 
             const responseBodyText =
@@ -190,6 +203,12 @@ function registerProxyRoute<TApp extends HalideContext = HalideContext>(
                 : undefined;
 
             await pipePromise;
+
+            if (abortController.signal.aborted) {
+              handlerError = new Error('Client disconnected');
+              statusCode = 499;
+              return;
+            }
 
             proxyResponseBody = responseBodyText;
             const responseInit: ResponseInit = {
