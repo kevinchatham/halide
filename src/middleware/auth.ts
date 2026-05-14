@@ -9,6 +9,7 @@ type JwkCacheEntry = {
 
 const jwkCache = new Map<string, JwkCacheEntry>();
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
+const jwkRefreshLocks = new Map<string, Promise<void>>();
 const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
 const MAX_JWK_CACHE = 100;
 
@@ -76,6 +77,40 @@ const jwkSweepTimer =
         }
       }, 600_000); // 10 minutes
 jwkSweepTimer?.unref();
+
+/** Background refresh: fetch fresh middleware for entries past half-life. */
+const jwkBackgroundRefreshTimer =
+  typeof vi !== 'undefined'
+    ? null
+    : setInterval(async () => {
+        const now = Date.now();
+        const halfLife = JWKS_CACHE_TTL_MS / 2;
+        for (const [uri, entry] of jwkCache.entries()) {
+          if (entry.expiresAt - now <= halfLife) {
+            const existing = jwkRefreshLocks.get(uri);
+            if (existing) {
+              await existing;
+              continue;
+            }
+            const refreshPromise = (async () => {
+              try {
+                const { jwk } = await import('hono/jwk');
+                const middleware = jwk({
+                  alg: ['RS256'],
+                  jwks_uri: uri,
+                });
+                jwkCache.set(uri, { expiresAt: now + JWKS_CACHE_TTL_MS, middleware });
+              } catch {
+                // Fire-and-forget: don't block other refreshes
+              } finally {
+                jwkRefreshLocks.delete(uri);
+              }
+            })();
+            jwkRefreshLocks.set(uri, refreshPromise);
+          }
+        }
+      }, JWKS_CACHE_TTL_MS / 2); // 30 minutes
+jwkBackgroundRefreshTimer?.unref();
 
 /** Check whether the JWT audience claim matches the expected value. */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {

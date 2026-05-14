@@ -137,7 +137,7 @@ export function createApp<TApp extends HalideContext = HalideContext>(
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes(app, configInput, logger, agentCache);
+  registerRoutes(app, configInput, logger, agentCache, undefined, security?.csp ?? {});
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
 

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import net from 'node:net';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { DEFAULTS } from '../config/defaults';
@@ -10,6 +11,7 @@ const MAX_AGENT_CACHE = 100;
 /** Cached HTTP agent pool with bounded size. */
 export class AgentCache {
   private readonly cache = new Map<string, http.Agent>();
+  private probeResults = new Map<string, boolean>();
 
   getAgent(target: string, maxSockets?: number, maxFreeSockets?: number): http.Agent {
     const key = `${target}|${maxSockets ?? 50}|${maxFreeSockets ?? 10}`;
@@ -33,11 +35,64 @@ export class AgentCache {
     return agent;
   }
 
+  /**
+   * Probe a target URL to check if the upstream is reachable via TCP.
+   *
+   * Opens a brief TCP connection to the target origin's host and port.
+   * For HTTPS targets, this checks TCP reachability without a TLS handshake.
+   *
+   * @param target - The target URL to probe (e.g., `https://api.example.com/v1`).
+   * @param timeoutMs - Connection timeout in milliseconds. Defaults to 5000.
+   * @returns `true` if the connection succeeds, `false` otherwise.
+   */
+  async probe(target: string, timeoutMs?: number): Promise<boolean> {
+    const { hostname, port } = new URL(target.startsWith('http') ? target : `https://${target}`);
+    const probeKey = `${hostname}:${port}`;
+    const timeout = timeoutMs ?? 5_000;
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          socket.destroy();
+          reject(new Error('Probe timed out'));
+        }, timeout);
+        const socket = net.createConnection(Number(port) || 443, hostname, () => {
+          clearTimeout(timer);
+          socket.destroy();
+          resolve();
+        });
+        socket.on('error', (err) => {
+          clearTimeout(timer);
+          socket.destroy();
+          reject(err);
+        });
+      });
+      this.probeResults.set(probeKey, true);
+      return true;
+    } catch {
+      this.probeResults.set(probeKey, false);
+      return false;
+    }
+  }
+
+  /**
+   * Return the last known probe result for a target.
+   *
+   * @param target - The target URL to check.
+   * @returns The last probe result, or `undefined` if not yet probed.
+   */
+  getProbeResult(target: string): boolean | undefined {
+    const { hostname, port } = new URL(target.startsWith('http') ? target : `https://${target}`);
+    const probeKey = `${hostname}:${port}`;
+    return this.probeResults.get(probeKey);
+  }
+
   dispose(): void {
     for (const [, agent] of this.cache) {
       agent.destroy();
     }
     this.cache.clear();
+    this.probeResults.clear();
   }
 }
 

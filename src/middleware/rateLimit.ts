@@ -1,6 +1,9 @@
 import type { Context, Next } from 'hono';
 import ipaddr from 'ipaddr.js';
 
+/** Default maximum number of entries in the in-memory rate limit store. */
+const DEFAULT_MAX_ENTRIES = 10_000;
+
 /** Minimal Redis client interface for rate limiting. */
 export interface RedisClient {
   del(key: string): Promise<number>;
@@ -87,7 +90,7 @@ interface RateLimitStore {
  * @param maxEntries - Maximum number of entries. Oldest entries are evicted when exceeded.
  * @returns A RateLimitStore implementation.
  */
-function createMemoryStore(maxEntries?: number): RateLimitStore {
+function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitStore {
   const store = new Map<string, WindowEntry>();
 
   return {

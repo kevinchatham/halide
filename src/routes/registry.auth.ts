@@ -3,7 +3,7 @@ import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
 import type { AuthorizeFn } from '../types/api';
-import type { Logger, ObservabilityConfig, THalideApp } from '../types/app';
+import type { Logger, ObservabilityConfig, RequestContext, THalideApp } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
@@ -142,6 +142,7 @@ export async function extractClaims<TApp>(
  * @param route - The route with an optional authorize function.
  * @param app - The bundled app context.
  * @param body - The parsed request body for authorization checks.
+ * @param ctx - Optional pre-built request context to avoid recreation.
  * @returns A 403 response if authorization is denied, or null to continue processing.
  */
 export async function checkAuthorization<TApp>(
@@ -149,10 +150,10 @@ export async function checkAuthorization<TApp>(
   route: { authorize?: AuthorizeFn<TApp> },
   app: TApp,
   body: unknown,
+  ctx: RequestContext = buildRequestContextFromHono(c, body),
 ): Promise<Response | null> {
   if (!route.authorize) return null;
   try {
-    const ctx = buildRequestContextFromHono(c, body);
     const allowed = await route.authorize(ctx, app);
     if (!allowed) {
       return createAuthErrorResponse(c, 403, 'Forbidden');
@@ -176,6 +177,7 @@ export async function checkAuthorization<TApp>(
  * @param observability - The observability configuration.
  * @param observe - Whether observability is enabled for this specific route.
  * @param logger - Logger instance for reporting hook errors.
+ * @param ctx - Optional pre-built request context to avoid recreation.
  */
 export function emitOnRequest<TApp>(
   c: Context,
@@ -184,9 +186,9 @@ export function emitOnRequest<TApp>(
   observability: ObservabilityConfig<TApp> | undefined,
   observe: boolean | undefined,
   logger?: Logger<unknown>,
+  ctx: RequestContext = buildRequestContextFromHono(c, body),
 ): void {
   if (observability?.onRequest && observe !== false) {
-    const ctx = buildRequestContextFromHono(c, body);
     try {
       const result = observability.onRequest(ctx, app);
       if (result instanceof Promise) {
@@ -223,9 +225,10 @@ interface ResponseEmitContext {
  * @param app - The bundled app context.
  * @param observability - The observability configuration.
  * @param observe - Whether observability is enabled for this specific route.
- * @param ctx - The response emit context with error, start time, and status code.
+ * @param emitCtx - The response emit context with error, start time, and status code.
  * @param responseBody - The captured response body for logging.
  * @param logger - Logger instance for reporting hook errors.
+ * @param ctx - Optional pre-built request context to avoid recreation.
  */
 export function emitOnResponse<TApp>(
   c: Context,
@@ -233,18 +236,18 @@ export function emitOnResponse<TApp>(
   app: TApp,
   observability: ObservabilityConfig<TApp> | undefined,
   observe: boolean | undefined,
-  ctx: ResponseEmitContext,
+  emitCtx: ResponseEmitContext,
   responseBody?: unknown,
   logger?: Logger<unknown>,
+  ctx: RequestContext = buildRequestContextFromHono(c, body),
 ): void {
   if (observability?.onResponse && observe !== false) {
-    const reqCtx = buildRequestContextFromHono(c, body);
     try {
-      const result = observability.onResponse(reqCtx, app, {
+      const result = observability.onResponse(ctx, app, {
         body: responseBody,
-        durationMs: Date.now() - ctx.start,
-        error: ctx.handlerError,
-        statusCode: ctx.statusCode,
+        durationMs: Date.now() - emitCtx.start,
+        error: emitCtx.handlerError,
+        statusCode: emitCtx.statusCode,
       });
       if (result instanceof Promise) {
         result.catch((err) =>

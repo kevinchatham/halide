@@ -83,7 +83,7 @@ describe('createNoopLogger', () => {
 describe('DEFAULTS', () => {
   it('has expected default values', () => {
     expect(DEFAULTS.route.method).toBe('get');
-    expect(DEFAULTS.proxy.timeoutMs).toBe(60_000);
+    expect(DEFAULTS.proxy.timeoutMs).toBe(10_000);
     expect(DEFAULTS.rateLimit.maxRequests).toBe(100);
     expect(DEFAULTS.rateLimit.windowMs).toBe(900_000);
     expect(DEFAULTS.app.apiPrefix).toBe('/api');

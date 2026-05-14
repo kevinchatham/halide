@@ -1,5 +1,6 @@
 import type { ZodSchema } from 'zod';
 import type { HalideContext, RequestContext } from './app';
+import type { CspDirectives } from './csp';
 
 export type { HalideContext };
 
@@ -53,6 +54,8 @@ export type ApiRoute<TApp = HalideContext, TBody = unknown, TResponse = unknown>
   responseSchema?: ZodSchema<TResponse>;
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
+  /** CSP directives to apply to this route, overriding the global CSP. */
+  csp?: Partial<CspDirectives>;
 };
 
 /**
@@ -95,12 +98,19 @@ export type ProxyRoute<TApp = HalideContext> = {
   identity?: (ctx: RequestContext, app: TApp) => Record<string, string> | undefined;
   /** Transform function to modify the request body/headers before forwarding. */
   transform?: TransformFn;
-  /** Headers to forward to upstream. Defaults to a safe subset; omits authorization and cookie headers. Includes x-forwarded-for since the proxy is a trusted intermediary. */
+  /**
+   * Headers to forward to upstream. Defaults to a safe subset
+   * (accept, accept-encoding, accept-language, cache-control, content-type,
+   * origin, user-agent, x-forwarded-for); omits authorization and cookie
+   * headers. Set to an empty array `[]` to forward no headers at all.
+   */
   forwardHeaders?: string[];
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
   /** External OpenAPI spec source for documenting the proxied API. */
   openapiSpec?: OpenApiSource;
+  /** CSP directives to apply to this route, overriding the global CSP. */
+  csp?: Partial<CspDirectives>;
 };
 
 /**

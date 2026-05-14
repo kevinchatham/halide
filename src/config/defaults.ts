@@ -59,7 +59,7 @@ export const DEFAULTS = {
     version: '1.0.0',
   },
   proxy: {
-    timeoutMs: 60_000,
+    timeoutMs: 10_000,
   },
   rateLimit: {
     maxRequests: 100,
