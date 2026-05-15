@@ -13,12 +13,13 @@ export function createErrorHandler<TLogScope = unknown>(
   return (err: unknown, c: Context) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error && err.stack ? err.stack : undefined;
-    const status = (() => {
-      if (err instanceof globalThis.Error && 'status' in err) {
-        return (err as unknown as { status: number }).status;
-      }
-      return 500;
-    })() as Parameters<typeof c.json>[1];
+    const rawStatus =
+      err instanceof globalThis.Error && 'status' in err
+        ? (err as unknown as { status: number }).status
+        : 500;
+    const status = (rawStatus >= 400 && rawStatus < 600 ? rawStatus : 500) as Parameters<
+      typeof c.json
+    >[1];
     const logScope = {
       ...(stack ? { errorStack: stack } : {}),
     } as TLogScope;

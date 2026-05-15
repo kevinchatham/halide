@@ -98,4 +98,21 @@ describe('createErrorHandler', () => {
     const body = await res.json();
     expect(body).toEqual({ error: 'Internal Server Error' });
   });
+
+  it('preserves valid 5xx status codes', async () => {
+    const app = new Hono();
+    const handler = createErrorHandler(logger);
+    app.onError(handler);
+    app.delete('/resource', () => {
+      const err = new Error('service unavailable') as unknown as Error & { status: number };
+      err.status = 503;
+      throw err;
+    });
+
+    const res = await app.request('/resource', { method: 'DELETE' });
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Internal Server Error' });
+  });
 });
