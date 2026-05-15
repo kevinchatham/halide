@@ -128,7 +128,7 @@ export type ApiRouteHandler<TApp = HalideContext, TBody = unknown, TResponse = u
   ctx: RequestContext & { body: TBody },
   /** Bundled app context with claims and logger. */
   app: TApp,
-) => Promise<TResponse>;
+) => Promise<TResponse | Response>;
 
 /**
  * Authorization function that determines if a request should be allowed.

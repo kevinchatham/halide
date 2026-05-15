@@ -296,6 +296,101 @@ describe('registerRoutes', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('returns Response with custom status', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => new Response('created', { status: 201 }),
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(201);
+    });
+
+    it('returns Response with custom headers', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () =>
+              new Response('ok', {
+                headers: { 'X-Custom': 'value' },
+              }),
+            path: '/headers',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/headers');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Custom')).toBe('value');
+    });
+
+    it('returns Response with 204 no content', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => new Response(null, { status: 204 }),
+            path: '/deleted',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/deleted');
+      expect(res.status).toBe(204);
+    });
+
+    it('returns Response with non-JSON content type', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () =>
+              new Response('plain text', {
+                headers: { 'Content-Type': 'text/plain' },
+              }),
+            path: '/text',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/text');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toContain('text/plain');
+    });
+
+    it('plain object return still works', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ ok: true }),
+            path: '/data',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/data');
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ ok: true });
+    });
   });
 });
 

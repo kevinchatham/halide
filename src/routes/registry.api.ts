@@ -14,6 +14,7 @@ import type {
 import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
 import { parseJsonBody } from '../utils/parseJsonBody.js';
+import { collectProxyBody } from './proxy-body.js';
 import {
   checkAuthorization,
   emitOnRequest,
@@ -47,6 +48,9 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
     const start = Date.now();
     let handlerError: Error | undefined;
     let statusCode = 200;
+    let proxyResponseBody: string | undefined;
+    let pipeError: Error | undefined;
+    let responseToReturn: Response | undefined;
 
     const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
     if (authResponse) return authResponse;
@@ -77,24 +81,71 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
       const handlerCtx = reqCtx as RequestContext & { body: unknown };
       handlerCtx.body = body;
       result = await route.handler(handlerCtx, appCtx);
+
+      if (result instanceof Response) {
+        statusCode = result.status;
+
+        if (route.observe !== false) {
+          const bodyStream = result.body;
+          const abortController = new AbortController();
+          c.req.raw?.signal?.addEventListener('abort', () => abortController.abort());
+
+          if (bodyStream) {
+            const maxCollect = observability?.maxCollect ?? 1024;
+            const {
+              response: pipedResponse,
+              body: responseBodyText,
+              error: collectedPipeError,
+            } = await collectProxyBody(result, abortController.signal, maxCollect);
+
+            if (abortController.signal.aborted) {
+              handlerError = new Error('Client disconnected');
+              statusCode = 499;
+            } else {
+              proxyResponseBody = responseBodyText;
+              if (collectedPipeError) {
+                pipeError = collectedPipeError;
+              }
+
+              responseToReturn = new Response(pipedResponse.body as ReadableStream<Uint8Array>, {
+                headers: pipedResponse.headers,
+                status: pipedResponse.status,
+              });
+            }
+          } else {
+            responseToReturn = result;
+          }
+        } else {
+          responseToReturn = result;
+        }
+      }
     } catch (err) {
       handlerError = err instanceof Error ? err : new Error(String(err));
       statusCode = 500;
       throw err;
     } finally {
+      if (pipeError && !handlerError) {
+        handlerError = pipeError;
+        statusCode = 502;
+      }
       emitOnResponse(
         {
           app: appCtx,
           body,
+          bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
           c,
           emitCtx: { handlerError, start, statusCode },
           logger,
           observability,
           observe: route.observe,
-          responseBody: result,
+          responseBody: proxyResponseBody !== undefined ? proxyResponseBody : result,
         },
         reqCtx,
       );
+    }
+
+    if (responseToReturn) {
+      return responseToReturn;
     }
 
     return c.json(result);

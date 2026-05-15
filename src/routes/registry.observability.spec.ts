@@ -235,5 +235,35 @@ describe('registerRoutes — observability', () => {
       expect(errorLogger.error.mock.calls[0]![1]).toContain('onResponse hook');
       expect(errorLogger.error.mock.calls[0]![1]).toContain('response hook failed');
     });
+
+    it('captures response body from handler returning Response', async () => {
+      const onResponse = vi.fn();
+
+      const app = await createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () =>
+              new Response(JSON.stringify({ hello: 'world' }), {
+                headers: { 'Content-Type': 'application/json' },
+                status: 201,
+              }),
+            path: '/response',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+        observability: { onResponse },
+      });
+
+      const res = await app.request('/response');
+      expect(res.status).toBe(201);
+
+      expect(onResponse).toHaveBeenCalledTimes(1);
+      const call = onResponse.mock.calls[0]!;
+      expect(call[2].statusCode).toBe(201);
+      expect(call[2].bodyType).toBe('text');
+      expect(call[2].body).toBe(JSON.stringify({ hello: 'world' }));
+    });
   });
 });
