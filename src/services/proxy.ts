@@ -353,10 +353,13 @@ export function createProxyService<TApp extends HalideContext = HalideContext>(
       const suffix = c.req.path.startsWith(prefix) ? c.req.path.slice(prefix.length) : '';
       rewrittenPath = rewritePrefix + suffix;
     } else {
-      const escapedPath = routePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      rewrittenPath = c.req.path.replace(new RegExp(`^${escapedPath}`), rewritePath);
+      const params = c.req.param();
+      rewrittenPath = rewritePath;
+      for (const [key, value] of Object.entries(params)) {
+        rewrittenPath = rewrittenPath.replace(`:${key}`, value);
+      }
     }
-    const targetUrl = new URL(rewrittenPath, target).toString();
+    const targetUrl = new URL(rewrittenPath, parsedTarget).toString();
 
     const allHeaders: Record<string, string | undefined> = { ...c.req.header() };
     delete allHeaders['host'];
