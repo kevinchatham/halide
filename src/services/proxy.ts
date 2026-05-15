@@ -3,11 +3,11 @@ import net from 'node:net';
 import tls from 'node:tls';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
-import { MAX_AGENT_CACHE } from '../config/constants.js';
+import { MAX_AGENT_CACHE } from '../config/constants';
 import { DEFAULTS } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
-import { isTrustedProxy } from '../utils/trustedProxies.js';
+import { isTrustedProxy } from '../utils/trustedProxies';
 
 /** Cached HTTP agent pool with bounded size. */
 export class AgentCache {

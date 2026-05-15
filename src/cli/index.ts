@@ -1,6 +1,6 @@
 import process from 'node:process';
 import { parseArgs } from 'node:util';
-import { init } from './commands/init.js';
+import { init } from './commands/init';
 
 const { positionals, values }: { positionals: string[]; values: { 'skills-only'?: boolean } } =
   parseArgs({

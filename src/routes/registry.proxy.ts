@@ -1,6 +1,5 @@
 import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute } from 'hono-openapi';
-import { createSecurityMiddleware } from '../middleware/security.js';
 import type { AgentCache } from '../services/proxy';
 import { createProxyService } from '../services/proxy';
 import type { ProxyRoute } from '../types/api';
@@ -11,13 +10,12 @@ import type {
   RequestContext,
   THalideApp,
 } from '../types/app';
-import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
-import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth.js';
-import { createProxyBodyParser } from './registry.body.js';
-import { registerRouteOnApp as registerRouteOnAppFn } from './registry.js';
-import { buildDescribeRouteOptions } from './registry.openapi.js';
-import { observeAndPipeResponse } from './registry.response.js';
+import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
+import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth';
+import { createProxyBodyParser } from './registry.body';
+import { buildDescribeRouteOptions } from './registry.openapi';
+import { observeAndPipeResponse } from './registry.response';
 
 /** Register a proxy route with auth, observability, and proxy forwarding for each configured method. */
 export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
@@ -27,14 +25,9 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
   observability: ObservabilityConfig<TApp> | undefined,
   logger: THalideApp['logger'],
   agentCache: AgentCache,
-  globalCsp?: CspDirectives,
 ): void {
   for (const method of route.methods) {
     const middlewares: MiddlewareHandler[] = [describeRoute(buildDescribeRouteOptions(route))];
-
-    if (route.csp) {
-      middlewares.push(createSecurityMiddleware(globalCsp ?? {}, route.csp));
-    }
 
     middlewares.push(
       createProxyBodyParser(route),

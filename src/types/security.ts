@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import type { RedisClient } from '../middleware/rateLimit';
 import type { CspDirectives } from './csp';
 
 /**
@@ -80,6 +81,6 @@ export type SecurityConfig = {
     /** Maximum number of entries in the rate limit store. Oldest entries are evicted when exceeded. */
     maxEntries?: number;
     /** Redis client for distributed rate limiting. */
-    redisClient?: import('../middleware/rateLimit.js').RedisClient;
+    redisClient?: RedisClient;
   };
 };

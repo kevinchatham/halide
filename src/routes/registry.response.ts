@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { HalideContext, ObservabilityConfig } from '../types/app';
-import { collectProxyBody } from './proxy-body.js';
+import { collectProxyBody } from './proxy-body';
 
 /** Result of response body collection with streaming. */
 export type PipeResult = {

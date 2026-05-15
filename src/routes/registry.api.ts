@@ -1,7 +1,6 @@
 import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute, validator } from 'hono-openapi';
 import { DEFAULTS } from '../config/defaults';
-import { createSecurityMiddleware } from '../middleware/security.js';
 import type { ApiRoute } from '../types/api';
 import type {
   HalideContext,
@@ -10,13 +9,12 @@ import type {
   RequestContext,
   THalideApp,
 } from '../types/app';
-import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
-import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth.js';
-import { createApiBodyParser } from './registry.body.js';
-import { registerRouteOnApp as registerRouteOnAppFn } from './registry.js';
-import { buildDescribeRouteOptions } from './registry.openapi.js';
-import { observeAndPipeResponse } from './registry.response.js';
+import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
+import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth';
+import { createApiBodyParser } from './registry.body';
+import { buildDescribeRouteOptions } from './registry.openapi';
+import { observeAndPipeResponse } from './registry.response';
 
 /** Register an API route with validator, describeRoute, auth, and handler middleware. */
 export function registerApiRoute<TApp extends HalideContext = HalideContext>(
@@ -25,17 +23,12 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
   claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
   observability: ObservabilityConfig<TApp> | undefined,
   logger: THalideApp['logger'],
-  globalCsp?: CspDirectives,
 ): void {
   const method = route.method ?? DEFAULTS.route.method;
   const middlewares: MiddlewareHandler[] = [];
 
   if (route.requestSchema) {
     middlewares.push(validator('json', route.requestSchema));
-  }
-
-  if (route.csp) {
-    middlewares.push(createSecurityMiddleware(globalCsp ?? {}, route.csp));
   }
 
   middlewares.push(

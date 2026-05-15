@@ -1,4 +1,4 @@
-import { createTestApp } from '../test-utils/index.js';
+import { createTestApp } from '../test-utils';
 
 describe('registerRoutes — authorization', () => {
   describe('Authorization', () => {

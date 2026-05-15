@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DescribeRouteOptions, ResponsesWithResolver } from 'hono-openapi';
 import { resolver } from 'hono-openapi';
-import { OPENAPI_FETCH_TIMEOUT_MS } from '../config/constants.js';
+import { OPENAPI_FETCH_TIMEOUT_MS } from '../config/constants';
 import type { ApiRoute, HalideContext, ProxyRoute } from '../types/api';
 import type { OpenApiSource, ResolvedOpenApiSpec } from '../types/openapi';
 

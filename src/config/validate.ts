@@ -1,5 +1,5 @@
-import type { Logger } from '../types/app.js';
-import { serverConfigSchema } from './schema.js';
+import type { Logger } from '../types/app';
+import { serverConfigSchema } from './schema';
 
 /** Partial auth config for async secret validation. */
 type AuthInput = {

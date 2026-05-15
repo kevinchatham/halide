@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import { getClientIp } from '../utils/trustedProxies.js';
+import { getClientIp } from '../utils/trustedProxies';
 
 /** Default maximum number of entries in the in-memory rate limit store. */
 const DEFAULT_MAX_ENTRIES = 10_000;

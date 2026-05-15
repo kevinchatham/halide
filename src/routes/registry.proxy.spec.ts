@@ -2,26 +2,6 @@ import { createTestApp } from '../test-utils/index.js';
 
 describe('registerRoutes — proxy', () => {
   describe('Proxy routes', () => {
-    it('applies route-level CSP when configured', async () => {
-      const app = await createTestApp({
-        app: { root: '/var/www' },
-        proxyRoutes: [
-          {
-            access: 'public',
-            csp: { defaultSrc: ["'self'"] },
-            methods: ['get'],
-            path: '/csp-test',
-            target: 'https://api.example.com',
-            type: 'proxy',
-          },
-        ],
-      });
-
-      const res = await app.request('/csp-test');
-      expect(res.status).toBeLessThan(600);
-      expect(res.headers.get('content-security-policy')).toBeTruthy();
-    });
-
     it('registers public proxy routes', async () => {
       const app = await createTestApp({
         app: { root: '/var/www' },

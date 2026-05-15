@@ -4,19 +4,20 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
-import { createErrorHandler } from '../middleware/errorHandler.js';
-import type { SpecCacheState } from '../middleware/openapi.js';
-import { createOpenApiRoutes } from '../middleware/openapi.js';
-import { createRateLimitMiddleware, createRedisRateLimitStore } from '../middleware/rateLimit.js';
-import { createRequestIdMiddleware } from '../middleware/requestId.js';
-import { createSecurityMiddleware } from '../middleware/security.js';
-import { createAppHandler } from '../routes/app.js';
-import { registerRoutes } from '../routes/registry.js';
-import { createAgentCache } from '../services/proxy.js';
-import type { AppConfig, HalideContext, HalideVariables, Logger } from '../types/app.js';
-import type { ServerConfig } from '../types/server-config.js';
-import { createDefaultLogger, DEFAULTS } from './defaults.js';
-import { validateServerConfigSync } from './validate.js';
+import { createErrorHandler } from '../middleware/errorHandler';
+import type { SpecCacheState } from '../middleware/openapi';
+import { createOpenApiRoutes } from '../middleware/openapi';
+import { createRateLimitMiddleware, createRedisRateLimitStore } from '../middleware/rateLimit';
+import { createRequestIdMiddleware } from '../middleware/requestId';
+import { createSecurityMiddleware } from '../middleware/security';
+import { createAppHandler } from '../routes/app';
+import { registerRoutes } from '../routes/registry';
+import { createAgentCache } from '../services/proxy';
+import type { AppConfig, HalideContext, HalideVariables, Logger } from '../types/app';
+import type { CspDirectives } from '../types/csp';
+import type { ServerConfig } from '../types/server-config';
+import { createDefaultLogger, DEFAULTS } from './defaults';
+import { validateServerConfigSync } from './validate';
 
 /**
  * Halide HTTP server with lifecycle management.
@@ -130,9 +131,7 @@ export function createApp<TApp extends HalideContext = HalideContext>(
       { appName } as unknown,
       `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
     );
-    const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<
-      import('../types/csp.js').CspDirectives
-    >;
+    const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<CspDirectives>;
     const swaggerPath = configInput.openapi?.path ?? DEFAULTS.openapi.path;
     app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
     app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
@@ -144,18 +143,19 @@ export function createApp<TApp extends HalideContext = HalideContext>(
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes(app, configInput, logger, agentCache, undefined, security?.csp ?? {});
+  registerRoutes(app, configInput, logger, agentCache);
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
 
   createOpenApiRoutes(configInput, app as unknown as Hono, specCacheState);
 
   if (configInput.app?.root) {
-    const { staticMiddleware, appFallback } = createAppHandler(
+    const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
       configInput.app as AppConfig & { root: string },
+      security?.csp,
     );
-    app.get('/*', staticMiddleware);
-    app.all('/*', appFallback);
+    app.get('/*', cspMiddleware, staticMiddleware);
+    app.all('/*', cspMiddleware, appFallback);
   }
 
   app.onError(createErrorHandler(logger));

@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
-import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE, MAX_JWK_LOCKS } from '../config/constants.js';
+import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE, MAX_JWK_LOCKS } from '../config/constants';
 
 /** Per-URI JWKS cache entry with TTL. */
 type JwkCacheEntry = {

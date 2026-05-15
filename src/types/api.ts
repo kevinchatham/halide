@@ -1,6 +1,5 @@
 import type { ZodSchema } from 'zod';
 import type { HalideContext, RequestContext } from './app';
-import type { CspDirectives } from './csp';
 
 export type { HalideContext };
 
@@ -54,8 +53,6 @@ export type ApiRoute<TApp = HalideContext, TBody = unknown, TResponse = unknown>
   responseSchema?: ZodSchema<TResponse>;
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
-  /** CSP directives to apply to this route, overriding the global CSP. */
-  csp?: Partial<CspDirectives>;
 };
 
 /**
@@ -113,8 +110,6 @@ export type ProxyRoute<TApp = HalideContext> = {
   openapi?: OpenApiRouteMeta;
   /** External OpenAPI spec source for documenting the proxied API. */
   openapiSpec?: OpenApiSource;
-  /** CSP directives to apply to this route, overriding the global CSP. */
-  csp?: Partial<CspDirectives>;
 };
 
 /**

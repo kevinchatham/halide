@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
-import { MAX_EXTRACTOR_CACHE } from '../config/constants.js';
+import { MAX_EXTRACTOR_CACHE } from '../config/constants';
 import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';

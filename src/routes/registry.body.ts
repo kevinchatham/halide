@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type { HalideContext } from '../types/app';
-import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody.js';
+import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody';
 
 /** Hono method types that have a request body. */
 type BodyMethod = 'post' | 'put' | 'patch';

@@ -1,15 +1,14 @@
 import type { Hono, MiddlewareHandler } from 'hono';
 import type { createAgentCache } from '../services/proxy';
 import type { HalideContext, HalideVariables, THalideApp } from '../types/app';
-import type { CspDirectives } from '../types/csp';
 import type { ServerConfig } from '../types/server-config';
-import { registerApiRoute as registerApiRouteFn } from './registry.api.js';
+import { registerApiRoute as registerApiRouteFn } from './registry.api';
 import {
   type ClaimExtractorCache,
   createClaimExtractor,
   NOOP_EXTRACTOR_CACHE,
-} from './registry.auth.js';
-import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy.js';
+} from './registry.auth';
+import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy';
 
 export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registerProxyRoute };
 
@@ -49,7 +48,6 @@ export function registerRouteOnApp(
  * @param logger - Logger instance for observability.
  * @param agentCache - The HTTP agent cache for proxy connections.
  * @param claimExtractorCache - The claim extractor cache instance.
- * @param globalCsp - Global CSP directives to use as base for route-level overrides.
  */
 export function registerRoutes<TApp extends HalideContext = HalideContext>(
   app: Hono<{ Variables: HalideVariables }>,
@@ -57,27 +55,18 @@ export function registerRoutes<TApp extends HalideContext = HalideContext>(
   logger: THalideApp['logger'],
   agentCache: ReturnType<typeof createAgentCache>,
   claimExtractorCache: ClaimExtractorCache = NOOP_EXTRACTOR_CACHE,
-  globalCsp?: CspDirectives,
 ): void {
   const claimExtractor = createClaimExtractor<TApp>(config, logger, claimExtractorCache);
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {
-      registerApiRouteFn(app, route, claimExtractor, config.observability, logger, globalCsp);
+      registerApiRouteFn(app, route, claimExtractor, config.observability, logger);
     }
   }
 
   if (config.proxyRoutes) {
     for (const route of config.proxyRoutes) {
-      registerProxyRouteFn(
-        app,
-        route,
-        claimExtractor,
-        config.observability,
-        logger,
-        agentCache,
-        globalCsp,
-      );
+      registerProxyRouteFn(app, route, claimExtractor, config.observability, logger, agentCache);
     }
   }
 }
