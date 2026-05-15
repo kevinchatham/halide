@@ -2,7 +2,7 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute } from 'hono-openapi';
 import { createSecurityMiddleware } from '../middleware/security.js';
 import type { AgentCache } from '../services/proxy';
-import { buildRequestContextFromHono, createProxyService } from '../services/proxy';
+import { createProxyService } from '../services/proxy';
 import type { ProxyRoute } from '../types/api';
 import type {
   HalideContext,
@@ -13,16 +13,11 @@ import type {
 } from '../types/app';
 import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
-import { parseJsonBody } from '../utils/parseJsonBody.js';
-import { collectProxyBody } from './proxy-body.js';
-import {
-  checkAuthorization,
-  emitOnRequest,
-  emitOnResponse,
-  extractClaims,
-} from './registry.auth.js';
+import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth.js';
+import { createProxyBodyParser } from './registry.body.js';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry.js';
 import { buildDescribeRouteOptions } from './registry.openapi.js';
+import { observeAndPipeResponse } from './registry.response.js';
 
 /** Register a proxy route with auth, observability, and proxy forwarding for each configured method. */
 export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
@@ -41,99 +36,92 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
       middlewares.push(createSecurityMiddleware(globalCsp ?? {}, route.csp));
     }
 
-    middlewares.push(async (c: Context) => {
-      const start = Date.now();
-      let handlerError: Error | undefined;
-      let pipeError: Error | undefined;
-      let statusCode = 200;
-      let proxyResponseBody: unknown;
-
-      let parsedBody: unknown;
-      if (route.transform) {
-        parsedBody = await parseJsonBody(c);
-        if (parsedBody instanceof Response) return parsedBody;
-        c.set('rawBody', parsedBody);
-      }
-
-      const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
-      if (authResponse) return authResponse;
-
-      const appCtx: TApp = { claims, logger } as TApp;
-      const reqCtx = buildRequestContextFromHono(c, parsedBody) as RequestContext;
-      const forbidResponse = await checkAuthorization(c, route, appCtx, parsedBody, reqCtx);
-      if (forbidResponse) return forbidResponse;
-
-      emitOnRequest(
-        { app: appCtx, body: parsedBody, c, logger, observability, observe: route.observe },
-        reqCtx,
-      );
-
-      try {
-        const proxyHandler = createProxyService(route, appCtx, agentCache, parsedBody);
-        const response = await proxyHandler(c);
-        statusCode = response.status;
-
-        if (route.observe === false) {
-          return response;
-        }
-
-        const body = response.body;
-        const abortController = new AbortController();
-        c.req.raw?.signal?.addEventListener('abort', () => abortController.abort());
-
-        if (body) {
-          const maxCollect = observability?.maxCollect ?? 1024;
-          const {
-            response: pipedResponse,
-            body: responseBodyText,
-            error: collectedPipeError,
-          } = await collectProxyBody(response, abortController.signal, maxCollect);
-
-          if (abortController.signal.aborted) {
-            handlerError = new Error('Client disconnected');
-            statusCode = 499;
-            return;
-          } else {
-            proxyResponseBody = responseBodyText;
-            if (collectedPipeError) {
-              pipeError = collectedPipeError;
-            }
-          }
-
-          const responseInit: ResponseInit = {
-            headers: pipedResponse.headers,
-            status: pipedResponse.status,
-          };
-          return new Response(pipedResponse.body as ReadableStream<Uint8Array>, responseInit);
-        }
-
-        return response;
-      } catch (err) {
-        handlerError = err instanceof Error ? err : new Error(String(err));
-        statusCode = 500;
-        throw err;
-      } finally {
-        if (pipeError && !handlerError) {
-          handlerError = pipeError;
-          statusCode = 502;
-        }
-        emitOnResponse(
-          {
-            app: appCtx,
-            body: parsedBody,
-            bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
-            c,
-            emitCtx: { handlerError, start, statusCode },
-            logger,
-            observability,
-            observe: route.observe,
-            responseBody: proxyResponseBody,
-          },
-          reqCtx,
-        );
-      }
-    });
+    middlewares.push(
+      createProxyBodyParser(route),
+      createAuthMiddleware(route, claimExtractor, logger),
+      createProxyHandler(route, agentCache, observability, logger),
+    );
 
     registerRouteOnAppFn(app, method, route.path, ...middlewares);
   }
+}
+
+/**
+ * Create a proxy handler middleware that executes the proxy service and manages
+ * response collection and observability hooks.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param route - The proxy route definition.
+ * @param agentCache - The HTTP agent cache for proxy connections.
+ * @param observability - The observability configuration.
+ * @param logger - Logger instance for error reporting.
+ * @returns A Hono middleware handler.
+ */
+function createProxyHandler<TApp extends HalideContext = HalideContext>(
+  route: ProxyRoute<TApp>,
+  agentCache: AgentCache,
+  observability: ObservabilityConfig<TApp> | undefined,
+  logger: THalideApp['logger'],
+): MiddlewareHandler {
+  return async (c: Context) => {
+    const start = Date.now();
+    let handlerError: Error | undefined;
+    let pipeError: Error | undefined;
+    let statusCode = 200;
+    let proxyResponseBody: unknown;
+
+    const appCtx = c.get('appCtx') as TApp;
+    const reqCtx = c.get('reqCtx') as RequestContext;
+    const body = c.get('parsedBody');
+
+    emitOnRequest({ app: appCtx, body, c, logger, observability, observe: route.observe }, reqCtx);
+
+    try {
+      const proxyHandler = createProxyService(route, appCtx, agentCache, body);
+      const response = await proxyHandler(c);
+      statusCode = response.status;
+
+      if (route.observe === false) {
+        return response;
+      }
+
+      const pipeResult = await observeAndPipeResponse(c, response, observability, route.observe);
+
+      if (pipeResult.aborted) {
+        handlerError = new Error('Client disconnected');
+        statusCode = 499;
+        return;
+      }
+
+      proxyResponseBody = pipeResult.body;
+      if (pipeResult.pipeError) {
+        pipeError = pipeResult.pipeError;
+      }
+
+      return pipeResult.response;
+    } catch (err) {
+      handlerError = err instanceof Error ? err : new Error(String(err));
+      statusCode = 500;
+      throw err;
+    } finally {
+      if (pipeError && !handlerError) {
+        handlerError = pipeError;
+        statusCode = 502;
+      }
+      emitOnResponse(
+        {
+          app: appCtx,
+          body,
+          bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
+          c,
+          emitCtx: { handlerError, start, statusCode },
+          logger,
+          observability,
+          observe: route.observe,
+          responseBody: proxyResponseBody,
+        },
+        reqCtx,
+      );
+    }
+  };
 }

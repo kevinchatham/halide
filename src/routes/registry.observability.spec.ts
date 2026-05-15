@@ -3,7 +3,7 @@ import { createAgentCache } from '../services/proxy';
 import { createTestApp, noopLogger } from '../test-utils/index.js';
 import { registerRoutes } from './registry';
 
-type HalideVariables = { rawBody?: unknown };
+type HalideVariables = { parsedBody?: unknown };
 
 describe('registerRoutes — observability', () => {
   describe('Observability', () => {

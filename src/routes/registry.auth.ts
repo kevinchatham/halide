@@ -1,9 +1,16 @@
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler, Next } from 'hono';
 import { MAX_EXTRACTOR_CACHE } from '../config/constants.js';
 import { DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
+import { buildRequestContextFromHono } from '../services/proxy';
 import type { AuthorizeFn } from '../types/api';
-import type { Logger, ObservabilityConfig, RequestContext, THalideApp } from '../types/app';
+import type {
+  HalideContext,
+  Logger,
+  ObservabilityConfig,
+  RequestContext,
+  THalideApp,
+} from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
@@ -264,4 +271,40 @@ export function emitOnResponse<TApp>(config: ResponseEmitConfig<TApp>, ctx: Requ
       );
     }
   }
+}
+
+/**
+ * Create an auth middleware that extracts claims, builds context objects,
+ * and checks authorization.
+ *
+ * Stores c.set('appCtx', { claims, logger }) and c.set('reqCtx', requestCtx)
+ * for downstream middleware. Returns 401 on auth failure, 403 on authorization
+ * denial.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param route - The route definition (provides access level and authorize function).
+ * @param claimExtractor - The configured claim extractor function.
+ * @param logger - Logger instance for error reporting.
+ * @returns A Hono middleware handler.
+ */
+export function createAuthMiddleware<TApp extends HalideContext = HalideContext>(
+  route: { access: string; authorize?: AuthorizeFn<TApp> },
+  claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
+  logger: THalideApp['logger'],
+): MiddlewareHandler {
+  return async (c: Context, next: Next) => {
+    const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
+    if (authResponse) return authResponse;
+
+    const body = c.get('parsedBody');
+    const appCtx: TApp = { claims, logger } as TApp;
+    const reqCtx = buildRequestContextFromHono(c, body) as RequestContext;
+
+    const forbidResponse = await checkAuthorization(c, route, appCtx, body, reqCtx);
+    if (forbidResponse) return forbidResponse;
+
+    c.set('appCtx', appCtx);
+    c.set('reqCtx', reqCtx);
+    return next();
+  };
 }

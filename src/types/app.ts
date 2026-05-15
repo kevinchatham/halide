@@ -120,7 +120,11 @@ export type AppConfig = {
 /**
  * Hono context variables used internally by Halide middleware.
  */
-export type HalideVariables = { rawBody?: unknown };
+export type HalideVariables = {
+  parsedBody?: unknown;
+  appCtx?: HalideContext;
+  reqCtx?: RequestContext;
+};
 
 /**
  * Configuration for observability features: logging, request IDs, and lifecycle hooks.

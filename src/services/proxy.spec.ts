@@ -110,7 +110,7 @@ describe('createProxyService', () => {
 
     const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
-    const app = new Hono<{ Variables: { rawBody?: unknown } }>();
+    const app = new Hono<{ Variables: { parsedBody?: unknown } }>();
     app.post('/api/data', handler);
 
     await app.request('/api/data', {

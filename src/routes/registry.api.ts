@@ -2,7 +2,6 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute, validator } from 'hono-openapi';
 import { DEFAULTS } from '../config/defaults';
 import { createSecurityMiddleware } from '../middleware/security.js';
-import { buildRequestContextFromHono } from '../services/proxy';
 import type { ApiRoute } from '../types/api';
 import type {
   HalideContext,
@@ -13,16 +12,11 @@ import type {
 } from '../types/app';
 import type { CspDirectives } from '../types/csp.js';
 import type { ClaimExtractor } from '../types/security';
-import { parseJsonBody } from '../utils/parseJsonBody.js';
-import { collectProxyBody } from './proxy-body.js';
-import {
-  checkAuthorization,
-  emitOnRequest,
-  emitOnResponse,
-  extractClaims,
-} from './registry.auth.js';
+import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth.js';
+import { createApiBodyParser } from './registry.body.js';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry.js';
 import { buildDescribeRouteOptions } from './registry.openapi.js';
+import { observeAndPipeResponse } from './registry.response.js';
 
 /** Register an API route with validator, describeRoute, auth, and handler middleware. */
 export function registerApiRoute<TApp extends HalideContext = HalideContext>(
@@ -44,7 +38,32 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
     middlewares.push(createSecurityMiddleware(globalCsp ?? {}, route.csp));
   }
 
-  middlewares.push(describeRoute(buildDescribeRouteOptions(route)), async (c: Context) => {
+  middlewares.push(
+    describeRoute(buildDescribeRouteOptions(route)),
+    createApiBodyParser(route),
+    createAuthMiddleware(route, claimExtractor, logger),
+    createApiHandler(route, observability, logger),
+  );
+
+  registerRouteOnAppFn(app, method, route.path, ...middlewares);
+}
+
+/**
+ * Create an API handler middleware that executes the route handler and manages
+ * response collection and observability hooks.
+ *
+ * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @param route - The API route definition.
+ * @param observability - The observability configuration.
+ * @param logger - Logger instance for error reporting.
+ * @returns A Hono middleware handler.
+ */
+function createApiHandler<TApp extends HalideContext = HalideContext>(
+  route: ApiRoute<TApp>,
+  observability: ObservabilityConfig<TApp> | undefined,
+  logger: THalideApp['logger'],
+): MiddlewareHandler {
+  return async (c: Context) => {
     const start = Date.now();
     let handlerError: Error | undefined;
     let statusCode = 200;
@@ -52,27 +71,9 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
     let pipeError: Error | undefined;
     let responseToReturn: Response | undefined;
 
-    const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
-    if (authResponse) return authResponse;
-
-    let body: unknown;
-    if (route.requestSchema) {
-      body = (c.req as { valid: (format: string) => unknown }).valid('json');
-    } else {
-      const methodsWithBody = new Set(['POST', 'PUT', 'PATCH']);
-      if (methodsWithBody.has(c.req.method.toUpperCase())) {
-        const raw = c.req.raw;
-        if (raw.body) {
-          const parsed = await parseJsonBody(c);
-          if (parsed instanceof Response) return parsed;
-          body = parsed;
-        }
-      }
-    }
-    const appCtx: TApp = { claims, logger } as TApp;
-    const reqCtx = buildRequestContextFromHono(c, body) as RequestContext;
-    const forbidResponse = await checkAuthorization(c, route, appCtx, body, reqCtx);
-    if (forbidResponse) return forbidResponse;
+    const appCtx = c.get('appCtx') as TApp;
+    const reqCtx = c.get('reqCtx') as RequestContext;
+    const body = c.get('parsedBody');
 
     emitOnRequest({ app: appCtx, body, c, logger, observability, observe: route.observe }, reqCtx);
 
@@ -84,39 +85,17 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
 
       if (result instanceof Response) {
         statusCode = result.status;
+        const pipeResult = await observeAndPipeResponse(c, result, observability, route.observe);
 
-        if (route.observe !== false) {
-          const bodyStream = result.body;
-          const abortController = new AbortController();
-          c.req.raw?.signal?.addEventListener('abort', () => abortController.abort());
-
-          if (bodyStream) {
-            const maxCollect = observability?.maxCollect ?? 1024;
-            const {
-              response: pipedResponse,
-              body: responseBodyText,
-              error: collectedPipeError,
-            } = await collectProxyBody(result, abortController.signal, maxCollect);
-
-            if (abortController.signal.aborted) {
-              handlerError = new Error('Client disconnected');
-              statusCode = 499;
-            } else {
-              proxyResponseBody = responseBodyText;
-              if (collectedPipeError) {
-                pipeError = collectedPipeError;
-              }
-
-              responseToReturn = new Response(pipedResponse.body as ReadableStream<Uint8Array>, {
-                headers: pipedResponse.headers,
-                status: pipedResponse.status,
-              });
-            }
-          } else {
-            responseToReturn = result;
-          }
+        if (pipeResult.aborted) {
+          handlerError = new Error('Client disconnected');
+          statusCode = 499;
         } else {
-          responseToReturn = result;
+          proxyResponseBody = pipeResult.body;
+          if (pipeResult.pipeError) {
+            pipeError = pipeResult.pipeError;
+          }
+          responseToReturn = pipeResult.response;
         }
       }
     } catch (err) {
@@ -128,20 +107,22 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
         handlerError = pipeError;
         statusCode = 502;
       }
-      emitOnResponse(
-        {
-          app: appCtx,
-          body,
-          bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
-          c,
-          emitCtx: { handlerError, start, statusCode },
-          logger,
-          observability,
-          observe: route.observe,
-          responseBody: proxyResponseBody !== undefined ? proxyResponseBody : result,
-        },
-        reqCtx,
-      );
+      if (route.observe !== false) {
+        emitOnResponse(
+          {
+            app: appCtx,
+            body,
+            bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
+            c,
+            emitCtx: { handlerError, start, statusCode },
+            logger,
+            observability,
+            observe: route.observe,
+            responseBody: proxyResponseBody !== undefined ? proxyResponseBody : result,
+          },
+          reqCtx,
+        );
+      }
     }
 
     if (responseToReturn) {
@@ -149,7 +130,5 @@ export function registerApiRoute<TApp extends HalideContext = HalideContext>(
     }
 
     return c.json(result);
-  });
-
-  registerRouteOnAppFn(app, method, route.path, ...middlewares);
+  };
 }
