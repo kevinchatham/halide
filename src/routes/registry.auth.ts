@@ -15,6 +15,11 @@ import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
+/** Wrap a string secret as a fetcher function with an explicit return type. */
+function stringSecretFetcher(s: string): () => string | Promise<string> {
+  return () => s;
+}
+
 /** Cache for claim extractors keyed by auth strategy. */
 export class ClaimExtractorCache {
   private readonly cache = new Map<string, ClaimExtractor<unknown> | undefined>();
@@ -88,8 +93,10 @@ export function createClaimExtractor<TApp = unknown>(
     const { secret, audience, secretTtl, algorithms } = auth;
     const ttl = secretTtl ?? DEFAULTS.auth.secretTtl;
     const cachedResolver = createSecretCache(ttl, logger);
+    const secretFetcher: () => string | Promise<string> =
+      typeof secret === 'string' ? stringSecretFetcher(secret) : secret;
     result = async (c: Context): Promise<THalideApp<TApp>['claims'] | null> => {
-      const resolvedSecret = await cachedResolver(secret);
+      const resolvedSecret = await cachedResolver(secretFetcher);
       return extractBearerClaims<THalideApp<TApp>['claims']>(
         c,
         resolvedSecret,

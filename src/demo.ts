@@ -12,19 +12,20 @@
  */
 
 import { z } from 'zod';
-import { createServer, type Server } from './config/runtime'; // from 'halide';
-import { apiRoute, proxyRoute } from './index';
-import type { ApiRoute, ProxyRoute } from './types/api';
 import type {
+  ApiRoute,
   AppConfig,
   ObservabilityConfig,
+  OpenApiConfig,
+  ProxyRoute,
   RequestContext,
   ResponseContext,
+  SecurityConfig,
+  Server,
+  ServerConfig,
   THalideApp,
-} from './types/app';
-import type { OpenApiConfig } from './types/openapi';
-import type { SecurityConfig } from './types/security';
-import type { ServerConfig } from './types/server-config';
+} from './index';
+import { apiRoute, createServer, proxyRoute } from './index';
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {

@@ -45,10 +45,10 @@ export type SecurityAuthConfig = {
    */
   strategy?: 'bearer' | 'jwks';
   /**
-   * Function that returns the JWT signing secret. Can return a string
-   * synchronously or a Promise for async secret resolution (e.g., from a vault).
+   * JWT signing secret. Can be a plain string or a function that returns the
+   * secret synchronously or asynchronously (e.g., from a vault).
    */
-  secret?: () => string | Promise<string>;
+  secret?: string | (() => string | Promise<string>);
   /**
    * Time-to-live (seconds) for caching the resolved secret. Useful when
    * secret is an async function. Defaults to 60.

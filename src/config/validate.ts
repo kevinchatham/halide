@@ -1,11 +1,9 @@
 import type { Logger } from '../types/app';
+import type { SecurityAuthConfig } from '../types/security';
 import { serverConfigSchema } from './schema';
 
 /** Partial auth config for async secret validation. */
-type AuthInput = {
-  strategy?: 'bearer' | 'jwks';
-  secret?: string | (() => string | Promise<string>);
-};
+type AuthInput = Pick<SecurityAuthConfig, 'strategy' | 'secret'>;
 
 /** A single validation error with field location and message. */
 export type ValidationError = {
@@ -52,6 +50,24 @@ function collectValidationWarnings(config: Record<string, unknown>): ValidationE
 }
 
 /**
+ * Shared sync validation: parse Zod schema and collect warnings.
+ * Returns a tuple of (errors, warnings) without throwing.
+ */
+function parseConfig<TConfig extends Record<string, unknown>>(
+  config: TConfig,
+): { errors: ValidationError[]; warnings: ValidationError[] } {
+  const result = serverConfigSchema.safeParse(config);
+  const errors: ValidationError[] = result.success
+    ? []
+    : result.error.issues.map((issue) => ({
+        field: issue.path.join('.') || 'unknown',
+        message: issue.message,
+      }));
+  const warnings = result.success ? collectValidationWarnings(config) : [];
+  return { errors, warnings };
+}
+
+/**
  * Validate an async auth secret by calling it and checking the resolved value.
  * Zod already validates string-based secrets synchronously; this only handles
  * function-based secrets that return a Promise.
@@ -87,6 +103,8 @@ export async function validateAuthSecret(auth?: AuthInput): Promise<ValidationRe
 /**
  * Synchronously validate a server configuration object.
  * Uses Zod schemas with superRefine for structural and cross-field validation.
+ * Throws if the config contains function-based auth secrets, as they cannot be
+ * validated synchronously — use `validateServerConfig` for async secret support.
  * @typeParam TConfig - The server configuration type.
  * @param config - The server configuration to validate.
  * @param logger - Optional logger for emitting validation warnings.
@@ -96,18 +114,25 @@ export function validateServerConfigSync<TConfig extends Record<string, unknown>
   config: TConfig,
   logger?: Logger<unknown>,
 ): void {
-  const result = serverConfigSchema.safeParse(config);
-  if (!result.success) {
-    const errors: ValidationError[] = result.error.issues.map((issue) => ({
-      field: issue.path.join('.') || 'unknown',
-      message: issue.message,
-    }));
+  const { errors, warnings } = parseConfig(config);
+
+  // Reject function-based secrets — they require async resolution
+  const auth = (config as { security?: { auth?: AuthInput } })?.security?.auth;
+  if (auth?.secret && typeof auth.secret === 'function') {
+    errors.push({
+      field: 'security.auth.secret',
+      message:
+        'Function-based auth secrets cannot be validated synchronously. Pass a string secret, or use `validateServerConfig` for async secret resolution.',
+    });
+  }
+
+  if (errors.length > 0) {
     throw new Error(
       'Configuration validation failed:\n' +
         errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
     );
   }
-  const warnings = collectValidationWarnings(config);
+
   for (const w of warnings) {
     logger?.warn(`[Halide] ${w.field}: ${w.message}`);
   }
@@ -125,18 +150,12 @@ export function validateServerConfigSync<TConfig extends Record<string, unknown>
 export async function validateServerConfig<TConfig extends Record<string, unknown>>(
   config: TConfig,
 ): Promise<ValidationResult> {
-  const result = serverConfigSchema.safeParse(config);
-  const errors: ValidationError[] = result.success
-    ? []
-    : result.error.issues.map((issue) => ({
-        field: issue.path.join('.') || 'unknown',
-        message: issue.message,
-      }));
-  const warnings = result.success ? collectValidationWarnings(config) : [];
+  const { errors, warnings } = parseConfig(config);
 
   // Run async auth secret validation (function-based secrets only; string secrets are validated by Zod)
-  const authForSecret = (config as Record<string, unknown>)?.security as { auth?: AuthInput };
-  const asyncResult = await validateAuthSecret(authForSecret?.auth);
+  const asyncResult = await validateAuthSecret(
+    (config as { security?: { auth?: AuthInput } })?.security?.auth,
+  );
   const asyncErrors = asyncResult.errors;
 
   const allErrors = [...errors, ...asyncErrors];

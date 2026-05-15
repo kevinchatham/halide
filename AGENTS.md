@@ -80,6 +80,6 @@ Directory structure:
 - `observability.onRequest`/`onResponse` hooks fire per-route; set `observe: false` to skip.
 - `security.auth.secret` can be async; `secretTtl` (default 60s) controls cache.
 - Proxy routes support `identity`, `transform`, and `authorize` per route.
-- Proxy routes forward `x-forwarded-for` by default (see `DEFAULT_FORWARD_HEADERS` in `proxy.ts`). Consumers relying on client IP detection should account for this. To disable, set `forwardHeaders: []` on the proxy route.
+- Proxy routes do **not** forward `x-forwarded-for` by default — it is not in `DEFAULT_FORWARD_HEADERS`. To enable it, include `'x-forwarded-for'` in `forwardHeaders` **and** configure `trustedProxies`; the header is only forwarded when the socket IP matches a trusted proxy. To suppress it entirely, set `forwardHeaders: []`.
 - Rate limit uses in-memory store with internal `dispose` cleanup.
 - Published files: `dist`, `LICENSE`, `package.json`, `README.md` (see `files` in `package.json`).

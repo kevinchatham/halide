@@ -57,7 +57,7 @@ describe('createApp', () => {
     const { app } = createApp({
       ...minimalConfig,
       security: {
-        auth: { secret: () => 'secret', strategy: 'bearer' },
+        auth: { secret: 'secret', strategy: 'bearer' },
         cors: { credentials: true, origin: ['http://localhost:3000'] },
       },
     });
@@ -71,7 +71,7 @@ describe('createApp', () => {
     const { app } = createApp({
       ...minimalConfig,
       security: {
-        auth: { secret: () => 'secret', strategy: 'bearer' },
+        auth: { secret: 'secret', strategy: 'bearer' },
         cors: { credentials: true, origin: ['http://localhost:3000'] },
       },
     });
@@ -83,7 +83,7 @@ describe('createApp', () => {
     const { app } = createApp({
       ...minimalConfig,
       security: {
-        auth: { secret: () => 'secret', strategy: 'bearer' },
+        auth: { secret: 'secret', strategy: 'bearer' },
         cors: { credentials: true, origin: ['http://localhost:3000'] },
       },
     });
@@ -98,7 +98,7 @@ describe('createApp', () => {
     const { app } = createApp({
       ...minimalConfig,
       security: {
-        auth: { secret: () => 'secret', strategy: 'bearer' },
+        auth: { secret: 'secret', strategy: 'bearer' },
         cors: { credentials: true, origin: ['http://localhost:3000'] },
       },
     });
@@ -113,7 +113,7 @@ describe('createApp', () => {
     const { app } = createApp({
       ...minimalConfig,
       security: {
-        auth: { secret: () => 'secret', strategy: 'bearer' },
+        auth: { secret: 'secret', strategy: 'bearer' },
         cors: { origin: ['http://localhost:3000'] },
       },
     });
