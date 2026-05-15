@@ -166,7 +166,9 @@ export function buildRequestContextFromHono(c: Context, body?: unknown): Request
     body,
     headers: c.req.header() as Record<string, string | string[]>,
     method: c.req.method.toLowerCase() as RequestContext['method'],
-    params: Object.fromEntries(Object.entries(c.req.param()).map(([k, v]) => [k, v ?? ''])),
+    params: Object.fromEntries(
+      Object.entries(c.req.param()).filter(([_, v]) => v !== undefined),
+    ) as Record<string, string>,
     path: c.req.path,
     query: Object.fromEntries(
       Object.entries(c.req.query()).map(([k, v]) => [k, serializeQueryParam(v)]),
@@ -236,12 +238,11 @@ function applyIdentityHeaders<TApp extends HalideContext>(
   route: ProxyRoute<TApp>,
   app: TApp,
   c: Context,
-  parsedBody: unknown,
+  reqCtx: RequestContext,
 ): void {
   const claims = app.claims;
   if (!route.identity || !claims) return;
-  const ctx = buildRequestContextFromHono(c, parsedBody);
-  const identityHeaders = route.identity(ctx, app);
+  const identityHeaders = route.identity(reqCtx, app);
   if (!identityHeaders) return;
   const { multiValueKeys } = normalizeHeaders(c.req.header());
   for (const [key, value] of Object.entries(identityHeaders)) {
@@ -372,7 +373,7 @@ export function createProxyService<TApp extends HalideContext = HalideContext>(
     const headers: Record<string, string | undefined> = { ...filteredHeaders };
     headers['x-forwarded-host'] = c.req.header('host') ?? '';
 
-    applyIdentityHeaders(headers, route, app, c, parsedBody);
+    applyIdentityHeaders(headers, route, app, c, c.get('reqCtx') as RequestContext);
 
     const body = applyTransform(route, parsedBody, c, headers, logger);
 
