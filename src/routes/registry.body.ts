@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type { HalideContext } from '../types/app';
-import { parseJsonBody } from '../utils/parseJsonBody.js';
+import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody.js';
 
 /** Hono method types that have a request body. */
 type BodyMethod = 'post' | 'put' | 'patch';
@@ -39,10 +39,14 @@ export function createApiBodyParser<TApp = HalideContext>(
     const raw = c.req.raw;
     if (!raw?.body) return next();
 
-    const parsed = await parseJsonBody(c);
-    if (parsed instanceof Response) return parsed;
-    c.set('parsedBody', parsed);
-    return next();
+    try {
+      const parsed = await parseJsonBody(c);
+      c.set('parsedBody', parsed);
+      return next();
+    } catch (e) {
+      if (e instanceof BodyParseError) return c.json({ error: e.message }, 400);
+      throw e;
+    }
   };
 }
 
@@ -62,9 +66,13 @@ export function createProxyBodyParser<TApp = HalideContext>(
   return async (c: Context, next: Next) => {
     if (!route.transform) return next();
 
-    const parsed = await parseJsonBody(c);
-    if (parsed instanceof Response) return parsed;
-    c.set('parsedBody', parsed);
-    return next();
+    try {
+      const parsed = await parseJsonBody(c);
+      c.set('parsedBody', parsed);
+      return next();
+    } catch (e) {
+      if (e instanceof BodyParseError) return c.json({ error: e.message }, 400);
+      throw e;
+    }
   };
 }

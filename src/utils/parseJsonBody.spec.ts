@@ -1,13 +1,17 @@
 import { Hono } from 'hono';
-import { parseJsonBody } from './parseJsonBody';
+import { BodyParseError, parseJsonBody } from './parseJsonBody';
 
 describe('parseJsonBody', () => {
   function createApp(handler: (c: Parameters<typeof parseJsonBody>[0]) => Promise<unknown>): Hono {
     const app = new Hono();
     app.post('/test', async (c) => {
-      const body = await handler(c);
-      if (body instanceof Response) return body;
-      return c.json({ parsed: body });
+      try {
+        const body = await handler(c);
+        return c.json({ parsed: body });
+      } catch (e) {
+        if (e instanceof BodyParseError) return c.json({ error: e.message }, 400);
+        throw e;
+      }
     });
     return app;
   }
