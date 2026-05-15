@@ -1,5 +1,6 @@
 import http from 'node:http';
 import net from 'node:net';
+import tls from 'node:tls';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { MAX_AGENT_CACHE } from '../config/constants.js';
@@ -35,37 +36,63 @@ export class AgentCache {
     return agent;
   }
 
+  /** Build a probe cache key from a target URL. */
+  private static probeKeyFor(target: string): string {
+    const u = new URL(target.startsWith('http') ? target : `https://${target}`);
+    return `${u.hostname}:${u.port}`;
+  }
+
   /**
-   * Probe a target URL to check if the upstream is reachable via TCP.
+   * Probe a target URL to check if the upstream is reachable.
    *
-   * Opens a brief TCP connection to the target origin's host and port.
-   * For HTTPS targets, this checks TCP reachability without a TLS handshake.
+   * For HTTPS targets, opens a TLS connection with certificate verification.
+   * For HTTP targets, opens a plain TCP connection.
    *
    * @param target - The target URL to probe (e.g., `https://api.example.com/v1`).
    * @param timeoutMs - Connection timeout in milliseconds. Defaults to 5000.
    * @returns `true` if the connection succeeds, `false` otherwise.
    */
   async probe(target: string, timeoutMs?: number): Promise<boolean> {
-    const { hostname, port } = new URL(target.startsWith('http') ? target : `https://${target}`);
-    const probeKey = `${hostname}:${port}`;
+    const url = new URL(target.startsWith('http') ? target : `https://${target}`);
+    const probeKey = `${url.hostname}:${url.port}`;
     const timeout = timeoutMs ?? 5_000;
+
+    const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80;
 
     try {
       await new Promise<void>((resolve, reject) => {
+        let socket: tls.TLSSocket | net.Socket;
         const timer = setTimeout(() => {
-          socket.destroy();
+          socket?.destroy();
           reject(new Error('Probe timed out'));
         }, timeout);
-        const socket = net.createConnection(Number(port) || 443, hostname, () => {
-          clearTimeout(timer);
-          socket.destroy();
-          resolve();
-        });
-        socket.on('error', (err) => {
-          clearTimeout(timer);
-          socket.destroy();
-          reject(err);
-        });
+
+        if (url.protocol === 'https:') {
+          socket = tls.connect(port, url.hostname, {
+            rejectUnauthorized: true,
+          });
+          socket.once('error', (err) => {
+            clearTimeout(timer);
+            socket.destroy();
+            reject(err);
+          });
+          socket.once('secureConnect', () => {
+            clearTimeout(timer);
+            socket.destroy();
+            resolve();
+          });
+        } else {
+          socket = net.createConnection(port, url.hostname, () => {
+            clearTimeout(timer);
+            socket.destroy();
+            resolve();
+          });
+          socket.once('error', (err) => {
+            clearTimeout(timer);
+            socket.destroy();
+            reject(err);
+          });
+        }
       });
       this.probeResults.set(probeKey, true);
       return true;
@@ -82,9 +109,7 @@ export class AgentCache {
    * @returns The last probe result, or `undefined` if not yet probed.
    */
   getProbeResult(target: string): boolean | undefined {
-    const { hostname, port } = new URL(target.startsWith('http') ? target : `https://${target}`);
-    const probeKey = `${hostname}:${port}`;
-    return this.probeResults.get(probeKey);
+    return this.probeResults.get(AgentCache.probeKeyFor(target));
   }
 
   dispose(): void {

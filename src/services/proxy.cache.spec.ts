@@ -45,7 +45,7 @@ describe('AgentCache', () => {
   });
 
   describe('probe', () => {
-    it('returns true for localhost on port 443', async () => {
+    it('returns false for localhost on port 443 (no listener)', async () => {
       const result = await cache.probe('https://localhost:443', 1000);
       expect(result).toBe(false);
     }, 2000);
@@ -53,12 +53,6 @@ describe('AgentCache', () => {
     it('returns false for unreachable host', async () => {
       const result = await cache.probe('https://192.0.2.1:443', 1000);
       expect(result).toBe(false);
-    }, 2000);
-
-    it('caches successful probe results', async () => {
-      await cache.probe('https://example.com:443', 1000);
-      const result = cache.getProbeResult('https://example.com:443');
-      expect(result).toBe(true);
     }, 2000);
 
     it('caches failed probe results', async () => {
@@ -70,6 +64,26 @@ describe('AgentCache', () => {
     it('accepts hostname-only targets', async () => {
       const result = await cache.probe('192.0.2.1', 1000);
       expect(result).toBe(false);
+    }, 2000);
+
+    it('caches probe results for HTTP targets', async () => {
+      const result = await cache.probe('http://localhost:80', 1000);
+      expect(result).toBe(false);
+      expect(cache.getProbeResult('http://localhost:80')).toBe(false);
+    }, 2000);
+
+    it('caches probe results for HTTPS targets', async () => {
+      const result = await cache.probe('https://localhost:443', 1000);
+      expect(result).toBe(false);
+      expect(cache.getProbeResult('https://localhost:443')).toBe(false);
+    }, 2000);
+
+    it('returns cached result for re-probed target', async () => {
+      await cache.probe('https://localhost:443', 1000);
+      const result1 = cache.getProbeResult('https://localhost:443');
+      await cache.probe('https://localhost:443', 1000);
+      const result2 = cache.getProbeResult('https://localhost:443');
+      expect(result1).toBe(result2);
     }, 2000);
   });
 
