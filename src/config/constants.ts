@@ -4,6 +4,9 @@ export const JWKS_CACHE_TTL_MS = 3600_000;
 /** Maximum number of cached JWKS middleware instances. */
 export const MAX_JWK_CACHE = 100;
 
+/** Maximum number of in-flight JWKS fetch/refresh locks. */
+export const MAX_JWK_LOCKS = 100;
+
 /** Maximum number of HTTP agent pool entries. */
 export const MAX_AGENT_CACHE = 100;
 

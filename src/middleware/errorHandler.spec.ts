@@ -34,6 +34,7 @@ describe('createErrorHandler', () => {
     expect(body).toEqual({ error: 'Internal Server Error' });
     expect(logger.error).toHaveBeenCalled();
     const call = logger.error.mock.calls[0]!;
+    expect(call[0]).toHaveProperty('errorStack');
     expect(call[1]).toContain('Something broke');
   });
 

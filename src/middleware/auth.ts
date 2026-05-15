@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
-import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE } from '../config/constants.js';
+import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE, MAX_JWK_LOCKS } from '../config/constants.js';
 
 /** Per-URI JWKS cache entry with TTL. */
 type JwkCacheEntry = {
@@ -23,6 +23,14 @@ function setJwkCacheEntry(
     if (firstKey) jwkCache.delete(firstKey);
   }
   jwkCache.set(jwksUri, { expiresAt, middleware });
+}
+
+/** Evict the oldest lock map entry (FIFO) when the map exceeds MAX_JWK_LOCKS. */
+function evictLock(map: Map<string, Promise<unknown>>): void {
+  if (map.size >= MAX_JWK_LOCKS) {
+    const firstKey = map.keys().next().value;
+    if (firstKey) map.delete(firstKey);
+  }
 }
 
 /**
@@ -54,6 +62,8 @@ async function getCachedJwkMiddleware(
   }
 
   jwkCache.delete(jwksUri);
+
+  evictLock(jwkFetchLocks);
 
   const fetchPromise = (async () => {
     try {
@@ -100,6 +110,8 @@ const jwkBackgroundRefreshTimer =
               await existing;
               continue;
             }
+            evictLock(jwkRefreshLocks);
+
             const refreshPromise = (async () => {
               try {
                 const { jwk } = await import('hono/jwk');
