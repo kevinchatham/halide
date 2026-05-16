@@ -1,8 +1,10 @@
 # Full example
 
 ```ts
-import { createServer, apiRoute, proxyRoute, type HalideContext } from 'halide';
+import { defineHalide, type HalideContext } from 'halide';
 import { z } from 'zod';
+
+const { createServer, apiRoute, proxyRoute } = defineHalide();
 
 interface UserClaims {
   sub: string;
@@ -18,7 +20,7 @@ const CreateUserSchema = z.object({
   name: z.string().min(1),
 });
 
-const server = createServer<App>({
+const server = createServer<UserClaims, LogScope>({
   app: {
     name: 'dashboard',
     root: './dist/browser',

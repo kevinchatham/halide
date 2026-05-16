@@ -2,10 +2,12 @@
 
 API routes are handler functions that compose and return data directly. They define the controlled API surface your frontend can call.
 
-Use the `apiRoute()` factory to create routes — it fills in the `type` field and provides a default `authorize` function:
+Use the `defineHalide()` builder to get `apiRoute` — it fills in the `type` field and provides a default `authorize` function:
 
 ```ts
-import { apiRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute } = defineHalide();
 
 apiRoute({
   access: 'public',
@@ -20,8 +22,10 @@ apiRoute({
 With body validation:
 
 ```ts
-import { apiRoute } from 'halide';
+import { defineHalide } from 'halide';
 import { z } from 'zod';
+
+const { apiRoute } = defineHalide();
 
 apiRoute({
   access: 'private',
@@ -36,12 +40,12 @@ apiRoute({
 
 ## Handler signature
 
-The handler receives two arguments:
+The handler receives 2 parameters:
 
-| Parameter | Type                               | Description                                              |
-| --------- | ---------------------------------- | -------------------------------------------------------- |
-| `ctx`     | `RequestContext & { body: TBody }` | Method, path, headers, params, query, and validated body |
-| `app`     | `TApp`                             | Bundled app context with `claims` and `logger`           |
+| Parameter | Type                                | Description                                              |
+| --------- | ----------------------------------- | -------------------------------------------------------- |
+| `ctx`     | `RequestContext & { body: TBody }`  | Method, path, headers, params, query, and validated body |
+| `app`     | `HalideContext<TClaims, TLogScope>` | Bundled app context with `claims` and `logger`           |
 
 `app` is a `HalideContext<TClaims, TLogScope>` object containing:
 

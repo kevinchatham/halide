@@ -24,13 +24,12 @@ A lightweight backend framework for Node.js built on Hono. Provides API routes, 
 
 ```ts
 import {
-  apiRoute,
-  proxyRoute,
   createApp,
   createServer,
   createDefaultLogger,
   createNoopLogger,
   createScopedLogger,
+  defineHalide,
 } from 'halide';
 import type {
   ServerConfig,
@@ -52,7 +51,6 @@ import type {
   AuthorizeFn,
   TransformFn,
   ClaimExtractor,
-  RegisterRoutesOptions,
   Server,
   CreateAppResult,
 } from 'halide';
@@ -61,7 +59,9 @@ import type {
 ## Minimal Example
 
 ```ts
-import { createServer, apiRoute } from 'halide';
+import { createServer, defineHalide } from 'halide';
+
+const { apiRoute } = defineHalide();
 
 const server = createServer({
   apiRoutes: [

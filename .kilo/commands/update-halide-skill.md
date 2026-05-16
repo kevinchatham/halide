@@ -1,99 +1,183 @@
 ---
-description: Research the Halide source code and update skills/halide/SKILL.md to accurately reflect the current API
+description: Audit and update the Halide skill index and reference files from the current source code
 agent: code
 output: markdown
 ---
 
-## Purpose
+# Purpose
 
-This command updates `skill/SKILL.md` as a concise index pointing to existing documentation and reference files, rather than duplicating everything.
+Update `skill/SKILL.md` and `skill/references/*.md` so they accurately reflect the current Halide API and architecture.
 
-## Steps
+The source code is the only source of truth.
+Existing skill files and references may be stale or incomplete.
 
-### Phase 1: Gather Source Truth
+`SKILL.md` should remain concise and stable:
+- navigation
+- concept overview
+- quick-start guidance
+- links to detailed references
 
-Dynamically discover source files — do NOT rely on hardcoded paths.
+Detailed type definitions and implementation behavior belong in `skill/references/`.
 
-1. Use glob to find all `src/**/*.ts` files, filter out `*.spec.ts` test files
-2. Read `src/index.ts` to identify public exports
-3. Verify the `docs/` directory has files for each major topic
-4. Verify the `skill/references/` directory has reference files for detailed type info
-5. Map each reference file to its corresponding source modules:
-   - `skill/references/config.md` ← `src/config/types.ts`, `src/config/defaults.ts`
-   - `skill/references/routes.md` ← `src/routes/apiRoute.ts`, `src/routes/proxyRoute.ts`
-   - `skill/references/auth.md` ← `src/middleware/auth.ts`
-   - `skill/references/security.md` ← `src/middleware/csp.ts`, `src/middleware/cors.ts`
-   - `skill/references/openapi.md` ← `src/middleware/openapi.ts`
-   - `skill/references/observability.md` ← `src/middleware/observability.ts`
+---
 
-### Phase 2: Write the Skill
+# Source Discovery
 
-Write `skill/SKILL.md` as a concise index (~50-100 lines):
+Dynamically inspect the repository structure.
 
-1. **Frontmatter** — `name: halide`, concise `description`
-2. **Primary Resources table** — map topics to `docs/*.md` files
-3. **Detailed References table** — map topics to `skill/references/*.md`
-4. **Complete Type Reference** — minimal import snippet showing all exports from `'halide'`
-5. **Minimal Example** — 10-line working example using `createServer` + `apiRoute`
-6. **Key Gotchas** — 5-6 bullet points (camelCase CSP, wildcard origin/credentials, private routes need auth, etc.)
-7. **Fallback Reference** — point to `node_modules/halide/dist/index.d.ts` and `node_modules/halide/dist/index.js`
+Do not rely on hardcoded module paths unless they are verified to exist.
 
-### Phase 3: Update Reference Files
+Inspect:
+- all non-test TypeScript source files
+- public exports
+- configuration types
+- route factories
+- middleware
+- runtime composition
+- validation logic
+- OpenAPI integration
+- observability hooks
+- auth/security behavior
+- proxy/runtime behavior
 
-For each reference file, read the corresponding source modules and update the reference with accurate type definitions, interfaces, and examples derived from the current source code.
+Also inspect:
+- `docs/`
+- `skill/references/`
+- README examples
+- package exports
+- generated type declarations if present
 
-**config.md** — Extract from `src/config/types.ts`:
-- `ServerConfig` interface (note: uses separate `apiRoutes` and `proxyRoutes` arrays)
-- `THalideApp` type (claims + logger bundle)
-- `AppConfig` interface (root, port, fallback, apiPrefix)
-- `SecurityConfig` interface
-- All other config types (CorsConfig, CspOptions, etc.)
+Derive documentation structure from the current implementation.
 
-**routes.md** — Extract from `src/routes/apiRoute.ts` and `src/routes/proxyRoute.ts`:
-- `apiRoute()` factory signature with `access`, `path`, `method`, `handler`, `requestSchema`
-- `proxyRoute()` factory signature with `access`, `path`, `methods`, `target`, `proxyPath`, `timeout`, `identity`, `transform`
-- Handler signatures: `(ctx, app) => Promise<unknown>` where `ctx` is plain object, `app` is `THalideApp`
-- Path rewriting rules for proxy routes (especially wildcard `/*` handling)
-- Headers stripped from proxied requests
+---
 
-**auth.md** — Extract from `src/middleware/auth.ts`:
-- Bearer strategy config (secret, secretTtl, audience)
-- JWKS strategy config (jwksUri, audience)
-- Auth middleware behavior (how claims are extracted and validated)
-- Error responses for missing/invalid auth
+# Reference Organization
 
-**security.md** — Extract from `src/middleware/csp.ts` and `src/middleware/cors.ts`:
-- CSP directives (camelCase keys, e.g., `defaultSrc` not `default-src`)
-- CORS config (origin, methods, credentials, headers)
-- Validation rules (wildcard origin + credentials is forbidden)
-- SecurityConfig composition
+The existing `skill/references/` structure is a starting point, not a required structure.
 
-**openapi.md** — Extract from `src/middleware/openapi.ts`:
-- OpenApiConfig interface (enabled, path, options)
-- OpenApiRouteMeta per-route metadata
-- Scalar UI integration
-- Default disabled — warn when enabled in production
+You may:
+- create reference files
+- merge files
+- split files
+- rename files
+- remove obsolete files
 
-**observability.md** — Extract from `src/middleware/observability.ts`:
-- ObservabilityConfig interface (logger, requestId, onRequest, onResponse)
-- Logger interface (`{ debug, error, info, warn }`)
-- Lifecycle hooks (onRequest, onResponse per route)
-- `observe: false` to skip hooks per route
+Organize references around major framework concepts and runtime concerns.
 
-### Phase 4: Verify
+Examples:
+- configuration
+- routes
+- auth
+- security
+- observability
+- OpenAPI
+- runtime lifecycle
+- proxy behavior
+- testing utilities
 
-1. Confirm `skill/SKILL.md` is under 100 lines
-2. Confirm all major topics have corresponding docs/references files
-3. Confirm exports in the type reference match `src/index.ts`
-4. Confirm gotchas are accurate based on validation rules
-5. Confirm each reference file reflects current source code (types, interfaces, examples match)
+Do not preserve outdated structure solely for compatibility.
 
-## Rules
+---
 
-- Keep SKILL.md as an index, not a comprehensive guide
-- Point to existing `docs/` and `skill/references/` files rather than duplicating
-- Code examples should be minimal (under 15 lines each)
-- Write from a consuming agent's perspective (halide installed via npm)
-- Do NOT reference internal source file paths — use `node_modules/halide` as fallback
-- Reference files must reflect actual source code types/interfaces — do not hardcode stale definitions
-- When source and reference conflict, trust the source — update the reference to match
+# SKILL.md Requirements
+
+Keep `skill/SKILL.md` concise (roughly 50-100 lines).
+
+It should contain:
+
+1. Frontmatter
+2. Brief framework summary
+3. Primary documentation index
+4. Reference index
+5. Minimal quick-start example
+6. Minimal public API import example
+7. Key behavioral gotchas
+8. Fallback references to distributed typings/runtime files
+
+Avoid duplicating detailed type definitions already covered in references.
+
+SKILL.md should help an agent quickly determine:
+- where information lives
+- how the framework is organized
+- which APIs are public
+- which runtime behaviors are important
+
+---
+
+# Reference File Requirements
+
+Reference files should be implementation-derived technical references.
+
+For each reference:
+
+1. Extract types from current source
+2. Verify signatures against exports
+3. Verify defaults against runtime/config source
+4. Verify validation behavior
+5. Include minimal examples
+6. Remove undocumented historical behavior
+7. Prefer concise reference-style formatting
+
+Document:
+- public interfaces
+- exported types
+- handler signatures
+- configuration structures
+- runtime behavior
+- validation rules
+- lifecycle hooks
+- middleware behavior
+- serialization behavior
+- auth behavior
+- proxy behavior
+- OpenAPI behavior
+
+Do not document implementation details that are irrelevant to consumers.
+
+---
+
+# API Surface Verification
+
+Generate API references directly from the current public exports.
+
+Do not manually preserve historical export lists.
+
+Verify:
+- exported functions
+- exported types
+- configuration objects
+- runtime return values
+- factory helpers
+- middleware configuration
+- lifecycle hooks
+
+If source and existing references conflict, trust the source.
+
+---
+
+# Examples
+
+Examples should:
+- use current public APIs
+- reflect current best practices
+- avoid deprecated patterns
+- remain minimal and focused
+- conceptually compile against the current implementation
+
+---
+
+# Important Rules
+
+- Treat existing documentation and references as potentially stale
+- Source code overrides all existing docs
+- Do not rely on hardcoded source module locations
+- Prefer concept-based organization over implementation-based organization
+- Keep SKILL.md concise and navigational
+- Keep detailed technical information in references
+- Remove obsolete behavior that cannot be verified
+- Do not reference repository-internal source paths in consumer-facing docs
+- Prefer npm-consumer perspective (`import from 'halide'`)
+- This skill updates the consumer-facing Halide skill distributed to downstream agents
+- When an agent lacks Halide knowledge, guide it to inspect `node_modules/halide`
+  (the installed package) as a fallback source of truth for types, exports,
+  and runtime behavior

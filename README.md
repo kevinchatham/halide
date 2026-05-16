@@ -56,13 +56,15 @@ npm install halide
 
 ```ts
 // routes.ts
-import { apiRoute, proxyRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute, proxyRoute } = defineHalide();
 
 export const healthRoute = apiRoute({
   access: 'public',
   method: 'get',
   path: '/api/health',
-  handler: async () => ({ status: 'ok' }),
+  handler: async (_ctx, _app) => ({ status: 'ok' }),
 });
 
 export const userProxyRoute = proxyRoute({
@@ -76,9 +78,9 @@ export const userProxyRoute = proxyRoute({
 ```ts
 // server.ts
 import { healthRoute, userProxyRoute } from './routes';
-import { createServer, type ServerConfig } from 'halide';
+import { createServer } from 'halide';
 
-const config: ServerConfig = {
+const server = createServer({
   app: {
     root: './browser',
   },
@@ -91,9 +93,7 @@ const config: ServerConfig = {
   },
   apiRoutes: [healthRoute],
   proxyRoutes: [userProxyRoute],
-};
-
-const server = createServer(config);
+});
 
 server.start((port) => console.log(`Serving on ${port}`));
 ```

@@ -44,16 +44,21 @@ Routes with `access: 'private'` require a valid JWT. If any private route exists
 Restrict route access with per-route logic beyond public/private. Every route accepts an optional `authorize` function for fine-grained access control:
 
 ```ts
-import { apiRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute } = defineHalide();
 
 apiRoute({
   access: 'private',
   path: '/admin/settings',
   authorize: (ctx, app) => app.claims?.role === 'admin',
-  handler: async (ctx, app) => ({ settings: '...' }),
+  handler: async (ctx, app) => {
+    app.logger.info({ user: app.claims?.sub }, 'Admin settings accessed');
+    return { settings: '...' };
+  },
 });
 ```
 
-The `authorize` function receives `(ctx: RequestContext, app: TApp)` where `app` is a `HalideContext` containing `claims` and `logger`. Returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
+The `authorize` function receives `(ctx: RequestContext, app: HalideContext<TClaims, TLogScope>)` where `app` contains `claims` and `logger`. Returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
 
 The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.

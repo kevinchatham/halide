@@ -14,6 +14,14 @@ Interactively scaffolds a Halide server in the current project. It prompts for:
 2. **Port** — server listen port (default: `3553`)
 3. **Install AI coding skills** — optionally copies halide skill from node_modules (default: yes)
 
+### CLI flags
+
+| Flag            | Description                                           |
+| --------------- | ----------------------------------------------------- |
+| `--dry-run`     | Preview changes without modifying any files           |
+| `--force`       | Overwrite existing files without prompting            |
+| `--skills-only` | Only install AI coding skills, skip other scaffolding |
+
 Then it:
 
 1. Detects your package manager (npm, pnpm, yarn, or bun)
@@ -27,7 +35,9 @@ Then it:
 ### Generated `server.ts`
 
 ```ts
-import { createServer, apiRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { createServer, apiRoute } = defineHalide();
 
 const healthRoute = apiRoute({
   access: 'public',

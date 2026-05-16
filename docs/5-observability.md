@@ -2,20 +2,22 @@
 
 Attach logging, request IDs, and lifecycle hooks for visibility into every request.
 
+A styled default logger is used when none is provided (colored in TTY, plain text otherwise). Use `createNoopLogger()` for silent output.
+
 ```ts
 type MyLogScope = { requestId: string; service: string };
 
 observability: {
-  requestId: true,       // generates/forwards x-request-id headers
+  requestId: true, // generates/forwards x-request-id headers
   logger: {
     debug: (scope) => myLogger.debug(scope),
     error: (scope) => myLogger.error(scope),
     info: (scope) => myLogger.info(scope),
     warn: (scope) => myLogger.warn(scope),
   },
-  logScopeFactory: (ctx, app) => ({
+  logScopeFactory: (ctx, claims) => ({
     requestId: ctx.path,
-    userId: app.claims?.sub ?? undefined,
+    userId: claims?.sub ?? undefined,
   }),
   onRequest: (ctx, app) => {
     app.logger.info(ctx, `${ctx.method} ${ctx.path}`);
@@ -30,14 +32,14 @@ Per-route observability is controlled with the `observe` flag. Set `observe: fal
 
 ### Configuration fields
 
-| Field             | Default               | Description                                                                                           |
-| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
-| `requestId`       | `false`               | Enable `x-request-id` header propagation.                                                             |
-| `logger`          | Styled default logger | Custom logger instance. Colored in TTY, plain text otherwise.                                         |
-| `logScopeFactory` | (none)                | Factory that produces a typed log scope per request. Automatically passed to every logger call.       |
-| `maxCollect`      | `1024`                | Maximum bytes to collect from proxy responses for observability logging. Full response is unmodified. |
-| `onRequest`       | (none)                | Hook called before each request is handled.                                                           |
-| `onResponse`      | (none)                | Hook called after each response is sent.                                                              |
+| Field             | Default                 | Description                                                                                               |
+| ----------------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `requestId`       | `false`                 | Enable `x-request-id` header propagation.                                                                 |
+| `logger`          | `createDefaultLogger()` | Custom logger instance. Colored in TTY, plain text otherwise. Use `createNoopLogger()` for silent output. |
+| `logScopeFactory` | (none)                  | Factory that produces a typed log scope per request. Automatically passed to every logger call.           |
+| `maxCollect`      | `1024`                  | Maximum bytes to collect from proxy responses for observability logging. Full response is unmodified.     |
+| `onRequest`       | (none)                  | Hook called before each request is handled.                                                               |
+| `onResponse`      | (none)                  | Hook called after each response is sent.                                                                  |
 
 ## Logger interface
 
@@ -75,7 +77,7 @@ The `response` object (type `ResponseContext`) has the following shape:
 | `body?`      | `unknown`            | Response body returned by the handler   |
 | `bodyType?`  | `'text' \| 'binary'` | Format of the body field                |
 
-`ResponseContext` is exported from `index.ts` and used by the `onResponse` hook.
+`ResponseContext` is available for type annotation in `onResponse` hooks.
 
 ## Request ID middleware
 
