@@ -2,8 +2,10 @@ import { Scalar } from '@scalar/hono-api-reference';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
+import { asInternalLogger } from '../config/defaults';
 import { resolveOpenApiSpec } from '../routes/registry.openapi';
 import type { ProxyRoute } from '../types/api';
+import type { Logger } from '../types/app';
 import type { OpenApiOptions } from '../types/openapi';
 import type { ServerConfig } from '../types/server-config';
 
@@ -169,6 +171,7 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,
   app: Hono,
   state: SpecCacheState = createSpecCacheState(),
+  logger?: Logger<TLogScope>,
 ): void {
   const openapiConfig = config.openapi;
   if (!openapiConfig?.enabled) return;
@@ -177,6 +180,7 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
   const options = openapiConfig.options;
   const proxyRoutes = config.proxyRoutes;
   const hasExternalSpecs = proxyRoutes?.some((r) => r.openapiSpec) ?? false;
+  const il = logger ? asInternalLogger(logger) : undefined;
 
   if (hasExternalSpecs) {
     app.get(`${swaggerPath}/openapi.json`, async (c) => {
@@ -191,8 +195,13 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
             const resolvedSpecs = await resolveOpenApiSpec(proxyRoutes ?? []);
             const mergedSpec = mergeExternalSpecs(inlineSpec, resolvedSpecs);
             state.cachedSpec = buildFinalSpec(mergedSpec, options);
-          } catch {
-            state.cachedSpec = {};
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            il?.error(
+              { error: 'openapi_spec_resolution_failed' },
+              `Failed to resolve OpenAPI spec: ${message}`,
+            );
+            state.specResolution = null;
           }
         })();
       }

@@ -40,6 +40,23 @@ export type ResponseContext = {
 };
 
 /**
+ * Internal logging interface for framework internals that log ad-hoc scope shapes
+ * (e.g., validation errors, startup warnings, secret refresh failures).
+ * Accepts `unknown` scope to allow arbitrary objects without requiring the
+ * consumer's `TLogScope` type parameter.
+ */
+export type InternalLogger = {
+  /** Log a debug-level message with arbitrary scope. */
+  debug: (scope: unknown, ...args: unknown[]) => void;
+  /** Log an error-level message with arbitrary scope. */
+  error: (scope: unknown, ...args: unknown[]) => void;
+  /** Log an info-level message with arbitrary scope. */
+  info: (scope: unknown, ...args: unknown[]) => void;
+  /** Log a warning-level message with arbitrary scope. */
+  warn: (scope: unknown, ...args: unknown[]) => void;
+};
+
+/**
  * Logging interface for observability.
  * @typeParam TLogScope - The type of the structured log scope object passed to each log method.
  */

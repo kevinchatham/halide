@@ -1,6 +1,6 @@
 import { styleText } from 'node:util';
 import type { AuthorizeFn } from '../types/api';
-import type { HalideContext, Logger, RequestContext } from '../types/app';
+import type { HalideContext, InternalLogger, Logger, RequestContext } from '../types/app';
 import type { CspDirectives } from '../types/csp';
 
 /**
@@ -172,13 +172,16 @@ export function createScopedLogger<TLogScope>(
 }
 
 /**
- * Cast a typed logger to a generic internal logger for use in framework internals
+ * Cast a typed logger to an internal logger for use in framework internals
  * where ad-hoc scope objects are logged (e.g., validation errors, startup warnings).
+ *
+ * The cast is safe because the underlying logger implementation (e.g., `createDefaultLogger`)
+ * accepts any value via `stringifyScope(scope)` which operates on `unknown`.
  *
  * @typeParam T - The current type parameter of the logger.
  * @param logger - The logger to cast.
- * @returns The logger cast to {@link Logger}<Record<string, unknown>>.
+ * @returns The logger cast to {@link InternalLogger}.
  */
-export function asInternalLogger<T>(logger: Logger<T>): Logger<Record<string, unknown>> {
-  return logger as Logger<Record<string, unknown>>;
+export function asInternalLogger<T>(logger: Logger<T>): InternalLogger {
+  return logger as InternalLogger;
 }

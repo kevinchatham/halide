@@ -160,12 +160,13 @@ function setupRoutes<TClaims = unknown, TLogScope = unknown>(
   registerRoutes({ agentCache, app, config, logger });
 }
 
-function setupOpenapiRoutes<TClaims, TLogScope>(
+function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,
   app: Hono,
   specCacheState: SpecCacheState,
+  logger?: Logger<TLogScope>,
 ): void {
-  createOpenApiRoutes(config, app, specCacheState);
+  createOpenApiRoutes(config, app, specCacheState, logger);
 }
 
 function setupAppHandler<TClaims, TLogScope>(
@@ -236,7 +237,7 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
   setupRoutes(app, agentCache, config, logger);
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
-  setupOpenapiRoutes(config, app as unknown as Hono, specCacheState);
+  setupOpenapiRoutes(config, app as unknown as Hono, specCacheState, logger);
 
   setupAppHandler(app, config);
   setupErrorHandling(app, logger, logScopeFactory);

@@ -62,21 +62,21 @@
 
 <!-- **In-memory rate limiter loses state on restart.** The `Map`-based store (`src/middleware/rateLimit.ts:117-142`) is ephemeral. On process restart, all rate limit counters reset to zero. For burst protection, this means a malicious client can trigger a restart (via memory pressure or OOM) and get a fresh rate limit window. -->
 
-**Claim extractor cache has no TTL.** `src/routes/registry.auth.ts:21-43` uses a FIFO eviction at `MAX_EXTRACTOR_CACHE` (200) but never expires entries. If auth config changes (e.g., secret rotation), the stale extractor remains cached until all slots are evicted through new config changes. This is a 200-request window for stale auth configuration.
+<!-- **Claim extractor cache has no TTL.** `src/routes/registry.auth.ts:21-43` uses a FIFO eviction at `MAX_EXTRACTOR_CACHE` (200) but never expires entries. If auth config changes (e.g., secret rotation), the stale extractor remains cached until all slots are evicted through new config changes. This is a 200-request window for stale auth configuration. -->
 
-**JWKS cache has no size limit enforcement on refresh.** `src/middleware/auth.ts:80-98` deletes the cache entry before fetching, but `jwkFetchLocks` and `jwkRefreshLocks` have `MAX_JWK_LOCKS = 100` limits with FIFO eviction. If 100 different JWKS URIs are fetching concurrently, new fetches for existing URIs will get evicted locks and create duplicate fetches.
+<!-- **JWKS cache has no size limit enforcement on refresh.** `src/middleware/auth.ts:80-98` deletes the cache entry before fetching, but `jwkFetchLocks` and `jwkRefreshLocks` have `MAX_JWK_LOCKS = 100` limits with FIFO eviction. If 100 different JWKS URIs are fetching concurrently, new fetches for existing URIs will get evicted locks and create duplicate fetches. -->
 
-**HTTP agent pool uses FIFO eviction with connection destruction.** `src/services/proxy.ts:21-27` evicts the oldest agent and calls `agent.destroy()` which closes all keep-alive connections. This causes a burst of reconnections for the evicted host, potentially overwhelming the upstream server.
+<!-- **HTTP agent pool uses FIFO eviction with connection destruction.** `src/services/proxy.ts:21-27` evicts the oldest agent and calls `agent.destroy()` which closes all keep-alive connections. This causes a burst of reconnections for the evicted host, potentially overwhelming the upstream server. -->
 
-**No request queue or backpressure mechanism.** The framework forwards requests directly to upstream servers via `hono/proxy`. There is no request queue, circuit breaker, or backpressure. If an upstream server slows down, all worker threads are occupied waiting for responses, eventually causing the Node.js event loop to stall.
+<!-- **No request queue or backpressure mechanism.** The framework forwards requests directly to upstream servers via `hono/proxy`. There is no request queue, circuit breaker, or backpressure. If an upstream server slows down, all worker threads are occupied waiting for responses, eventually causing the Node.js event loop to stall. -->
 
-**Proxy body collection buffers in memory.** `src/routes/proxy-body.ts:26-50` collects response body chunks into a `Uint8Array[]` array up to `maxCollect` bytes. For responses larger than `maxCollect`, the array is truncated but all collected chunks are held in memory. With `maxCollect = 1024` (default), this is bounded, but the `Blob` conversion at line 59 copies the data again.
+<!-- **Proxy body collection buffers in memory.** `src/routes/proxy-body.ts:26-50` collects response body chunks into a `Uint8Array[]` array up to `maxCollect` bytes. For responses larger than `maxCollect`, the array is truncated but all collected chunks are held in memory. With `maxCollect = 1024` (default), this is bounded, but the `Blob` conversion at line 59 copies the data again. -->
 
-**`activeRequests` Set grows unbounded.** `src/config/runtime.ts:233` tracks `ServerResponse` objects in a `Set`. This is bounded by concurrent connections, but there is no maximum. Under a DDoS, this Set grows proportionally to the attack size.
+<!-- **`activeRequests` Set grows unbounded.** `src/config/runtime.ts:233` tracks `ServerResponse` objects in a `Set`. This is bounded by concurrent connections, but there is no maximum. Under a DDoS, this Set grows proportionally to the attack size. -->
 
-**OpenAPI spec resolution blocks on first request.** `src/middleware/openapi.ts:188-197` resolves external specs on the first request to `/swagger/openapi.json`. If multiple requests arrive simultaneously, `state.specResolution` is set and subsequent requests await it — this is correct. However, if resolution fails, `state.cachedSpec = {}` is set and all subsequent requests get an empty spec without retry.
+<!-- **OpenAPI spec resolution blocks on first request.** `src/middleware/openapi.ts:188-197` resolves external specs on the first request to `/swagger/openapi.json`. If multiple requests arrive simultaneously, `state.specResolution` is set and subsequent requests await it — this is correct. However, if resolution fails, `state.cachedSpec = {}` is set and all subsequent requests get an empty spec without retry. -->
 
-**`createAgentCache` creates new `http.Agent` per target.** Each unique target URL gets a new `http.Agent` with its own connection pool. With `MAX_AGENT_CACHE = 500`, this means up to 500 agents with 50 sockets each = 25,000 concurrent connections. This is significant but bounded.
+<!-- **`createAgentCache` creates new `http.Agent` per target.** Each unique target URL gets a new `http.Agent` with its own connection pool. With `MAX_AGENT_CACHE = 500`, this means up to 500 agents with 50 sockets each = 25,000 concurrent connections. This is significant but bounded. -->
 
 ## 5. Maintainability Issues
 
@@ -84,7 +84,7 @@
 
 <!-- **Config validation is split between Zod and imperative code.** `src/config/schema.ts` uses Zod for structural validation, but cross-field rules (port range, proxy target URL, method requirements) are in `superRefine`. The `validate.ts` file adds additional imperative checks (async secret validation, algorithm warnings). This hybrid approach makes it hard to understand all validation rules without reading both files. -->
 
-**`asInternalLogger` type cast is a code smell.** `src/config/defaults.ts:172-174` casts `Logger<T>` to `Logger<Record<string, unknown>>`. This bypasses type safety and means internal logger calls can log arbitrary shapes that the consumer's `TLogScope` type doesn't expect. The cast is necessary because internal logging doesn't fit the consumer's scope type, but it indicates the Logger interface is not flexible enough.
+<!-- **`asInternalLogger` type cast is a code smell.** `src/config/defaults.ts:172-174` casts `Logger<T>` to `Logger<Record<string, unknown>>`. This bypasses type safety and means internal logger calls can log arbitrary shapes that the consumer's `TLogScope` type doesn't expect. The cast is necessary because internal logging doesn't fit the consumer's scope type, but it indicates the Logger interface is not flexible enough. -->
 
 **Test utilities don't mock middleware.** `src/test-utils/index.ts:21-29` creates a test app by calling `registerRoutes` and `createOpenApiRoutes` directly, bypassing `createApp`. This means tests don't exercise CORS, CSP, rate limiting, or CSRF middleware — they test routes in isolation but not the full middleware pipeline.
 
