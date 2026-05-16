@@ -13,18 +13,17 @@
 
 import { z } from 'zod';
 import type {
-  ApiRoute,
   AppConfig,
   HalideContext,
   ObservabilityConfig,
   OpenApiConfig,
-  ProxyRoute,
   RequestContext,
   ResponseContext,
   SecurityConfig,
   Server,
   ServerConfig,
 } from './index';
+import { defineHalide } from './index';
 
 /** Structured log scope shape for typed logging throughout the application. */
 interface LogScope {
@@ -34,8 +33,6 @@ interface LogScope {
   userId?: string;
 }
 
-import { apiRoute, createServer, proxyRoute } from './index';
-
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
 interface UserClaims {
   /** User role, e.g. 'admin' or 'user'. */
@@ -43,9 +40,6 @@ interface UserClaims {
   /** Subject identifier (typically a user ID). */
   sub: string;
 }
-
-/** Bundled app context for this demo, combining UserClaims JWT payload with typed log scope. */
-type DemoApp = HalideContext<UserClaims, LogScope>;
 
 /** Zod schema validating the request body for creating a new user (email and name fields). */
 const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> = z.object({
@@ -57,17 +51,22 @@ const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> =
 /** Inferred TypeScript type from {@link CreateUserSchema}: `{ email: string; name: string }`. */
 type CreateUserSchema = z.infer<typeof CreateUserSchema>;
 
+const { apiRoute, proxyRoute, createServer } = defineHalide<UserClaims, LogScope>();
+
 /**
  * Private GET /profile route.
  * - `access: 'private'`: requires a valid JWT bearer token
  * - `authorize`: restricts access to users with the 'admin' role
  * - `handler`: returns the request context and authenticated user subject
  */
-const profileRoute: ApiRoute<DemoApp> = apiRoute<DemoApp>({
+const profileRoute = apiRoute({
   access: 'private',
-  authorize: (_ctx: RequestContext, app: DemoApp) =>
+  authorize: (_ctx: RequestContext, app: HalideContext<UserClaims, LogScope>) =>
     !!app.claims?.role && app.claims.role === 'admin',
-  handler: async (ctx: RequestContext & { body: unknown }, app: DemoApp) => ({
+  handler: async (
+    ctx: RequestContext & { body: unknown },
+    app: HalideContext<UserClaims, LogScope>,
+  ) => ({
     ctx: JSON.stringify(ctx),
     user: app.claims?.sub,
   }),
@@ -81,9 +80,12 @@ const profileRoute: ApiRoute<DemoApp> = apiRoute<DemoApp>({
  * - `requestSchema`: Zod schema validating that body contains a valid email and non-empty name
  * - `handler`: creates a user with a generated UUID, timestamp, and the validated body fields
  */
-const userRoute: ApiRoute<DemoApp, CreateUserSchema> = apiRoute<DemoApp, CreateUserSchema>({
+const userRoute = apiRoute<CreateUserSchema>({
   access: 'public',
-  handler: async (ctx: RequestContext & { body: CreateUserSchema }, _app: DemoApp) => {
+  handler: async (
+    ctx: RequestContext & { body: CreateUserSchema },
+    _app: HalideContext<UserClaims, LogScope>,
+  ) => {
     return {
       createdAt: new Date().toISOString(),
       email: ctx.body.email,
@@ -101,9 +103,12 @@ const userRoute: ApiRoute<DemoApp, CreateUserSchema> = apiRoute<DemoApp, CreateU
  * - `access: 'public'`: no authentication required
  * - `handler`: returns `{ status: 'ok' }`, useful for load balancer health checks
  */
-const healthRoute: ApiRoute<DemoApp> = apiRoute({
+const healthRoute = apiRoute({
   access: 'public',
-  handler: async (_ctx: RequestContext & { body: unknown }, _app: DemoApp) => ({ status: 'ok' }),
+  handler: async (
+    _ctx: RequestContext & { body: unknown },
+    _app: HalideContext<UserClaims, LogScope>,
+  ) => ({ status: 'ok' }),
   method: 'get',
   path: '/health',
 });
@@ -116,7 +121,7 @@ const healthRoute: ApiRoute<DemoApp> = apiRoute({
  * - `timeout`: aborts the proxy request after 5000ms
  * - `transform`: merges a `transformed: true` flag into the request body before forwarding
  */
-const usersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
+const usersProxyRoute = proxyRoute({
   access: 'private',
   methods: ['get', 'post'],
   path: '/api/users',
@@ -147,9 +152,9 @@ const usersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
  * - `proxyPath`: omitted, so '/api/orders' is forwarded as-is to the target
  * - `authorize`: allows both 'admin' and 'user' roles
  */
-const ordersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
+const ordersProxyRoute = proxyRoute({
   access: 'private',
-  authorize: (_ctx: RequestContext, app: DemoApp) =>
+  authorize: (_ctx: RequestContext, app: HalideContext<UserClaims, LogScope>) =>
     !!app.claims?.role && (app.claims.role === 'admin' || app.claims.role === 'user'),
   methods: ['get'],
   path: '/api/orders',
@@ -168,12 +173,12 @@ const ordersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
  * - `onRequest`: called on every incoming request with the request context and app
  * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
  */
-const observability: ObservabilityConfig<DemoApp> = {
-  logScopeFactory: (ctx: RequestContext, app: DemoApp) => ({
+const observability: ObservabilityConfig<UserClaims, LogScope> = {
+  logScopeFactory: (ctx: RequestContext, claims: UserClaims | undefined) => ({
     requestId: ctx.path,
-    userId: app.claims?.sub ?? undefined,
+    userId: claims?.sub ?? undefined,
   }),
-  onRequest: (ctx: RequestContext, app: DemoApp) => {
+  onRequest: (ctx: RequestContext, app: HalideContext<UserClaims, LogScope>) => {
     app.logger.info(
       {
         requestId: ctx.path,
@@ -181,7 +186,11 @@ const observability: ObservabilityConfig<DemoApp> = {
       `[Request] ${ctx.method} ${ctx.path}`,
     );
   },
-  onResponse: (ctx: RequestContext, app: DemoApp, { statusCode, durationMs }: ResponseContext) => {
+  onResponse: (
+    ctx: RequestContext,
+    app: HalideContext<UserClaims, LogScope>,
+    { statusCode, durationMs }: ResponseContext,
+  ) => {
     app.logger.info(
       {
         requestId: ctx.path,
@@ -260,8 +269,8 @@ const openapi: OpenApiConfig = {
  *
  * Passed to `createServer()` to bootstrap the halide BFF server.
  */
-const exampleConfig: ServerConfig<DemoApp> = {
-  apiRoutes: [profileRoute, userRoute as unknown as ApiRoute<DemoApp>, healthRoute],
+const exampleConfig: ServerConfig<UserClaims, LogScope> = {
+  apiRoutes: [profileRoute, userRoute, healthRoute],
   app,
   observability,
   openapi,
@@ -269,7 +278,7 @@ const exampleConfig: ServerConfig<DemoApp> = {
   security,
 };
 
-const server: Server = createServer<DemoApp>(exampleConfig);
+const server: Server = createServer(exampleConfig);
 
 server.start((port) => {
   // biome-ignore lint/suspicious/noConsole: demo

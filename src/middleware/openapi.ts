@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
 import { resolveOpenApiSpec } from '../routes/registry.openapi';
-import type { HalideContext, ProxyRoute } from '../types/api';
+import type { ProxyRoute } from '../types/api';
 import type { OpenApiOptions } from '../types/openapi';
 import type { ServerConfig } from '../types/server-config';
 
@@ -31,9 +31,9 @@ export function resetOpenApiCache(state: SpecCacheState): void {
  * Merge metadata overrides (summary, description, tags) from a proxy route
  * onto an OpenAPI operation object.
  */
-function applyMetadata(
+function applyMetadata<TClaims = unknown, TLogScope = unknown>(
   operation: Record<string, unknown>,
-  metadata: ProxyRoute<HalideContext>['openapi'],
+  metadata: ProxyRoute<TClaims, TLogScope>['openapi'],
 ): void {
   if (metadata?.summary) operation.summary = metadata.summary;
   if (metadata?.description) operation.description = metadata.description;
@@ -44,9 +44,9 @@ function applyMetadata(
  * Merge external OpenAPI spec paths into the inline spec's paths map,
  * respecting route method filtering and route-level metadata overrides.
  */
-function mergeExternalSpecs(
+function mergeExternalSpecs<TClaims = unknown, TLogScope = unknown>(
   inlineSpec: Record<string, unknown>,
-  resolvedSpecs: Array<{ spec: Record<string, unknown>; route: ProxyRoute<HalideContext> }>,
+  resolvedSpecs: Array<{ spec: Record<string, unknown>; route: ProxyRoute<TClaims, TLogScope> }>,
 ): Record<string, unknown> {
   const paths = (inlineSpec['paths'] as Record<string, unknown>) ?? {};
 
@@ -68,11 +68,11 @@ function mergeExternalSpecs(
  * Merge a single path item from an external spec into the paths map,
  * filtering by allowed HTTP methods and applying route-level metadata.
  */
-function mergePathItem(
+function mergePathItem<TClaims = unknown, TLogScope = unknown>(
   externalPath: string,
   pathItem: Record<string, unknown>,
   routeMethods: string[],
-  metadata: ProxyRoute<HalideContext>['openapi'],
+  metadata: ProxyRoute<TClaims, TLogScope>['openapi'],
   paths: Record<string, unknown>,
 ): void {
   if (!(externalPath in paths)) {
@@ -159,13 +159,14 @@ function buildFinalSpec(
  * Registers the OpenAPI spec JSON endpoint and the Scalar UI page
  * on the provided Hono app. Does nothing if `config.openapi.enabled` is false.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param config - The server configuration containing OpenAPI settings.
  * @param app - The Hono application to register documentation routes on.
  * @param state - The spec cache state instance for test isolation.
  */
-export function createOpenApiRoutes<TApp extends HalideContext = HalideContext>(
-  config: ServerConfig<TApp>,
+export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
+  config: ServerConfig<TClaims, TLogScope>,
   app: Hono,
   state: SpecCacheState = createSpecCacheState(),
 ): void {
@@ -187,8 +188,8 @@ export function createOpenApiRoutes<TApp extends HalideContext = HalideContext>(
         state.specResolution = (async (): Promise<void> => {
           try {
             const inlineSpec = await buildInlineSpec(app, options);
-            const resolved = await resolveOpenApiSpec(proxyRoutes ?? []);
-            const mergedSpec = mergeExternalSpecs(inlineSpec, resolved);
+            const resolvedSpecs = await resolveOpenApiSpec(proxyRoutes ?? []);
+            const mergedSpec = mergeExternalSpecs(inlineSpec, resolvedSpecs);
             state.cachedSpec = buildFinalSpec(mergedSpec, options);
           } catch {
             state.cachedSpec = {};

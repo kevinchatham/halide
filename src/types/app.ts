@@ -68,27 +68,13 @@ export type HalideContext<TClaims = unknown, TLogScope = unknown> = {
 };
 
 /**
- * Minimal constraint for type parameters that need to accept any HalideContext
- * variant without contravariance issues on Logger's type parameter.
- *
- * Uses `Logger<any>` because Logger is contravariant in TLogScope, which
- * prevents `HalideContext<UserClaims, LogScope>` from satisfying
- * `extends HalideContext<unknown, unknown>`. The `any` is intentional to
- * break contravariance at the constraint boundary.
+ * Hono context variables used internally by Halide middleware.
  */
-// biome-ignore lint/suspicious/noExplicitAny: required to accept any HalideContext variant
-export type AnyHalideContext = { claims: unknown; logger: Logger<any> };
-
-/** Extract the claims type from a context-like type. */
-export type AppClaims<TApp> = TApp extends { claims: infer C } ? C : unknown;
-
-/** Extract the logger type from a context-like type. */
-export type AppLogger<TApp> = TApp extends { logger: Logger<infer S> }
-  ? Logger<S>
-  : Logger<unknown>;
-
-/** Extract the log scope type from a context-like type. */
-export type AppLogScope<TApp> = TApp extends { logger: Logger<infer S> } ? S : unknown;
+export type HalideVariables = {
+  parsedBody?: unknown;
+  appCtx?: HalideContext;
+  reqCtx?: RequestContext;
+};
 
 /**
  * Configuration for app hosting (static files and/or API backend).
@@ -122,19 +108,11 @@ export type AppConfig = {
 };
 
 /**
- * Hono context variables used internally by Halide middleware.
- */
-export type HalideVariables = {
-  parsedBody?: unknown;
-  appCtx?: HalideContext;
-  reqCtx?: RequestContext;
-};
-
-/**
  * Configuration for observability features: logging, request IDs, and lifecycle hooks.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type ObservabilityConfig<TApp = HalideContext> = {
+export type ObservabilityConfig<TClaims = unknown, TLogScope = unknown> = {
   /**
    * Enable x-request-id header propagation. If an incoming request has an
    * x-request-id header, it is reused; otherwise a new UUID is generated.
@@ -143,31 +121,31 @@ export type ObservabilityConfig<TApp = HalideContext> = {
   requestId?: boolean;
   /**
    * Logger instance. If not provided, a styled default logger is used.
-   * The logger scope type is inferred from TApp's TLogScope parameter.
+   * The logger scope type is inferred from TLogScope.
    */
-  logger?: AppLogger<TApp>;
+  logger?: Logger<TLogScope>;
   /**
    * Factory that builds a typed log scope object for each request.
-   * Receives the normalized request context and the bundled app context
-   * (with claims and logger), and returns a TLogScope value that will be
-   * automatically passed to every logger call within the request.
+   * Receives the normalized request context and the JWT claims (if authenticated),
+   * and returns a TLogScope value that will be automatically passed to every
+   * logger call within the request.
    *
    * This eliminates the need to manually construct and pass scope objects
    * in every `logger.info(scope, ...)` call — the framework does it for you.
    *
    * @example
    * ```ts
-   * const server = createServer<HalideContext<UserClaims, { requestId: string }>>>({
+   * const server = createServer({
    *   observability: {
-   *     logScopeFactory: (ctx, app) => ({
+   *     logScopeFactory: (ctx, claims) => ({
    *       requestId: ctx.path,
-   *       userId: app.claims?.sub ?? undefined,
+   *       userId: claims?.sub ?? undefined,
    *     }),
    *   },
    * });
    * ```
    */
-  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>;
+  logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope;
   /**
    * Maximum bytes to collect from proxy responses for observability logging.
    * The full response is always piped through unmodified; this only limits
@@ -181,7 +159,7 @@ export type ObservabilityConfig<TApp = HalideContext> = {
     /** Normalized request context. */
     ctx: RequestContext,
     /** Bundled app context with claims and logger. */
-    app: TApp,
+    app: HalideContext<TClaims, TLogScope>,
   ) => void | Promise<void>;
   /**
    * Hook called after each response is sent. Use for logging response times and status codes.
@@ -190,7 +168,7 @@ export type ObservabilityConfig<TApp = HalideContext> = {
     /** Normalized request context. */
     ctx: RequestContext,
     /** Bundled app context with claims and logger. */
-    app: TApp,
+    app: HalideContext<TClaims, TLogScope>,
     /** Response context including status code and duration. */
     response: ResponseContext,
   ) => void | Promise<void>;

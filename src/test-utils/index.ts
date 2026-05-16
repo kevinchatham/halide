@@ -18,7 +18,9 @@ export const noopLogger: Logger<unknown> = createNoopLogger();
  * @param config - The server configuration containing routes.
  * @returns A Hono app with routes registered but not started.
  */
-export function createTestApp(config: ServerConfig): Hono<{ Variables: HalideVariables }> {
+export function createTestApp<TClaims = unknown, TLogScope = unknown>(
+  config: ServerConfig<TClaims, TLogScope>,
+): Hono<{ Variables: HalideVariables }> {
   const app = new Hono<{ Variables: HalideVariables }>();
   const agentCache = createAgentCache();
   registerRoutes({ agentCache, app, config, logger: noopLogger });

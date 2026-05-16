@@ -435,7 +435,7 @@ describe('createApp', () => {
       ],
       observability: {
         logger,
-        logScopeFactory: (ctx: import('../types/app').RequestContext, _app: unknown) => ({
+        logScopeFactory: (ctx: import('../types/app').RequestContext, _claims: unknown) => ({
           requestId: ctx.path,
         }),
       },

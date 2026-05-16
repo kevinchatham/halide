@@ -1,6 +1,5 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { ApiRoute, ProxyRoute } from '../types/api';
-import type { HalideContext } from '../types/app';
 import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody';
 
 /**
@@ -21,11 +20,13 @@ type BodyMethod = 'post' | 'put' | 'patch';
  *
  * Must call next() to continue the middleware chain when no body is returned.
  *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The API route definition.
  * @returns A Hono middleware handler.
  */
-export function createApiBodyParser<TApp = HalideContext>(
-  route: ApiRoute<TApp>,
+export function createApiBodyParser<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope>,
 ): MiddlewareHandler {
   const methodsWithBody = new Set<BodyMethod | string>(['POST', 'PUT', 'PATCH']);
 
@@ -60,11 +61,13 @@ export function createApiBodyParser<TApp = HalideContext>(
  *
  * Skips body parsing when no transform function is configured.
  *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The proxy route definition.
  * @returns A Hono middleware handler.
  */
-export function createProxyBodyParser<TApp = HalideContext>(
-  route: ProxyRoute<TApp>,
+export function createProxyBodyParser<TClaims = unknown, TLogScope = unknown>(
+  route: ProxyRoute<TClaims, TLogScope>,
 ): MiddlewareHandler {
   return async (c: Context, next: Next) => {
     if (!route.transform) return next();

@@ -6,7 +6,7 @@ import { proxy } from 'hono/proxy';
 import { MAX_AGENT_CACHE } from '../config/constants';
 import { DEFAULTS } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
-import type { AnyHalideContext, Logger, RequestContext } from '../types/app';
+import type { Logger, RequestContext } from '../types/app';
 import { isTrustedProxy } from '../utils/trustedProxies';
 
 /** Cached HTTP agent pool with bounded size. */
@@ -295,10 +295,10 @@ function filterForwardHeaders(
  * Calls `route.identity(ctx, app)` to get a map of header names to values,
  * then sets each header only if it is writable (not readonly, not multi-value).
  */
-function applyIdentityHeaders<TApp extends AnyHalideContext>(
+function applyIdentityHeaders<TClaims = unknown, TLogScope = unknown>(
   headers: Record<string, string | undefined>,
-  route: ProxyRoute<TApp>,
-  app: TApp,
+  route: ProxyRoute<TClaims, TLogScope>,
+  app: HalideContext<TClaims, TLogScope>,
   c: Context,
   reqCtx: RequestContext,
 ): void {
@@ -335,12 +335,12 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
  * When a transform exists, normalizes headers, calls the transform function,
  * and applies any modified headers back, respecting readonly constraints.
  */
-function applyTransform<TApp extends AnyHalideContext>(
-  route: ProxyRoute<TApp>,
+function applyTransform<TClaims = unknown, TLogScope = unknown>(
+  route: ProxyRoute<TClaims, TLogScope>,
   parsedBody: unknown,
   c: Context,
   headers: Record<string, string | undefined>,
-  logger?: Logger<unknown>,
+  logger?: Logger<TLogScope>,
 ): BodyInit | null {
   if (!route.transform) return c.req.raw.body;
   try {
@@ -366,7 +366,7 @@ function applyTransform<TApp extends AnyHalideContext>(
     }
     return body;
   } catch (err) {
-    logger?.error({}, err instanceof Error ? err.message : String(err));
+    logger?.error({} as TLogScope, err instanceof Error ? err.message : String(err));
     throw err;
   }
 }
@@ -377,15 +377,16 @@ function applyTransform<TApp extends AnyHalideContext>(
  * Rewrites paths (supporting wildcard patterns), applies identity headers,
  * transforms the request body, and forwards using `hono/proxy`.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The proxy route configuration.
  * @param app - Bundled app context with claims and logger.
  * @param parsedBody - Optional pre-parsed request body.
  * @returns A function that handles the proxy request.
  */
-export function createProxyService<TApp extends AnyHalideContext = HalideContext>(
-  route: ProxyRoute<TApp>,
-  app: TApp,
+export function createProxyService<TClaims = unknown, TLogScope = unknown>(
+  route: ProxyRoute<TClaims, TLogScope>,
+  app: HalideContext<TClaims, TLogScope>,
   agentCache: AgentCache,
   parsedBody?: unknown,
 ): (c: Context) => Promise<Response> {

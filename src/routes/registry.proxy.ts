@@ -2,17 +2,8 @@ import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { describeRoute } from 'hono-openapi';
 import type { AgentCache } from '../services/proxy';
 import { createProxyService } from '../services/proxy';
-import type { ProxyRoute } from '../types/api';
-import type {
-  AnyHalideContext,
-  AppClaims,
-  AppLogger,
-  AppLogScope,
-  HalideContext,
-  HalideVariables,
-  ObservabilityConfig,
-  RequestContext,
-} from '../types/app';
+import type { HalideContext, ProxyRoute } from '../types/api';
+import type { HalideVariables, Logger, ObservabilityConfig, RequestContext } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
 import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth';
@@ -21,14 +12,14 @@ import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
 
 /** Register a proxy route with auth, observability, and proxy forwarding for each configured method. */
-export function registerProxyRoute<TApp extends AnyHalideContext = HalideContext>(
+export function registerProxyRoute<TClaims = unknown, TLogScope = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
-  route: ProxyRoute<TApp>,
-  claimExtractor: ClaimExtractor<AppClaims<TApp>> | undefined,
-  observability: ObservabilityConfig<TApp> | undefined,
-  logger: AppLogger<TApp>,
+  route: ProxyRoute<TClaims, TLogScope>,
+  claimExtractor: ClaimExtractor<TClaims> | undefined,
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined,
+  logger: Logger<TLogScope>,
   agentCache: AgentCache,
-  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>,
+  logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope,
 ): void {
   for (const method of route.methods) {
     const middlewares: MiddlewareHandler[] = [describeRoute(buildDescribeRouteOptions(route))];
@@ -51,18 +42,19 @@ export function registerProxyRoute<TApp extends AnyHalideContext = HalideContext
  * observability, and emits onRequest/onResponse hooks. Returns 502 if the
  * pipe fails or 500 on handler errors.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The proxy route definition.
  * @param agentCache - The HTTP agent cache for proxy connections.
  * @param observability - The observability configuration.
  * @param logger - Logger instance for error reporting.
  * @returns A Hono middleware handler.
  */
-function createProxyHandler<TApp extends AnyHalideContext = HalideContext>(
-  route: ProxyRoute<TApp>,
+function createProxyHandler<TClaims = unknown, TLogScope = unknown>(
+  route: ProxyRoute<TClaims, TLogScope>,
   agentCache: AgentCache,
-  observability: ObservabilityConfig<TApp> | undefined,
-  logger: AppLogger<TApp>,
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined,
+  logger: Logger<TLogScope>,
 ): MiddlewareHandler {
   return async (c: Context) => {
     const start = Date.now();
@@ -71,7 +63,7 @@ function createProxyHandler<TApp extends AnyHalideContext = HalideContext>(
     let statusCode = 200;
     let proxyResponseBody: unknown;
 
-    const appCtx = c.get('appCtx') as TApp;
+    const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope>;
     const reqCtx = c.get('reqCtx') as RequestContext;
     const body = c.get('parsedBody');
 
@@ -86,12 +78,7 @@ function createProxyHandler<TApp extends AnyHalideContext = HalideContext>(
         return response;
       }
 
-      const pipeResult = await observeAndPipeResponse(
-        c,
-        response,
-        observability as ObservabilityConfig<HalideContext> | undefined,
-        route.observe,
-      );
+      const pipeResult = await observeAndPipeResponse(c, response, observability, route.observe);
 
       if (pipeResult.aborted) {
         handlerError = new Error('Client disconnected');

@@ -118,12 +118,7 @@ describe('createErrorHandler', () => {
 
   it('calls logScopeFactory and merges scope into logger call', () => {
     const factory =
-      vi.fn<
-        (
-          ctx: RequestContext,
-          app: { claims: unknown; logger: Logger<unknown> },
-        ) => { userId: string; path: string }
-      >();
+      vi.fn<(ctx: RequestContext, claims: unknown) => { userId: string; path: string }>();
     factory.mockReturnValue({ path: '/fail', userId: 'user-1' });
     const handler = createErrorHandler(logger, factory);
     const reqCtx = {
@@ -133,7 +128,7 @@ describe('createErrorHandler', () => {
       path: '/fail',
       query: {},
     } satisfies RequestContext;
-    const appCtx = { claims: null, logger };
+    const appCtx = { claims: 'user-1', logger };
     const mockJson = vi.fn().mockReturnValue(new Response());
     const mockContext = {
       get: (key: string) => {
@@ -149,7 +144,7 @@ describe('createErrorHandler', () => {
 
     expect(mockJson).toHaveBeenCalledWith({ error: 'Internal Server Error' }, 500);
     expect(factory).toHaveBeenCalledTimes(1);
-    expect(factory).toHaveBeenCalledWith(reqCtx, appCtx);
+    expect(factory).toHaveBeenCalledWith(reqCtx, appCtx.claims);
     expect(logger.error).toHaveBeenCalled();
     const call = logger.error.mock.calls[0]!;
     const scope = call[0] as { userId: string; path: string; errorStack?: string };

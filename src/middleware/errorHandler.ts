@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Logger, RequestContext } from '../types/app';
+import type { HalideContext, Logger, RequestContext } from '../types/app';
 
 /**
  * Create an error handler middleware that logs error details and returns a response.
@@ -9,15 +9,15 @@ import type { Logger, RequestContext } from '../types/app';
  * per-request scope that is merged with the error metadata (e.g., errorStack)
  * before logging, so error logs automatically include the request context.
  *
+ * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
- * @typeParam TApp - The type of the app context passed to the factory.
  * @param logger - Logger instance for error logging.
  * @param logScopeFactory - Optional per-request factory that produces a typed log scope.
  * @returns A Hono error handler function.
  */
-export function createErrorHandler<TLogScope = unknown, TApp = unknown>(
+export function createErrorHandler<TClaims = unknown, TLogScope = unknown>(
   logger: Logger<TLogScope>,
-  logScopeFactory?: (ctx: RequestContext, app: TApp) => TLogScope,
+  logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope,
 ): (err: unknown, c: Context) => Response {
   return (err: unknown, c: Context) => {
     const message = err instanceof Error ? err.message : String(err);
@@ -33,9 +33,9 @@ export function createErrorHandler<TLogScope = unknown, TApp = unknown>(
     let logScope: TLogScope;
     if (logScopeFactory) {
       const reqCtx = c.get('reqCtx') as RequestContext | undefined;
-      const appCtx = c.get('appCtx') as { claims: unknown; logger: Logger<TLogScope> } | undefined;
+      const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope> | undefined;
       const factoryScope =
-        reqCtx && appCtx ? logScopeFactory(reqCtx, appCtx as unknown as TApp) : ({} as TLogScope);
+        reqCtx && appCtx ? logScopeFactory(reqCtx, appCtx.claims) : ({} as TLogScope);
       logScope = {
         ...(typeof factoryScope === 'object' && factoryScope !== null ? factoryScope : {}),
         ...(stack ? { errorStack: stack } : {}),

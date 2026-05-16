@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import type { DescribeRouteOptions, ResponsesWithResolver } from 'hono-openapi';
 import { resolver } from 'hono-openapi';
 import { OPENAPI_FETCH_TIMEOUT_MS } from '../config/constants';
-import type { ApiRoute, HalideContext, ProxyRoute } from '../types/api';
+import type { ApiRoute, ProxyRoute } from '../types/api';
 import type { OpenApiSource, ResolvedOpenApiSpec } from '../types/openapi';
 
 /**
@@ -65,15 +65,15 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
  * @param proxyRoutes - The proxy routes to check for external spec sources.
  * @returns A list of resolved specs paired with their owning routes.
  */
-export async function resolveOpenApiSpec<TApp extends HalideContext = HalideContext>(
-  proxyRoutes: ProxyRoute<TApp>[],
-): Promise<ResolvedOpenApiSpec[]> {
-  const results: ResolvedOpenApiSpec[] = [];
+export async function resolveOpenApiSpec<TClaims = unknown, TLogScope = unknown>(
+  proxyRoutes: ProxyRoute<TClaims, TLogScope>[],
+): Promise<ResolvedOpenApiSpec<TClaims, TLogScope>[]> {
+  const results: ResolvedOpenApiSpec<TClaims, TLogScope>[] = [];
 
   for (const route of proxyRoutes) {
     if (route.openapiSpec) {
       const spec = await resolveOpenApiSource(route.openapiSpec);
-      results.push({ route: route as ProxyRoute<HalideContext>, spec });
+      results.push({ route, spec });
     }
   }
 
@@ -84,12 +84,13 @@ export async function resolveOpenApiSpec<TApp extends HalideContext = HalideCont
  * Build OpenAPI describeRoute options from route metadata, including hidden flag
  * and request body schema.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The API or proxy route to build options for.
  * @returns Describe route options for hono-openapi.
  */
-export function buildDescribeRouteOptions<TApp>(
-  route: ApiRoute<TApp> | ProxyRoute<TApp>,
+export function buildDescribeRouteOptions<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope> | ProxyRoute<TClaims, TLogScope>,
 ): DescribeRouteOptions {
   const meta = route.openapi;
   const options: DescribeRouteOptions = {};
@@ -110,12 +111,13 @@ export function buildDescribeRouteOptions<TApp>(
  * Build OpenAPI request body configuration from route request schema, detecting
  * optional wrappers.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The route with a potential request schema.
  * @returns Request body configuration or undefined when no schema exists.
  */
-export function buildRequestBody<TApp>(
-  route: ApiRoute<TApp> | ProxyRoute<TApp>,
+export function buildRequestBody<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope> | ProxyRoute<TClaims, TLogScope>,
 ): DescribeRouteOptions['requestBody'] {
   const schema = route.type === 'api' ? route.requestSchema : undefined;
   if (!schema) return undefined;
@@ -134,12 +136,13 @@ export function buildRequestBody<TApp>(
  * Build OpenAPI responses object from route metadata or response schema,
  * defaulting to a 200 successful response.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The route to build response definitions for.
  * @returns Responses map for hono-openapi describeRoute.
  */
-export function buildResponses<TApp>(
-  route: ApiRoute<TApp> | ProxyRoute<TApp>,
+export function buildResponses<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope> | ProxyRoute<TClaims, TLogScope>,
 ): ResponsesWithResolver {
   const meta = route.openapi;
   const responses: ResponsesWithResolver = {};

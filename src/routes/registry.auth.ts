@@ -3,15 +3,8 @@ import { MAX_EXTRACTOR_CACHE } from '../config/constants';
 import { createScopedLogger, DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
-import type { AuthorizeFn } from '../types/api';
-import type {
-  AppClaims,
-  AppLogger,
-  AppLogScope,
-  HalideContext,
-  ObservabilityConfig,
-  RequestContext,
-} from '../types/app';
+import type { AuthorizeFn, HalideContext } from '../types/api';
+import type { Logger, ObservabilityConfig, RequestContext } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
@@ -69,46 +62,47 @@ export function createAuthErrorResponse(c: Context, status: number, message: str
  * Selects between JWKS or bearer extraction based on the auth strategy.
  * Results are cached by auth strategy key for reuse across calls.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param config - The server configuration containing auth settings.
  * @param logger - Logger instance for error reporting.
  * @param cache - The claim extractor cache instance.
  * @returns A claim extractor function or undefined when auth is disabled.
  */
-export function createClaimExtractor<TApp = HalideContext>(
-  config: ServerConfig<TApp>,
-  logger: AppLogger<TApp>,
+export function createClaimExtractor<TClaims = unknown, TLogScope = unknown>(
+  config: ServerConfig<TClaims, TLogScope>,
+  logger: Logger<TLogScope>,
   cache: ClaimExtractorCache = NOOP_EXTRACTOR_CACHE,
-): ClaimExtractor<AppClaims<TApp>> | undefined {
+): ClaimExtractor<TClaims> | undefined {
   const auth = config.security?.auth;
   if (!auth) return undefined;
 
   const key = auth.strategy || 'none';
   const cached = cache.get(key);
-  if (cached) return cached as ClaimExtractor<AppClaims<TApp>> | undefined;
+  if (cached) return cached as ClaimExtractor<TClaims> | undefined;
 
   let result: ClaimExtractor<unknown> | undefined;
 
   if (auth.strategy === 'jwks' && auth.jwksUri) {
     const { jwksUri, audience } = auth;
-    result = (c: Context): Promise<AppClaims<TApp> | null> =>
-      extractJwksClaims<AppClaims<TApp>>(c, jwksUri, audience);
+    result = (c: Context): Promise<TClaims | null> =>
+      extractJwksClaims<TClaims>(c, jwksUri, audience);
   } else if (auth.secret) {
     const { secret, audience, secretTtl, algorithms } = auth;
     const ttl = secretTtl ?? DEFAULTS.auth.secretTtl;
     const cachedResolver = createSecretCache(ttl, logger);
     const secretFetcher: () => string | Promise<string> =
       typeof secret === 'string' ? stringSecretFetcher(secret) : secret;
-    result = async (c: Context): Promise<AppClaims<TApp> | null> => {
+    result = async (c: Context): Promise<TClaims | null> => {
       const resolvedSecret = await cachedResolver(secretFetcher);
-      return extractBearerClaims<AppClaims<TApp>>(c, resolvedSecret, audience, algorithms);
+      return extractBearerClaims<TClaims>(c, resolvedSecret, audience, algorithms);
     };
   }
 
   if (result) {
     cache.set(key, result);
   }
-  return result as ClaimExtractor<AppClaims<TApp>> | undefined;
+  return result as ClaimExtractor<TClaims> | undefined;
 }
 
 /**
@@ -117,17 +111,17 @@ export function createClaimExtractor<TApp = HalideContext>(
  *
  * Skips extraction for public routes or when no auth is configured.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
  * @param c - The Hono context.
  * @param route - The route, which determines access level.
  * @param claimExtractor - The configured claim extractor function.
  * @returns The extracted claims and a response to return on authentication failure.
  */
-export async function extractClaims<TApp = HalideContext>(
+export async function extractClaims<TClaims = unknown>(
   c: Context,
   route: { access: string },
-  claimExtractor: ClaimExtractor<AppClaims<TApp>> | undefined,
-): Promise<{ claims: AppClaims<TApp> | undefined; response: Response | null }> {
+  claimExtractor: ClaimExtractor<TClaims> | undefined,
+): Promise<{ claims: TClaims | undefined; response: Response | null }> {
   if (route.access === 'public' || !claimExtractor) {
     return { claims: undefined, response: null };
   }
@@ -147,7 +141,8 @@ export async function extractClaims<TApp = HalideContext>(
  *
  * Returns null immediately when no authorize function is configured on the route.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param c - The Hono context.
  * @param route - The route with an optional authorize function.
  * @param app - The bundled app context.
@@ -155,10 +150,10 @@ export async function extractClaims<TApp = HalideContext>(
  * @param ctx - Pre-built request context to avoid recreation.
  * @returns A 403 response if authorization is denied, or null to continue processing.
  */
-export async function checkAuthorization<TApp>(
+export async function checkAuthorization<TClaims = unknown, TLogScope = unknown>(
   c: Context,
-  route: { authorize?: AuthorizeFn<TApp> },
-  app: TApp,
+  route: { authorize?: AuthorizeFn<TClaims, TLogScope> },
+  app: HalideContext<TClaims, TLogScope>,
   _body: unknown,
   ctx: RequestContext,
 ): Promise<Response | null> {
@@ -180,25 +175,29 @@ export async function checkAuthorization<TApp>(
  * Skips the hook when `observe` is false or when no onRequest hook is configured.
  * Wraps callback invocations in try/catch to prevent async errors from silently failing.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param config - The emit configuration.
  * @param ctx - Pre-built request context.
  */
-export function emitOnRequest<TApp>(config: EmitConfig<TApp>, ctx: RequestContext): void {
+export function emitOnRequest<TClaims = unknown, TLogScope = unknown>(
+  config: EmitConfig<TClaims, TLogScope>,
+  ctx: RequestContext,
+): void {
   if (config.observability?.onRequest && config.observe !== false) {
     try {
       const result = config.observability.onRequest(ctx, config.app);
       if (result instanceof Promise) {
         result.catch((err) =>
           config.logger?.error(
-            {},
+            {} as TLogScope,
             `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
           ),
         );
       }
     } catch (err) {
       config.logger?.error(
-        {},
+        {} as TLogScope,
         `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
@@ -219,28 +218,31 @@ interface ResponseEmitContext {
 
 /**
  * Common emit configuration shared between onRequest and onResponse hooks.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-interface EmitConfig<TApp> {
+interface EmitConfig<TClaims = unknown, TLogScope = unknown> {
   /** The bundled app context. */
-  app: TApp;
+  app: HalideContext<TClaims, TLogScope>;
   /** The parsed request body. */
   body: unknown;
   /** The Hono context. */
   c: Context;
   /** Logger instance for reporting hook errors. */
-  logger?: AppLogger<TApp>;
+  logger?: Logger<TLogScope>;
   /** The observability configuration. */
-  observability: ObservabilityConfig<TApp> | undefined;
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined;
   /** Whether observability is enabled for this specific route. */
   observe: boolean | undefined;
 }
 
 /**
  * Extended emit configuration for the onResponse hook.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-interface ResponseEmitConfig<TApp> extends EmitConfig<TApp> {
+interface ResponseEmitConfig<TClaims = unknown, TLogScope = unknown>
+  extends EmitConfig<TClaims, TLogScope> {
   /** Set to 'text' for proxy route response bodies. */
   bodyType?: 'text' | 'binary';
   /** The response emit context with error, start time, and status code. */
@@ -256,11 +258,15 @@ interface ResponseEmitConfig<TApp> extends EmitConfig<TApp> {
  * Computes the response duration from the start timestamp.
  * Wraps callback invocations in try/catch to prevent async errors from silently failing.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param config - The emit configuration.
  * @param ctx - Pre-built request context.
  */
-export function emitOnResponse<TApp>(config: ResponseEmitConfig<TApp>, ctx: RequestContext): void {
+export function emitOnResponse<TClaims = unknown, TLogScope = unknown>(
+  config: ResponseEmitConfig<TClaims, TLogScope>,
+  ctx: RequestContext,
+): void {
   if (config.observability?.onResponse && config.observe !== false) {
     try {
       const result = config.observability.onResponse(ctx, config.app, {
@@ -273,14 +279,14 @@ export function emitOnResponse<TApp>(config: ResponseEmitConfig<TApp>, ctx: Requ
       if (result instanceof Promise) {
         result.catch((err) =>
           config.logger?.error(
-            {},
+            {} as TLogScope,
             `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
           ),
         );
       }
     } catch (err) {
       config.logger?.error(
-        {},
+        {} as TLogScope,
         `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
@@ -299,18 +305,19 @@ export function emitOnResponse<TApp>(config: ResponseEmitConfig<TApp>, ctx: Requ
  * for downstream middleware. Returns 401 on auth failure, 403 on authorization
  * denial.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The route definition (provides access level and authorize function).
  * @param claimExtractor - The configured claim extractor function.
  * @param logger - Base logger instance for error reporting.
  * @param logScopeFactory - Optional per-request factory that produces a typed log scope.
  * @returns A Hono middleware handler.
  */
-export function createAuthMiddleware<TApp = HalideContext>(
-  route: { access: string; authorize?: AuthorizeFn<TApp> },
-  claimExtractor: ClaimExtractor<AppClaims<TApp>> | undefined,
-  logger: AppLogger<TApp>,
-  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>,
+export function createAuthMiddleware<TClaims = unknown, TLogScope = unknown>(
+  route: { access: string; authorize?: AuthorizeFn<TClaims, TLogScope> },
+  claimExtractor: ClaimExtractor<TClaims> | undefined,
+  logger: Logger<TLogScope>,
+  logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope,
 ): MiddlewareHandler {
   return async (c: Context, next: Next) => {
     const { claims, response: authResponse } = await extractClaims(c, route, claimExtractor);
@@ -321,12 +328,11 @@ export function createAuthMiddleware<TApp = HalideContext>(
 
     let scopedLogger = logger;
     if (logScopeFactory) {
-      const preliminaryAppCtx = { claims, logger } as TApp;
-      const scope = logScopeFactory(reqCtx, preliminaryAppCtx);
-      scopedLogger = createScopedLogger(logger, scope) as AppLogger<TApp>;
+      const scope = logScopeFactory(reqCtx, claims);
+      scopedLogger = createScopedLogger(logger, scope);
     }
 
-    const appCtx: TApp = { claims, logger: scopedLogger } as TApp;
+    const appCtx: HalideContext<TClaims, TLogScope> = { claims, logger: scopedLogger };
 
     const forbidResponse = await checkAuthorization(c, route, appCtx, body, reqCtx);
     if (forbidResponse) return forbidResponse;

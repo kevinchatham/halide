@@ -250,8 +250,8 @@ describe('registerRoutes — auth', () => {
         },
       } as ServerConfig;
 
-      createClaimExtractor(bearerConfig, noopLogger);
-      createClaimExtractor(jwksConfig, noopLogger);
+      createClaimExtractor(bearerConfig, noopLogger as import('../types/app').Logger<unknown>);
+      createClaimExtractor(jwksConfig, noopLogger as import('../types/app').Logger<unknown>);
 
       expect(NOOP_EXTRACTOR_CACHE.size).toBe(2);
     });

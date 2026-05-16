@@ -1,12 +1,6 @@
 import type { Hono, MiddlewareHandler } from 'hono';
 import type { createAgentCache } from '../services/proxy';
-import type {
-  AnyHalideContext,
-  AppLogger,
-  AppLogScope,
-  HalideContext,
-  HalideVariables,
-} from '../types/app';
+import type { HalideVariables, Logger, RequestContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { registerApiRoute as registerApiRouteFn } from './registry.api';
 import {
@@ -51,15 +45,16 @@ export function registerRouteOnApp(
 
 /**
  * Options for {@link registerRoutes}.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type RegisterRoutesOptions<TApp extends AnyHalideContext = HalideContext> = {
+export type RegisterRoutesOptions<TClaims = unknown, TLogScope = unknown> = {
   /** The Hono application to register routes on. */
   app: Hono<{ Variables: HalideVariables }>;
   /** The server configuration containing routes and observability settings. */
-  config: ServerConfig<TApp>;
+  config: ServerConfig<TClaims, TLogScope>;
   /** Logger instance for observability. */
-  logger: AppLogger<TApp>;
+  logger: Logger<TLogScope>;
   /** The HTTP agent cache for proxy connections. */
   agentCache: ReturnType<typeof createAgentCache>;
   /** The claim extractor cache instance. Optional — defaults to a no-op cache. */
@@ -75,18 +70,23 @@ export type RegisterRoutesOptions<TApp extends AnyHalideContext = HalideContext>
  * so that every logger call within a request automatically receives the
  * per-request scope.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param options - The registration options.
  */
-export function registerRoutes<TApp extends AnyHalideContext = HalideContext>(
-  options: RegisterRoutesOptions<TApp>,
+export function registerRoutes<TClaims = unknown, TLogScope = unknown>(
+  options: RegisterRoutesOptions<TClaims, TLogScope>,
 ): void {
   const { app, config, logger, agentCache, claimExtractorCache = NOOP_EXTRACTOR_CACHE } = options;
   const logScopeFactory = config.observability?.logScopeFactory as
-    | ((ctx: import('../types/app').RequestContext, app: TApp) => AppLogScope<TApp>)
+    | ((ctx: RequestContext, claims: unknown) => TLogScope)
     | undefined;
 
-  const claimExtractor = createClaimExtractor<TApp>(config, logger, claimExtractorCache);
+  const claimExtractor = createClaimExtractor<TClaims, TLogScope>(
+    config,
+    logger,
+    claimExtractorCache,
+  );
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {

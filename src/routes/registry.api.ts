@@ -3,11 +3,9 @@ import { describeRoute, validator } from 'hono-openapi';
 import { DEFAULTS } from '../config/defaults';
 import type { ApiRoute } from '../types/api';
 import type {
-  AppClaims,
-  AppLogger,
-  AppLogScope,
   HalideContext,
   HalideVariables,
+  Logger,
   ObservabilityConfig,
   RequestContext,
 } from '../types/app';
@@ -19,13 +17,13 @@ import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
 
 /** Register an API route with validator, describeRoute, auth, and handler middleware. */
-export function registerApiRoute<TApp = HalideContext>(
+export function registerApiRoute<TClaims = unknown, TLogScope = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
-  route: ApiRoute<TApp>,
-  claimExtractor: ClaimExtractor<AppClaims<TApp>> | undefined,
-  observability: ObservabilityConfig<TApp> | undefined,
-  logger: AppLogger<TApp>,
-  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>,
+  route: ApiRoute<TClaims, TLogScope>,
+  claimExtractor: ClaimExtractor<TClaims> | undefined,
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined,
+  logger: Logger<TLogScope>,
+  logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope,
 ): void {
   const method = route.method ?? DEFAULTS.route.method;
   const middlewares: MiddlewareHandler[] = [];
@@ -51,16 +49,17 @@ export function registerApiRoute<TApp = HalideContext>(
  * Calls the route handler, pipes responses for observability, and emits
  * onRequest/onResponse hooks. Returns 502 if the pipe fails or 500 on handler errors.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The API route definition.
  * @param observability - The observability configuration.
  * @param logger - Logger instance for error reporting.
  * @returns A Hono middleware handler.
  */
-function createApiHandler<TApp = HalideContext>(
-  route: ApiRoute<TApp>,
-  observability: ObservabilityConfig<TApp> | undefined,
-  logger: AppLogger<TApp>,
+function createApiHandler<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope>,
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined,
+  logger: Logger<TLogScope>,
 ): MiddlewareHandler {
   return async (c: Context) => {
     const start = Date.now();
@@ -70,7 +69,7 @@ function createApiHandler<TApp = HalideContext>(
     let pipeError: Error | undefined;
     let responseToReturn: Response | undefined;
 
-    const appCtx = c.get('appCtx') as TApp;
+    const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope>;
     const reqCtx = c.get('reqCtx') as RequestContext;
     const body = c.get('parsedBody');
 
@@ -84,12 +83,7 @@ function createApiHandler<TApp = HalideContext>(
 
       if (result instanceof Response) {
         statusCode = result.status;
-        const pipeResult = await observeAndPipeResponse(
-          c,
-          result,
-          observability as ObservabilityConfig<HalideContext> | undefined,
-          route.observe,
-        );
+        const pipeResult = await observeAndPipeResponse(c, result, observability, route.observe);
 
         if (pipeResult.aborted) {
           handlerError = new Error('Client disconnected');

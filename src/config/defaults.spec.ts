@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Logger, RequestContext } from '../types/app';
+import type { HalideContext, Logger, RequestContext } from '../types/app';
 import {
   createDefaultLogger,
   createNoopLogger,
@@ -11,7 +11,7 @@ import {
 
 describe('defaultAuthorize', () => {
   it('returns true', async () => {
-    const result = await defaultAuthorize({} as RequestContext, {});
+    const result = await defaultAuthorize({} as RequestContext, {} as HalideContext);
     expect(result).toBe(true);
   });
 });

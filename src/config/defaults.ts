@@ -1,6 +1,6 @@
 import { styleText } from 'node:util';
 import type { AuthorizeFn } from '../types/api';
-import type { Logger, RequestContext } from '../types/app';
+import type { HalideContext, Logger, RequestContext } from '../types/app';
 
 /**
  * Default configuration values used when options are omitted.
@@ -71,8 +71,10 @@ export const DEFAULTS = {
 } as const;
 
 /** Default authorization function that permits all requests without checking claims. */
-export const defaultAuthorize: AuthorizeFn<unknown> = async (_ctx: RequestContext, _app: unknown) =>
-  true;
+export const defaultAuthorize: AuthorizeFn<unknown, unknown> = async (
+  _ctx: RequestContext,
+  _app: HalideContext,
+) => true;
 
 /**
  * Create a noop logger that discards all log messages.

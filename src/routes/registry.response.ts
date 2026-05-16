@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { HalideContext, ObservabilityConfig } from '../types/app';
+import type { ObservabilityConfig } from '../types/app';
 import { collectProxyBody } from './proxy-body';
 
 /**
@@ -23,17 +23,18 @@ export type PipeResult = {
  * response unchanged. Otherwise, tees the stream, reads up to maxCollect
  * bytes, and handles client disconnect (499 status).
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param c - The Hono context.
  * @param response - The response to pipe.
  * @param observability - The observability configuration.
  * @param observe - Whether observability is enabled for this route.
  * @returns The pipe result with collected body and potential errors.
  */
-export async function observeAndPipeResponse<TApp extends HalideContext = HalideContext>(
+export async function observeAndPipeResponse<TClaims = unknown, TLogScope = unknown>(
   c: Context,
   response: Response,
-  observability: ObservabilityConfig<TApp> | undefined,
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined,
   observe: boolean | undefined,
 ): Promise<PipeResult> {
   if (observe === false || !response.body) {

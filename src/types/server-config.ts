@@ -1,20 +1,21 @@
 import type { ApiRoute, ProxyRoute } from './api';
-import type { AppConfig, HalideContext, ObservabilityConfig } from './app';
+import type { AppConfig, ObservabilityConfig } from './app';
 import type { OpenApiConfig } from './openapi';
 import type { SecurityConfig } from './security';
 
 /**
  * Complete configuration for a Halide server.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type ServerConfig<TApp = HalideContext> = {
+export type ServerConfig<TClaims = unknown, TLogScope = unknown> = {
   /** Observability configuration: logging, request IDs, and lifecycle hooks. */
-  observability?: ObservabilityConfig<TApp>;
+  observability?: ObservabilityConfig<TClaims, TLogScope>;
   /** API route definitions. Each route maps a path+method to a handler function. */
-  apiRoutes?: ApiRoute<TApp, unknown, unknown>[];
+  apiRoutes?: ApiRoute<TClaims, TLogScope, unknown, unknown>[];
   /** Proxy route definitions. Each route forwards requests to an upstream target. */
-  proxyRoutes?: ProxyRoute<TApp>[];
+  proxyRoutes?: ProxyRoute<TClaims, TLogScope>[];
   /**
    * Security configuration: auth, CORS, CSP, rate limiting.
    *

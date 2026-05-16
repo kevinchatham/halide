@@ -13,15 +13,7 @@ import { createSecurityMiddleware } from '../middleware/security';
 import { createAppHandler } from '../routes/app';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
-import type {
-  AnyHalideContext,
-  AppConfig,
-  AppLogger,
-  AppLogScope,
-  HalideContext,
-  HalideVariables,
-  Logger,
-} from '../types/app';
+import type { AppConfig, HalideVariables, Logger } from '../types/app';
 import type { CspDirectives } from '../types/csp';
 import type { ServerConfig } from '../types/server-config';
 import { createDefaultLogger, DEFAULTS } from './defaults';
@@ -64,12 +56,13 @@ export interface CreateAppResult {
  * This is the core function that builds the server. It validates the config,
  * applies middleware, registers routes, and sets up the SPA fallback handler.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param configInput - The server configuration.
  * @returns An object containing the Hono app and cleanup functions.
  */
-export function createApp<TApp extends AnyHalideContext = HalideContext>(
-  configInput: ServerConfig<TApp>,
+export function createApp<TClaims = unknown, TLogScope = unknown>(
+  configInput: ServerConfig<TClaims, TLogScope>,
 ): CreateAppResult {
   const logger = configInput.observability?.logger ?? createDefaultLogger();
   const logScopeFactory = configInput.observability?.logScopeFactory;
@@ -80,7 +73,7 @@ export function createApp<TApp extends AnyHalideContext = HalideContext>(
     void validateServerConfig(configInput).then((result) => {
       if (!result.valid) {
         logger.error(
-          { errors: result.errors } as unknown as AppLogScope<TApp>,
+          { errors: result.errors } as TLogScope,
           'Async auth secret validation failed at startup:',
           result.errors.map((e) => e.message).join(', '),
         );
@@ -154,7 +147,7 @@ export function createApp<TApp extends AnyHalideContext = HalideContext>(
 
   if (openapiEnabled) {
     logger.warn(
-      { appName } as unknown,
+      { appName } as TLogScope,
       `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
     );
     const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<CspDirectives>;
@@ -169,15 +162,11 @@ export function createApp<TApp extends AnyHalideContext = HalideContext>(
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes({ agentCache, app, config: configInput, logger: logger as AppLogger<TApp> });
+  registerRoutes({ agentCache, app, config: configInput, logger: logger as Logger<TLogScope> });
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
 
-  createOpenApiRoutes(
-    configInput as ServerConfig<HalideContext>,
-    app as unknown as Hono,
-    specCacheState,
-  );
+  createOpenApiRoutes(configInput, app as unknown as Hono, specCacheState);
 
   if (configInput.app?.root) {
     const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
@@ -188,9 +177,14 @@ export function createApp<TApp extends AnyHalideContext = HalideContext>(
     app.all('/*', cspMiddleware, appFallback);
   }
 
-  app.onError(createErrorHandler<unknown, TApp>(logger, logScopeFactory));
+  app.onError(createErrorHandler<TClaims, TLogScope>(logger as Logger<TLogScope>, logScopeFactory));
 
-  return { app, logger, proxyDispose: () => agentCache.dispose(), rateLimitDispose };
+  return {
+    app,
+    logger: logger as Logger<unknown>,
+    proxyDispose: () => agentCache.dispose(),
+    rateLimitDispose,
+  };
 }
 
 /**
@@ -199,12 +193,15 @@ export function createApp<TApp extends AnyHalideContext = HalideContext>(
  * The server is synchronous to create. Call `server.start()` to listen.
  * Graceful shutdown is handled automatically on SIGINT/SIGTERM.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param configInput - The server configuration.
  * @returns A `Server` object with `ready`, `start`, and `stop` methods.
  * @example
  * ```ts
- * import { createServer, apiRoute } from 'halide';
+ * import { defineHalide } from 'halide';
+ *
+ * const { createServer, apiRoute } = defineHalide();
  *
  * const server = createServer({
  *   apiRoutes: [
@@ -219,10 +216,12 @@ export function createApp<TApp extends AnyHalideContext = HalideContext>(
  * server.start();
  * ```
  */
-export function createServer<TApp extends AnyHalideContext = HalideContext>(
-  configInput: ServerConfig<TApp>,
+export function createServer<TClaims = unknown, TLogScope = unknown>(
+  configInput: ServerConfig<TClaims, TLogScope>,
 ): Server {
-  const { app, proxyDispose, rateLimitDispose, logger } = createApp<TApp>(configInput);
+  const { app, proxyDispose, rateLimitDispose, logger } = createApp<TClaims, TLogScope>(
+    configInput,
+  );
 
   const appName = configInput.app?.name ?? DEFAULTS.app.name;
 
@@ -269,7 +268,7 @@ export function createServer<TApp extends AnyHalideContext = HalideContext>(
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    logger.info({ appName } as unknown, `Received ${signal}, shutting down...`);
+    logger.info({ appName }, `Received ${signal}, shutting down...`);
     await shutdownServer(0);
   };
 
@@ -279,7 +278,7 @@ export function createServer<TApp extends AnyHalideContext = HalideContext>(
       if (httpServer) return;
       const port =
         Number.parseInt(process.env.PORT || '', 10) || (configInput.app?.port ?? DEFAULTS.app.port);
-      logger.info({ appName } as unknown, `Server starting on port ${port}`);
+      logger.info({ appName }, `Server starting on port ${port}`);
       httpServer = serve(
         {
           fetch: app.fetch,
@@ -298,7 +297,7 @@ export function createServer<TApp extends AnyHalideContext = HalideContext>(
       });
       httpServer.on('error', (err: Error) => {
         readyReject(err);
-        logger.error({ appName } as unknown, `Failed to start: ${err.message}`);
+        logger.error({ appName }, `Failed to start: ${err.message}`);
       });
       process.on('SIGINT', () => {
         void shutdown('SIGINT');
