@@ -10,6 +10,7 @@ export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registe
 
 /**
  * Hono method types that have direct `app.*` methods on the Hono app instance.
+ *
  * HEAD is handled separately via `app.on('HEAD', ...)` since Hono has no dedicated `app.head()`.
  */
 export type HonoMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
@@ -19,6 +20,7 @@ export type HonoMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options'
  *
  * HEAD requests use `app.on('HEAD', ...)` since Hono has no dedicated `app.head()` method.
  *
+ * @internal
  * @param app - The Hono application to register the route on.
  * @param method - The HTTP method. `'head'` is mapped to `app.on('HEAD', ...)`.
  * @param path - The URL path pattern for this route (supports Hono-style parameters like `/:id`).

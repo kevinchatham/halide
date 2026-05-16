@@ -165,6 +165,8 @@ const jwksAuthSchema = z
  *
  * Uses `.union()` to accept either bearer or jwks auth config. Both are optional
  * at the top level (auth is nested under `security.auth`).
+ *
+ * @internal
  */
 export const authSchema = z.union([bearerAuthSchema, jwksAuthSchema]).optional();
 
@@ -240,6 +242,8 @@ export const proxyRouteSchema = z
  * Zod schema for route structural validation — union of API and proxy route schemas.
  *
  * Accepts either an API route (with `handler`) or a proxy route (with `target` and `methods`).
+ *
+ * @internal
  */
 export const routeSchema = z.union([apiRouteSchema, proxyRouteSchema]);
 
@@ -272,6 +276,8 @@ export const rateLimitSchema = z
  * Zod schema for security config — validates auth, cors, csp, and rateLimit sub-fields.
  *
  * All sub-fields are optional but the schema is strict (no unknown keys allowed).
+ *
+ * @internal
  */
 export const securitySchema = z
   .object({
@@ -299,6 +305,8 @@ export const openApiSchema = z
  *
  * Validates `logger`, `logScopeFactory`, `maxCollect` (positive, not exceeding MAX_COLLECT_BYTES),
  * `onRequest`, `onResponse`, and `requestId` fields.
+ *
+ * @internal
  */
 export const observabilitySchema = z
   .object({
@@ -327,6 +335,8 @@ export const observabilitySchema = z
  * - API route paths and proxy route paths must start with `/`.
  * - Proxy route `proxyPath` must start with `/`.
  * - API routes require a `handler` function.
+ *
+ * @internal
  */
 export const serverConfigSchema = z
   .object({

@@ -63,6 +63,9 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
  * local JSON file or URL), fetches or reads each spec, and returns them paired
  * with their owning route for later merging into the final OpenAPI document.
  *
+ * Supports http/https URLs and file:// URIs in addition to plain file paths.
+ * Fetches use a 10-second timeout to avoid hanging on unreachable URLs.
+ *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
  * @param proxyRoutes - The proxy routes to check for external spec sources.
@@ -89,7 +92,8 @@ export async function resolveOpenApiSpec<TClaims = unknown, TLogScope = unknown>
  *
  * Extracts `summary`, `description`, and `tags` from `route.openapi`, sets
  * `hide: true` when `observe` is false, and builds request body + response
- * definitions from route schemas.
+ * definitions from route schemas. Detects ZodOptional/ZodNullable wrappers
+ * to set `required: false` on optional request bodies.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
@@ -120,6 +124,7 @@ export function buildDescribeRouteOptions<TClaims = unknown, TLogScope = unknown
  *
  * For API routes, extracts the `requestSchema` and wraps it with the hono-openapi
  * resolver. Detects ZodOptional/ZodNullable wrappers to set `required: false`.
+ * Proxy routes do not have request schemas.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
@@ -147,8 +152,9 @@ export function buildRequestBody<TClaims = unknown, TLogScope = unknown>(
  * defaulting to a 200 successful response.
  *
  * When `route.openapi.responses` is set, uses those status-code-to-schema
- * mappings. For API routes with a `responseSchema`, generates a 200 response.
- * Otherwise returns a minimal 200 response with just a description.
+ * mappings. For API routes with a `responseSchema`, generates a 200 response
+ * with the schema resolver. Otherwise returns a minimal 200 response with just
+ * a description.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.

@@ -18,6 +18,8 @@ const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
  * Used to prevent concurrent OpenAPI spec resolution requests by sharing
  * a single `specResolution` promise among all in-flight requests.
  * When a spec is being resolved, subsequent requests await the same promise.
+ *
+ * Created by {@link createSpecCacheState} and passed to {@link createOpenApiRoutes}.
  */
 export interface SpecCacheState {
   /** The resolved OpenAPI spec, or `null` if not yet resolved. */
@@ -31,6 +33,7 @@ export interface SpecCacheState {
  *
  * Returns a new `SpecCacheState` with null cache and resolution,
  * allowing tests to create independent caches.
+ *
  * @returns A new `SpecCacheState` with null cache and resolution.
  */
 export function createSpecCacheState(): SpecCacheState {
@@ -42,6 +45,7 @@ export function createSpecCacheState(): SpecCacheState {
  *
  * Clears both `cachedSpec` and `specResolution` so that the next
  * request triggers a fresh spec resolution.
+ *
  * @param state - The spec cache state to reset.
  */
 export function resetOpenApiCache(state: SpecCacheState): void {
@@ -202,11 +206,16 @@ function buildFinalSpec(
  * Registers the OpenAPI spec JSON endpoint and the Scalar UI page
  * on the provided Hono app. Does nothing if `config.openapi.enabled` is false.
  *
+ * When proxy routes have `openapiSpec` configured, external specs are
+ * resolved (from URLs or local files) and merged into the inline spec
+ * before caching. Subsequent requests return the cached spec.
+ *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
  * @param config - The server configuration containing OpenAPI settings.
  * @param app - The Hono application to register documentation routes on.
  * @param state - The spec cache state instance for test isolation.
+ * @param logger - Optional logger for reporting spec resolution errors.
  */
 export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,

@@ -9,12 +9,16 @@ import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
 /** Wrap a string secret in a fetcher function for compatibility with the cached secret resolver. */
-function stringSecretFetcher(s: string): () => string | Promise<string> {
+function _stringSecretFetcher(s: string): () => string | Promise<string> {
   return () => s;
 }
 
 /**
  * Create an auth error response with the given HTTP status and error message.
+ *
+ * Returns a JSON response with the error message and the specified HTTP status code.
+ * Only accepts 400, 401, 403, 404, or 500 as valid status codes.
+ *
  * @param c - The Hono context.
  * @param status - HTTP status code (400, 401, 403, 404, or 500).
  * @param message - Error message to include in the response body.
@@ -56,7 +60,7 @@ export function createClaimExtractor<TClaims = unknown, TLogScope = unknown>(
     const ttl = secretTtl ?? DEFAULTS.auth.secretTtl;
     const cachedResolver = createSecretCache(ttl, logger);
     const secretFetcher: () => string | Promise<string> =
-      typeof secret === 'string' ? stringSecretFetcher(secret) : secret;
+      typeof secret === 'string' ? _stringSecretFetcher(secret) : secret;
     return async (c: Context): Promise<TClaims | null> => {
       const resolvedSecret = await cachedResolver(secretFetcher);
       return extractBearerClaims<TClaims>(c, resolvedSecret, audience, algorithms);

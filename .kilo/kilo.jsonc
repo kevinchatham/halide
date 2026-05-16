@@ -1,0 +1,10 @@
+{
+  "compaction": {
+    "auto": true,
+    "preserve_recent_tokens": 8000,
+    "prune": true,
+    "reserved": 20000,
+    "tail_turns": 2,
+    "threshold_percent": 100
+  }
+}

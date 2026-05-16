@@ -7,6 +7,10 @@ type AuthInput = Pick<SecurityAuthConfig, 'strategy' | 'secret'>;
 
 /**
  * A single validation error with field location and message.
+ *
+ * Used by {@link ValidationResult} to report configuration issues found
+ * during validation. The `field` uses dot-notation to identify the exact
+ * nested path (e.g., `'security.auth.secret'`).
  */
 export type ValidationError = {
   /** Dot-notation path to the offending field (e.g., `'security.auth.secret'`). */
@@ -17,8 +21,12 @@ export type ValidationError = {
 
 /**
  * Result of validation with collected errors and warnings.
+ *
  * When `valid` is true, `errors` is empty and `warnings` may contain
- * non-blocking advisory messages about config choices.
+ * non-blocking advisory messages about config choices (e.g., rate limiting
+ * without a Redis client).
+ *
+ * Returned by {@link validateServerConfig} and {@link validateAuthSecret}.
  */
 export type ValidationResult = {
   /** List of accumulated validation errors. Empty when `valid` is true. */
@@ -68,10 +76,13 @@ function parseConfig<TConfig extends Record<string, unknown>>(
 
 /**
  * Validate an async auth secret by calling it and checking the resolved value.
+ *
  * Zod already validates string-based secrets synchronously; this only handles
- * function-based secrets that return a Promise.
- * @param auth - Partial auth config to validate.
- * @returns A `ValidationResult` with any errors.
+ * function-based secrets that return a Promise. Checks that the resolved
+ * value is a non-empty string.
+ *
+ * @param auth - Partial auth config to validate (strategy and secret fields).
+ * @returns A `ValidationResult` with any errors from resolving the secret.
  */
 export async function validateAuthSecret(auth?: AuthInput): Promise<ValidationResult> {
   const errors: ValidationError[] = [];
@@ -101,9 +112,13 @@ export async function validateAuthSecret(auth?: AuthInput): Promise<ValidationRe
 
 /**
  * Synchronously validate a server configuration object.
+ *
  * Uses Zod schemas with superRefine for structural and cross-field validation.
  * Throws if the config contains function-based auth secrets, as they cannot be
- * validated synchronously — use `validateServerConfig` for async secret support.
+ * validated synchronously — use {@link validateServerConfig} for async secret support.
+ *
+ * Emits warnings via `logger` for non-blocking issues (e.g., rate limiting without Redis).
+ *
  * @typeParam TConfig - The server configuration type.
  * @param config - The server configuration to validate.
  * @param logger - Optional logger for emitting validation warnings.
@@ -139,9 +154,12 @@ export function validateServerConfigSync<TConfig extends Record<string, unknown>
 
 /**
  * Validate a server configuration object.
+ *
  * Uses Zod schemas with superRefine for structural and cross-field validation.
- * Returns a ValidationResult instead of throwing, allowing callers to handle
- * validation errors programmatically.
+ * Returns a {@link ValidationResult} instead of throwing, allowing callers to
+ * handle validation errors programmatically. Resolves async auth secrets
+ * (function-based secrets) and validates the resolved value.
+ *
  * @typeParam TConfig - The server configuration type.
  * @param config - The server configuration to validate.
  * @returns A `ValidationResult` with any errors and warnings.

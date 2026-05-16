@@ -19,8 +19,18 @@ import { isTrustedProxy } from '../utils/trustedProxies';
  * Cached HTTP agent pool with bounded size and LRU eviction.
  *
  * Manages connection pooling for upstream HTTP/HTTPS proxy connections.
- * Each unique target URL gets its own agent. When the cache exceeds
- * {@link MAX_AGENT_CACHE}, the oldest entry is evicted.
+ * Each unique target URL gets its own `http.Agent` with keep-alive enabled.
+ * When the cache exceeds {@link MAX_AGENT_CACHE} entries, the oldest entry
+ * is destroyed and removed. Supports probing upstream targets to check
+ * connectivity before routing requests.
+ *
+ * @example
+ * ```ts
+ * const cache = createAgentCache();
+ * const agent = cache.getAgent('https://api.example.com');
+ * // ... use agent ...
+ * cache.dispose();
+ * ```
  */
 export class AgentCache {
   private readonly cache = new Map<string, http.Agent>();
@@ -176,6 +186,7 @@ const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
  * Only forwards when x-forwarded-for is in the allowlist, trustedProxies is configured,
  * and the socket IP matches a trusted proxy.
  *
+ * @internal
  * @param headers - The headers object to modify.
  * @param forwardHeaders - The allowlist of headers to forward.
  * @param trustedProxies - Trusted proxy IPs/CIDRs.
@@ -210,6 +221,7 @@ function appendForwardedFor(
  *
  * Arrays are mapped: string items pass through, non-string items are JSON-stringified.
  * Used when building query strings for upstream proxy requests.
+ *
  * @param v - The query parameter value to serialize.
  * @returns The serialized value as a string or string array.
  */
@@ -225,6 +237,9 @@ export function serializeQueryParam(v: unknown): string | string[] {
  *
  * Extracts method, path, headers, params, query, and body from the Hono
  * request and normalizes them into a consistent shape for route handlers.
+ * Query parameters are serialized via {@link serializeQueryParam} to handle
+ * multi-value arrays.
+ *
  * @param c - The Hono request context.
  * @param body - Optional pre-parsed request body to include.
  * @returns A normalized {@link RequestContext} object.

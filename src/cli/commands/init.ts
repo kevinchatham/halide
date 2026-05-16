@@ -17,6 +17,7 @@ import {
  * Used to run package manager commands without producing noisy output.
  * Stderr is written to `process.stderr` before rethrowing the error.
  *
+ * @internal
  * @param cmd - The shell command to execute (e.g., `'npm install halide'`).
  * @param cwd - The working directory for the command.
  */
@@ -140,6 +141,9 @@ export function getInstallCmd(pkgManager: PackageManager): string {
  * Uses Node.js `require.resolve()` to locate the halide package, then copies
  * the skill directory (excluding docs, which agents read from `node_modules/halide/docs/`).
  * Silently logs a warning if the skill directory cannot be found.
+ *
+ * @internal
+ * @param cwd - The project working directory.
  */
 export function installSkillsFromHalide(cwd: string): void {
   try {

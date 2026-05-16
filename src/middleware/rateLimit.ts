@@ -13,10 +13,13 @@ import { getClientIp } from '../utils/trustedProxies';
  *
  * Uses Redis for distributed rate limiting across multiple server instances.
  * Each client IP gets a key with a TTL matching the window duration.
- * When the request count exceeds `maxRequests`, returns a 429 Too Many Requests response.
+ * When the request count exceeds `maxRequests`, returns a 429 Too Many Requests response
+ * with a `Retry-After` header.
+ *
+ * Respects `trustedProxies` for `x-forwarded-for` header validation.
  *
  * @param client - A Redis client implementing the {@link RedisClient} interface.
- * @param config - Rate limit configuration (`maxRequests` and `windowMs`).
+ * @param config - Rate limit configuration (`maxRequests`, `windowMs`, `trustedProxies`).
  * @returns Object containing the middleware and a dispose function (no-op for Redis).
  */
 export function createRedisRateLimitStore(
@@ -64,6 +67,9 @@ export function createRedisRateLimitStore(
  *
  * Implementations can use Redis, DynamoDB, or any other distributed store
  * to share rate limit state across multiple server instances.
+ *
+ * The in-memory implementation ({@link createMemoryStore}) is used internally
+ * by {@link createRateLimitMiddleware}.
  *
  * @internal
  */
@@ -149,7 +155,9 @@ function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitS
  * Returns 429 Too Many Requests when the client has exceeded its window quota.
  * The dispose function clears the cleanup timer.
  *
- * @param config - Rate limit configuration (`maxRequests` and `windowMs`).
+ * Respects `trustedProxies` for `x-forwarded-for` header validation.
+ *
+ * @param config - Rate limit configuration (`maxRequests`, `windowMs`, `maxEntries`, `trustedProxies`).
  * @returns Object containing the middleware and a dispose function for cleanup.
  */
 export function createRateLimitMiddleware(config: RateLimitConfig): {

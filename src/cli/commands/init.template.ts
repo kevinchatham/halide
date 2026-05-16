@@ -36,7 +36,9 @@ server.start();
 
 /**
  * TypeScript configuration for the server build.
+ *
  * Used by `writeTsconfigServer` to create tsconfig.server.json.
+ * Targets ES2022 with CommonJS modules for the server build.
  */
 export const TSCONFIG_SERVER = `{
   "compilerOptions": {
@@ -130,7 +132,9 @@ export function addServerReference(cwd: string, dryRun = false, force = false): 
 
 /** Resolved app tsconfig info with raw content to avoid double reads. */
 export interface ResolvedTsconfig {
+  /** The raw tsconfig.json content as a string. */
   content: string;
+  /** The filename of the resolved tsconfig (e.g., `'tsconfig.json'`). */
   name: string;
 }
 

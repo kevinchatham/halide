@@ -14,13 +14,18 @@ import { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 
-/** Logger instance that discards all log messages, used for testing to suppress output. */
+/**
+ * Logger instance that discards all log messages, used for testing to suppress output.
+ *
+ * Created by calling {@link createNoopLogger}. Re-exported for convenience
+ * so tests don't need to import from `config/defaults`.
+ */
 export const noopLogger: Logger<unknown> = createNoopLogger();
 
 /**
  * Options for configuring which middleware pipelines `createTestApp` applies.
- * All flags default to `false` for backward compatibility with existing tests.
  *
+ * All flags default to `false` for backward compatibility with existing tests.
  * Use these flags to selectively enable middleware during testing without
  * configuring them in the server config.
  */
@@ -49,7 +54,7 @@ const rateLimitDisposeMap = new WeakMap<Hono<{ Variables: HalideVariables }>, ()
  *
  * When `createTestApp` is called with `{ rateLimit: true }`, the rate limit
  * middleware's dispose function is stored internally so tests can clean up
- * resources after they finish. This helper retrieves and calls it.
+ * resources (clears the cleanup timer) after they finish.
  *
  * @param app - The Hono app returned by `createTestApp`.
  * @returns `true` if a dispose function was found and invoked, `false` otherwise.

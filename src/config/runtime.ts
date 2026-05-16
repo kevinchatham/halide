@@ -21,32 +21,55 @@ import { validateServerConfig, validateServerConfigSync } from './validate';
 
 /**
  * Halide HTTP server with lifecycle management.
+ *
  * Created by {@link createServer}. Call `start()` to begin listening and `stop()` to shut down gracefully.
+ * Handles SIGINT/SIGTERM automatically, draining active connections before closing.
+ *
+ * @example
+ * ```ts
+ * const server = createServer({
+ *   apiRoutes: [],
+ *   app: { root: 'dist' },
+ * });
+ * server.start();
+ * await server.stop();
+ * ```
  */
 export interface Server {
   /** Promise that resolves when the server is ready to accept connections. */
   ready: Promise<void>;
   /**
    * Start the server and begin listening on the configured port.
+   *
+   * Registers SIGINT/SIGTERM handlers for graceful shutdown. Calls `onReady`
+   * callback with the port number once the server is bound.
    * @param onReady - Optional callback invoked with the port when the server starts.
    */
   start: (onReady?: (port: number) => void) => void;
-  /** Stop the server and close all connections. */
+  /**
+   * Stop the server and close all connections.
+   *
+   * Drains active requests (up to 30s timeout), disposes proxy HTTP agents
+   * and rate limit resources, then closes the HTTP server.
+   */
   stop: () => Promise<void>;
 }
 
 /**
  * Result of {@link createApp}, containing the Hono app and cleanup functions.
- * Call `proxyDispose()` and `rateLimitDispose()` when shutting down to release resources.
+ *
+ * Call `proxyDispose()` and `rateLimitDispose()` when shutting down to release
+ * HTTP agent connections and rate limit timers. These functions are `undefined`
+ * when no proxy or rate limit routes are configured.
  */
 export interface CreateAppResult {
-  /** The configured Hono application. */
+  /** The configured Hono application with all middleware and routes registered. */
   app: HonoApp;
   /** Logger instance used throughout the server. */
   logger: Logger<unknown>;
-  /** Function to dispose of proxy HTTP agent connections. */
+  /** Function to dispose of proxy HTTP agent connections. undefined when no proxy routes are configured. */
   proxyDispose: (() => void) | undefined;
-  /** Function to dispose of rate limit resources. */
+  /** Function to dispose of rate limit resources (clears cleanup timer). undefined when rate limiting is disabled. */
   rateLimitDispose: (() => void) | undefined;
 }
 
@@ -56,7 +79,10 @@ export interface CreateAppResult {
  * Configures `hono/cors` with the provided CORS settings and adds `hono/csrf`
  * when credentials are enabled (to prevent cross-site request forgery).
  *
- * @internal
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing CORS settings.
  */
 export function setupCorsAndCsrf<TClaims, TLogScope>(
   app: HonoApp,
@@ -90,10 +116,14 @@ export function setupCorsAndCsrf<TClaims, TLogScope>(
  * Apply rate limiting middleware to the Hono app.
  *
  * When `security.rateLimit` is configured, creates either a Redis-backed
- * store ({@link createRedisRateLimitStore}) or an in-memory store with
- * periodic cleanup. Returns a dispose function for cleanup.
+ * store or an in-memory store with periodic cleanup. Returns a dispose
+ * function for cleanup.
  *
- * @internal
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param security - The security configuration containing rate limit settings.
+ * @returns A dispose function for cleanup, or undefined when rate limiting is disabled.
  */
 export function setupRateLimit<TClaims, TLogScope>(
   app: HonoApp,
@@ -138,7 +168,11 @@ export function setupRateLimit<TClaims, TLogScope>(
  * {@link DEFAULTS.csp.openapiOverrides}) to the Swagger path so that
  * the Scalar UI can load its scripts and styles.
  *
- * @internal
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing OpenAPI settings.
+ * @param logger - Logger instance for emitting warnings about relaxed CSP.
  */
 export function setupOpenapi<TClaims, TLogScope>(
   app: HonoApp,
@@ -168,7 +202,10 @@ export function setupOpenapi<TClaims, TLogScope>(
  * Registers the {@link createSecurityMiddleware} as global middleware to
  * apply Content Security Policy headers to all responses.
  *
- * @internal
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing CSP settings.
  */
 export function setupSecurity<TClaims, TLogScope>(
   app: HonoApp,
@@ -183,7 +220,10 @@ export function setupSecurity<TClaims, TLogScope>(
  * Registers the {@link createRequestIdMiddleware} to add a unique request
  * ID to each request (reusing `x-request-id` if present, otherwise generating a UUID).
  *
- * @internal
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing observability settings.
  */
 export function setupRequestId<TClaims, TLogScope>(
   app: HonoApp,
@@ -216,7 +256,15 @@ function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
 
 /**
  * Apply SPA fallback and static file handler when `config.app.root` is set.
- * @internal
+ *
+ * Registers static file serving for the configured root directory and a
+ * fallback handler that serves the fallback file (e.g., `index.html`) for
+ * unmatched routes, supporting client-side routing.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register handlers on.
+ * @param config - The server configuration containing app settings.
  */
 export function setupAppHandler<TClaims, TLogScope>(
   app: HonoApp,
@@ -234,7 +282,16 @@ export function setupAppHandler<TClaims, TLogScope>(
 
 /**
  * Apply the global error handler middleware to the Hono app.
- * @internal
+ *
+ * Registers an error handler via `app.onError()` that logs error details
+ * and returns a JSON error response. Supports error `.status` properties
+ * for HTTP error codes.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register the error handler on.
+ * @param logger - Logger instance for error logging.
+ * @param logScopeFactory - Optional per-request factory that produces a typed log scope.
  */
 export function setupErrorHandling<TClaims, TLogScope>(
   app: HonoApp,
