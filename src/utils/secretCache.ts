@@ -1,3 +1,4 @@
+import { MILLIS_PER_SECOND } from '../config/constants';
 import { asInternalLogger } from '../config/defaults';
 import type { Logger } from '../types/app';
 
@@ -48,7 +49,7 @@ export function createSecretCache<TLogScope = unknown>(
       const freshNow = Date.now();
       try {
         const value = await fetcher();
-        cache = { expiresAt: freshNow + ttlSeconds * 1000, value };
+        cache = { expiresAt: freshNow + ttlSeconds * MILLIS_PER_SECOND, value };
         return value;
       } catch (err) {
         il.error(

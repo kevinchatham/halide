@@ -2,6 +2,15 @@ import { styleText } from 'node:util';
 import type { AuthorizeFn } from '../types/api';
 import type { HalideContext, InternalLogger, Logger, RequestContext } from '../types/app';
 import type { CspDirectives } from '../types/csp';
+import {
+  DEFAULT_MAX_FREE_SOCKETS,
+  DEFAULT_MAX_SOCKETS,
+  DEFAULT_PORT,
+  DEFAULT_PROXY_TIMEOUT_MS,
+  DEFAULT_RATE_LIMIT_MAX_REQUESTS,
+  DEFAULT_RATE_LIMIT_WINDOW_MS,
+  SECRET_CACHE_TTL_SECONDS,
+} from './constants';
 
 /**
  * Default configuration values used when options are omitted.
@@ -12,10 +21,10 @@ export const DEFAULTS = {
     apiPrefix: '/api',
     fallback: 'index.html',
     name: 'app',
-    port: 3553,
+    port: DEFAULT_PORT,
   },
   auth: {
-    secretTtl: 60,
+    secretTtl: SECRET_CACHE_TTL_SECONDS,
   },
   cors: {
     credentials: false,
@@ -58,13 +67,13 @@ export const DEFAULTS = {
     version: '1.0.0',
   },
   proxy: {
-    maxFreeSockets: 10,
-    maxSockets: 50,
-    timeoutMs: 10_000,
+    maxFreeSockets: DEFAULT_MAX_FREE_SOCKETS,
+    maxSockets: DEFAULT_MAX_SOCKETS,
+    timeoutMs: DEFAULT_PROXY_TIMEOUT_MS,
   },
   rateLimit: {
-    maxRequests: 100,
-    windowMs: 900_000,
+    maxRequests: DEFAULT_RATE_LIMIT_MAX_REQUESTS,
+    windowMs: DEFAULT_RATE_LIMIT_WINDOW_MS,
   },
   route: {
     method: 'get' as const,

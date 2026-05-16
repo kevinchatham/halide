@@ -3,8 +3,14 @@ import net from 'node:net';
 import tls from 'node:tls';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
-import { MAX_AGENT_CACHE } from '../config/constants';
-import { asInternalLogger, DEFAULTS } from '../config/defaults';
+import {
+  DEFAULT_MAX_FREE_SOCKETS,
+  DEFAULT_MAX_SOCKETS,
+  DEFAULT_PROBE_TIMEOUT_MS,
+  DEFAULT_PROXY_TIMEOUT_MS,
+  MAX_AGENT_CACHE,
+} from '../config/constants';
+import { asInternalLogger } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
 import { isTrustedProxy } from '../utils/trustedProxies';
@@ -28,8 +34,8 @@ export class AgentCache {
       }
       agent = new http.Agent({
         keepAlive: true,
-        maxFreeSockets: DEFAULTS.proxy.maxFreeSockets,
-        maxSockets: DEFAULTS.proxy.maxSockets,
+        maxFreeSockets: DEFAULT_MAX_FREE_SOCKETS,
+        maxSockets: DEFAULT_MAX_SOCKETS,
       });
       this.cache.set(key, agent);
     }
@@ -55,7 +61,7 @@ export class AgentCache {
   async probe(target: string, timeoutMs?: number): Promise<boolean> {
     const url = new URL(target.startsWith('http') ? target : `https://${target}`);
     const probeKey = `${url.hostname}:${url.port}`;
-    const timeout = timeoutMs ?? 5_000;
+    const timeout = timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
 
     const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80;
 
@@ -395,7 +401,7 @@ export function createProxyService<TClaims = unknown, TLogScope = unknown>(
   const target = route.target;
   const routePath = route.path;
   const rewritePath = route.proxyPath ?? routePath;
-  const timeoutMs = route.timeout ?? DEFAULTS.proxy.timeoutMs;
+  const timeoutMs = route.timeout ?? DEFAULT_PROXY_TIMEOUT_MS;
 
   if (!target || target === '') {
     throw new Error(`Proxy route "${routePath}" requires a non-empty target URL`);

@@ -1,8 +1,11 @@
 import type { Context, Next } from 'hono';
+import {
+  DEFAULT_MAX_ENTRIES,
+  MAX_SWEEP_INTERVAL_MS,
+  MILLIS_PER_SECOND,
+  MIN_SWEEP_INTERVAL_MS,
+} from '../config/constants';
 import { getClientIp } from '../utils/trustedProxies';
-
-/** Default maximum number of entries in the in-memory rate limit store (10,000). */
-const DEFAULT_MAX_ENTRIES = 10_000;
 
 /** Minimal Redis client interface for rate limiting. */
 export interface RedisClient {
@@ -31,7 +34,7 @@ export function createRedisRateLimitStore(
   middleware: (c: Context, next: Next) => Promise<Response | undefined>;
   dispose: () => void;
 } {
-  const windowSeconds = Math.ceil(config.windowMs / 1000);
+  const windowSeconds = Math.ceil(config.windowMs / MILLIS_PER_SECOND);
 
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
     const nodeReq = c.req as { socket?: { remoteAddress?: string } };
@@ -48,7 +51,7 @@ export function createRedisRateLimitStore(
 
     if (count > config.maxRequests) {
       const pttl = await client.pttl(key);
-      const retryAfter = pttl > 0 ? Math.ceil(pttl / 1000) : 1;
+      const retryAfter = pttl > 0 ? Math.ceil(pttl / MILLIS_PER_SECOND) : 1;
       c.header('Retry-After', String(retryAfter));
       return c.json({ error: 'Too Many Requests' }, 429);
     }
@@ -156,7 +159,10 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
 } {
   const store = createMemoryStore(config.maxEntries);
 
-  const sweepInterval = Math.min(Math.max(config.windowMs * 2, 60_000), 1_800_000);
+  const sweepInterval = Math.min(
+    Math.max(config.windowMs * 2, MIN_SWEEP_INTERVAL_MS),
+    MAX_SWEEP_INTERVAL_MS,
+  );
   const timer = setInterval(() => {
     const now = Date.now();
     void store.sweep(now);
@@ -184,7 +190,7 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
     entry.count += 1;
 
     if (entry.count > config.maxRequests) {
-      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      const retryAfter = Math.ceil((entry.resetTime - now) / MILLIS_PER_SECOND);
       c.header('Retry-After', String(retryAfter));
       return c.json({ error: 'Too Many Requests' }, 429);
     }

@@ -92,17 +92,17 @@
 
 <!-- **`registry.auth.ts` mixes auth and observability.** The file contains `emitOnRequest` and `emitOnResponse` functions (observability concerns) alongside `extractClaims` and `checkAuthorization` (auth concerns). This coupling means auth changes require understanding observability hooks and vice versa. -->
 
-**Constants are scattered across multiple files.** `src/config/constants.ts` defines `JWKS_CACHE_TTL_MS`, `MAX_JWK_CACHE`, `MAX_AGENT_CACHE`, etc. But `src/middleware/rateLimit.ts:5` redefines `DEFAULT_MAX_ENTRIES = 10_000` which duplicates `src/config/constants.ts:17`. Constants should be centralized.
+<!-- **Constants are scattered across multiple files.** `src/config/constants.ts` defines `JWKS_CACHE_TTL_MS`, `MAX_JWK_CACHE`, `MAX_AGENT_CACHE`, etc. But `src/middleware/rateLimit.ts:5` redefines `DEFAULT_MAX_ENTRIES = 10_000` which duplicates `src/config/constants.ts:17`. Constants should be centralized. -->
 
-**`createAuthMiddleware` has 30 lines of scope creation logic.** `src/routes/registry.auth.ts:311-333` creates scoped loggers, builds `HalideContext`, and stores variables on the Hono context. This is framework machinery that every route handler must understand implicitly.
+<!-- **`createAuthMiddleware` has 30 lines of scope creation logic.** `src/routes/registry.auth.ts:311-333` creates scoped loggers, builds `HalideContext`, and stores variables on the Hono context. This is framework machinery that every route handler must understand implicitly. -->
 
 **Proxy path rewriting uses string replacement.** `src/services/proxy.ts:434-436` replaces `:key` patterns in `proxyPath` using `String.replace()`. This is fragile — if a route parameter name appears as a substring of another word in the path, it gets replaced incorrectly. Hono's path parser handles this, but the manual replacement doesn't.
 
 ## 6. Recommendations
 
-**1. Extract middleware pipeline into composable builder.** Replace the monolithic `createApp` with a middleware pipeline builder that accepts ordered middleware configurations. This would let consumers add/replace middleware without understanding the internal ordering. Priority: High.
+<!-- **1. Extract middleware pipeline into composable builder.** Replace the monolithic `createApp` with a middleware pipeline builder that accepts ordered middleware configurations. This would let consumers add/replace middleware without understanding the internal ordering. Priority: High. -->
 
-**2. Require explicit `authorize` for private routes.** Change validation to reject routes with `access: 'private'` and no `authorize` function. The current `defaultAuthorize` (always `true`) creates a false sense of security. Priority: High.
+<!-- **2. Require explicit `authorize` for private routes.** Change validation to reject routes with `access: 'private'` and no `authorize` function. The current `defaultAuthorize` (always `true`) creates a false sense of security. Priority: High. -->
 
 **3. Add circuit breaker to proxy routes.** Implement a circuit breaker pattern (`src/services/proxy.ts`) that tracks upstream failure rates and stops forwarding to unhealthy targets. This prevents cascading failures when upstream servers are degraded. Priority: High.
 

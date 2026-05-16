@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { DEFAULT_MAX_COLLECT_BYTES } from '../config/constants';
 import type { ObservabilityConfig } from '../types/app';
 import { collectProxyBody } from './proxy.body';
 
@@ -44,7 +45,7 @@ export async function observeAndPipeResponse<TClaims = unknown, TLogScope = unkn
   const abortController = new AbortController();
   c.req.raw?.signal?.addEventListener('abort', () => abortController.abort(), { once: true });
 
-  const maxCollect = observability?.maxCollect ?? 1024;
+  const maxCollect = observability?.maxCollect ?? DEFAULT_MAX_COLLECT_BYTES;
   const {
     response: pipedResponse,
     body: responseBodyText,
