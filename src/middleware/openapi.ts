@@ -17,14 +17,20 @@ const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
  *
  * Used to prevent concurrent OpenAPI spec resolution requests by sharing
  * a single `specResolution` promise among all in-flight requests.
+ * When a spec is being resolved, subsequent requests await the same promise.
  */
 export interface SpecCacheState {
+  /** The resolved OpenAPI spec, or `null` if not yet resolved. */
   cachedSpec: Record<string, unknown> | null;
+  /** In-flight spec resolution promise, or `null` when no resolution is in progress. */
   specResolution: Promise<void> | null;
 }
 
 /**
  * Create a fresh spec cache state for isolation (used by tests).
+ *
+ * Returns a new `SpecCacheState` with null cache and resolution,
+ * allowing tests to create independent caches.
  * @returns A new `SpecCacheState` with null cache and resolution.
  */
 export function createSpecCacheState(): SpecCacheState {
@@ -33,6 +39,9 @@ export function createSpecCacheState(): SpecCacheState {
 
 /**
  * Reset the cached spec and resolution promise (used by tests).
+ *
+ * Clears both `cachedSpec` and `specResolution` so that the next
+ * request triggers a fresh spec resolution.
  * @param state - The spec cache state to reset.
  */
 export function resetOpenApiCache(state: SpecCacheState): void {
@@ -280,9 +289,9 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
  * builds a new info object with options taking priority over inline info.
  * Otherwise, passes through inline info as-is.
  *
- * @param options - OpenAPI options from config.
- * @param inlineInfo - Inline info from the resolved spec.
- * @returns The resolved info object, or undefined if no info is available.
+ * @param options - OpenAPI options from config (title, version, description, servers).
+ * @param inlineInfo - Inline info from the resolved OpenAPI spec.
+ * @returns The resolved info object, or `undefined` if no info is available.
  */
 export function resolveOpenApiInfo(
   options?: OpenApiOptions,

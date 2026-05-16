@@ -14,7 +14,7 @@ import { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 
-/** Logger instance that discards all log messages, used for testing. */
+/** Logger instance that discards all log messages, used for testing to suppress output. */
 export const noopLogger: Logger<unknown> = createNoopLogger();
 
 /**
@@ -25,22 +25,23 @@ export const noopLogger: Logger<unknown> = createNoopLogger();
  * configuring them in the server config.
  */
 export type TestAppOptions = {
-  /** Apply CORS + CSRF middleware (default: false) */
+  /** Apply CORS + CSRF middleware (default: `false`). */
   cors?: boolean;
-  /** Apply CSP security headers (default: false) */
+  /** Apply CSP security headers middleware (default: `false`). */
   csp?: boolean;
-  /** Apply rate limiting middleware (default: false) */
+  /** Apply rate limiting middleware (default: `false`). */
   rateLimit?: boolean;
-  /** Apply request ID middleware (default: false) */
+  /** Apply request ID middleware (default: `false`). */
   requestId?: boolean;
-  /** Apply global error handler (default: false) */
+  /** Apply global error handler middleware (default: `false`). */
   errorHandler?: boolean;
-  /** Apply SPA fallback + static file handler (default: false) */
+  /** Apply SPA fallback + static file handler (default: `false`). */
   appHandler?: boolean;
-  /** Logger override — defaults to noopLogger */
+  /** Logger override — defaults to {@link noopLogger}. */
   logger?: Logger<unknown>;
 };
 
+/** WeakMap tracking rate limit dispose functions per test app for cleanup. */
 const rateLimitDisposeMap = new WeakMap<Hono<{ Variables: HalideVariables }>, () => void>();
 
 /**
@@ -70,8 +71,10 @@ export function disposeRateLimit(app: Hono<{ Variables: HalideVariables }>): boo
  * Uses a noop logger so tests don't produce log output.
  *
  * When `options.rateLimit` is enabled, call `disposeRateLimit(app)` after tests
- * complete to release rate limit resources.
+ * complete to release rate limit resources (clears the cleanup timer).
  *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param config - The server configuration containing routes.
  * @param options - Optional middleware configuration flags.
  * @returns A Hono app with routes registered but not started.

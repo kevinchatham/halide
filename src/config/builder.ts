@@ -5,6 +5,7 @@ import type { ServerConfig } from '../types/server-config';
 import type { CreateAppResult, Server } from './runtime';
 import { createApp, createServer } from './runtime';
 
+/** Builder object returned by {@link defineHalide}, pre-baked with `TClaims` and `TLogScope`. */
 type HalideBuilder<TClaims, TLogScope> = {
   apiRoute: <TBody = unknown, TResponse = unknown>(
     route: ApiRouteInput<TClaims, TLogScope, TBody, TResponse>,

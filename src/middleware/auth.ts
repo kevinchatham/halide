@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE, MAX_JWK_LOCKS } from '../config/constants';
 
+/** Asymmetric signing algorithms supported by JWKS verification. */
 type AsymmetricAlgorithm =
   | 'RS256'
   | 'RS384'
@@ -14,19 +15,23 @@ type AsymmetricAlgorithm =
   | 'ES512'
   | 'EdDSA';
 
+/** Cached JWKS middleware instance with expiration and allowed algorithms. */
 type JwkCacheEntry = {
   middleware: ReturnType<typeof import('hono/jwk').jwk>;
   expiresAt: number;
   algorithms: string[];
 };
 
+/** Map of JWKS URI to cached middleware instance. */
 const jwkCache = new Map<string, JwkCacheEntry>();
 
+/** Map of JWKS URI to in-flight fetch promises, preventing concurrent JWKS fetches. */
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
 
+/** Map of JWKS URI to in-flight background refresh promises. */
 const jwkRefreshLocks = new Map<string, Promise<void>>();
 
-/** Cache a JWKS middleware instance with its expiration timestamp. */
+/** Cache a JWKS middleware instance with its expiration timestamp. Evicts oldest entry when cache is full. */
 function setJwkCacheEntry(
   jwksUri: string,
   expiresAt: number,
@@ -53,6 +58,7 @@ function evictLock(map: Map<string, Promise<unknown>>): void {
  *
  * Returns the cached middleware if it hasn't expired. Creates a new one
  * with deduplication via fetch locks to avoid concurrent JWKS fetches.
+ * In test environments (`vi` defined), bypasses caching entirely.
  */
 async function getCachedJwkMiddleware(
   jwksUri: string,
@@ -99,6 +105,10 @@ async function getCachedJwkMiddleware(
   return fetchPromise;
 }
 
+/**
+ * Periodic timer to sweep expired JWKS cache entries.
+ * Runs every 10 minutes. Skipped in test environments.
+ */
 const jwkSweepTimer =
   typeof vi !== 'undefined'
     ? null
@@ -112,6 +122,11 @@ const jwkSweepTimer =
       }, 600_000);
 jwkSweepTimer?.unref();
 
+/**
+ * Periodic timer to refresh soon-to-expire JWKS cache entries in the background.
+ * Runs every half of `JWKS_CACHE_TTL_MS`. Entries within half their TTL of expiry
+ * are proactively refreshed. Skipped in test environments.
+ */
 const jwkBackgroundRefreshTimer =
   typeof vi !== 'undefined'
     ? null
@@ -148,7 +163,7 @@ const jwkBackgroundRefreshTimer =
       }, JWKS_CACHE_TTL_MS / 2);
 jwkBackgroundRefreshTimer?.unref();
 
-/** Check whether the JWT audience claim matches the expected value. */
+/** Check whether the JWT audience claim matches the expected value. Supports both string and array claims. */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
   const aud = payload.aud;
   if (aud === undefined) return false;
@@ -157,7 +172,7 @@ function matchesAudience(payload: Record<string, unknown>, audience: string): bo
   return false;
 }
 
-/** Decode the JWT header (first segment) without verification. Returns null on failure. */
+/** Decode the JWT header (first segment) without verification. Returns null on malformed tokens. */
 function decodeJwtHeader(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split('.');
@@ -173,7 +188,7 @@ function decodeJwtHeader(token: string): Record<string, unknown> | null {
   }
 }
 
-/** Resolve the JWT signing algorithm from the header, checking against allowed algorithms. */
+/** Resolve the JWT signing algorithm from the header, checking against the allowed algorithms list. */
 function resolveAlgorithm(token: string, allowedAlgorithms: string[]): string | null {
   const header = decodeJwtHeader(token);
   if (!header) return null;

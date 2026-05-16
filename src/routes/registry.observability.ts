@@ -4,48 +4,51 @@ import type { HalideContext, Logger, ObservabilityConfig, RequestContext } from 
 
 /**
  * Context object capturing error, start time, and status code for the onResponse hook.
+ *
+ * Used by {@link emitOnResponse} to compute response duration and include
+ * error information in the hook payload.
  */
 export interface ResponseEmitContext {
   /** Error thrown by the handler during request processing, if any. */
   handlerError: Error | undefined;
-  /** Timestamp (Date.now()) when request processing started. */
+  /** Timestamp (`Date.now()`) when request processing started. Used to compute response duration. */
   start: number;
   /** HTTP status code of the final response. */
   statusCode: number;
 }
 
 /**
- * Common emit configuration shared between onRequest and onResponse hooks.
+ * Common emit configuration shared between {@link emitOnRequest} and {@link emitOnResponse} hooks.
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
  */
 interface EmitConfig<TClaims = unknown, TLogScope = unknown> {
-  /** The bundled app context. */
+  /** The bundled app context with claims and logger. */
   app: HalideContext<TClaims, TLogScope>;
-  /** The parsed request body. */
+  /** The parsed request body (available for POST/PUT/PATCH requests). */
   body: unknown;
-  /** The Hono context. */
+  /** The Hono context for accessing request details. */
   c: Context;
-  /** Logger instance for reporting hook errors. */
+  /** Logger instance for reporting hook errors (optional — framework internal). */
   logger?: Logger<TLogScope>;
-  /** The observability configuration. */
+  /** The observability configuration from server config. */
   observability: ObservabilityConfig<TClaims, TLogScope> | undefined;
-  /** Whether observability is enabled for this specific route. */
+  /** Whether observability is enabled for this specific route (`false` skips hooks). */
   observe: boolean | undefined;
 }
 
 /**
- * Extended emit configuration for the onResponse hook.
+ * Extended emit configuration for the {@link emitOnResponse} hook.
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
  */
 interface ResponseEmitConfig<TClaims = unknown, TLogScope = unknown>
   extends EmitConfig<TClaims, TLogScope> {
-  /** Set to 'text' for proxy route response bodies. */
+  /** Set to `'text'` for proxy route response bodies, `'binary'` for raw byte responses. */
   bodyType?: 'text' | 'binary';
-  /** The response emit context with error, start time, and status code. */
+  /** The response emit context with error, start time, and status code for duration computation. */
   emitCtx: ResponseEmitContext;
-  /** The captured response body for logging. */
+  /** The captured response body for logging (limited by `maxCollect`). */
   responseBody?: unknown;
 }
 

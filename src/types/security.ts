@@ -32,30 +32,33 @@ export type CorsConfig = {
 export type SecurityAuthConfig = {
   /**
    * Expected JWT 'aud' (audience) claim. If provided, the JWT must contain
-   * this audience or it will be rejected.
+   * this audience or it will be rejected. Supports both string and array
+   * audience claims per RFC 7519.
    */
   audience?: string;
-  /** JWKS endpoint URL (required when strategy is 'jwks'). */
+  /** JWKS endpoint URL (required when strategy is 'jwks'). Fetches and caches public keys. */
   jwksUri?: string;
   /**
    * Authentication strategy.
-   * - 'bearer' — HS256 JWT via hono/jwt with a shared secret.
-   * - 'jwks' — RS256 JWT via hono/jwk with a JWKS endpoint.
-   * Defaults to 'bearer'.
+   * - `'bearer'` — HS256 JWT via {@link https://hono.dev/docs/helpers/jwt | hono/jwt} with a shared secret.
+   * - `'jwks'` — RS256 JWT via {@link https://hono.dev/docs/helpers/jwk | hono/jwk} with a JWKS endpoint.
+   * Defaults to `'bearer'`.
    */
   strategy?: 'bearer' | 'jwks';
   /**
    * JWT signing secret. Can be a plain string or a function that returns the
    * secret synchronously or asynchronously (e.g., from a vault).
+   * Required when strategy is `'bearer'`.
    */
   secret?: string | (() => string | Promise<string>);
   /**
    * Time-to-live (seconds) for caching the resolved secret. Useful when
-   * secret is an async function. Defaults to 60.
+   * secret is an async function that fetches from a vault. Defaults to 60.
    */
   secretTtl?: number;
   /**
-   * JWT algorithms accepted for bearer strategy. Defaults to ['HS256'].
+   * JWT algorithms accepted for bearer strategy. Defaults to `['HS256']`.
+   * For JWKS strategy, defaults to `['RS256']`.
    */
   algorithms?: string[];
 };
@@ -64,23 +67,23 @@ export type SecurityAuthConfig = {
  * Security configuration combining auth, CORS, CSP, and rate limiting.
  */
 export type SecurityConfig = {
-  /** Authentication configuration for JWT validation. */
+  /** Authentication configuration for JWT validation. Required when any route has `access: 'private'`. */
   auth?: SecurityAuthConfig;
-  /** CORS configuration for cross-origin requests. */
+  /** CORS configuration for cross-origin requests. Use `{ origin: '*' }` for permissive development. */
   cors?: CorsConfig;
-  /** Content Security Policy directives. */
+  /** Content Security Policy directives. Controls which resources the browser can load. */
   csp?: CspDirectives;
-  /** Rate limiting configuration. */
+  /** Rate limiting configuration. Protects against abuse by limiting requests per client IP. */
   rateLimit?: {
     /** Maximum requests allowed per window. Defaults to 100. */
     maxRequests?: number;
     /** Time window in milliseconds. Defaults to 900000 (15 minutes). */
     windowMs?: number;
-    /** Trusted proxy IPs/CIDRs. When set, x-forwarded-for is only trusted from these IPs. */
+    /** Trusted proxy IPs/CIDRs. When set, `x-forwarded-for` is only trusted from these IPs. */
     trustedProxies?: string[];
-    /** Maximum number of entries in the rate limit store. Oldest entries are evicted when exceeded. */
+    /** Maximum number of entries in the rate limit store. Oldest entries are evicted when exceeded. Defaults to 10000. */
     maxEntries?: number;
-    /** Redis client for distributed rate limiting. */
+    /** Redis client for distributed rate limiting across multiple server instances. */
     redisClient?: RedisClient;
   };
 };

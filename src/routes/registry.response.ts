@@ -7,16 +7,18 @@ import { collectProxyBody } from './proxy.body';
  * Result of response body collection with streaming.
  *
  * Returned by {@link observeAndPipeResponse} after piping a response body
- * while collecting bytes for observability logging.
+ * while collecting bytes for observability logging. The response body is
+ * teed so the client receives data as chunks arrive without waiting for
+ * the full body to buffer.
  */
 export type PipeResult = {
-  /** The piped response (or original if no body). */
+  /** The piped response (or original response if the response has no body). */
   response: Response;
-  /** Collected body text (undefined if no body or aborted). */
+  /** Collected body text (undefined if no body, collection was aborted, or maxCollect was 0). */
   body: string | undefined;
-  /** Whether the client disconnected during collection. */
+  /** Whether the client disconnected during collection (HTTP 499). */
   aborted: boolean;
-  /** Error from reading the body stream, if any. */
+  /** Error from reading the body stream, if any (e.g., network error during collection). */
   pipeError?: Error;
 };
 

@@ -15,7 +15,13 @@ import type { HalideContext, ProxyRoute } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
 import { isTrustedProxy } from '../utils/trustedProxies';
 
-/** Cached HTTP agent pool with bounded size. */
+/**
+ * Cached HTTP agent pool with bounded size and LRU eviction.
+ *
+ * Manages connection pooling for upstream HTTP/HTTPS proxy connections.
+ * Each unique target URL gets its own agent. When the cache exceeds
+ * {@link MAX_AGENT_CACHE}, the oldest entry is evicted.
+ */
 export class AgentCache {
   private readonly cache = new Map<string, http.Agent>();
   private probeResults = new Map<string, boolean>();
@@ -53,6 +59,7 @@ export class AgentCache {
    *
    * For HTTPS targets, opens a TLS connection with certificate verification.
    * For HTTP targets, opens a plain TCP connection.
+   * Results are cached per host:port pair.
    *
    * @param target - The target URL to probe (e.g., `https://api.example.com/v1`).
    * @param timeoutMs - Connection timeout in milliseconds. Defaults to 5000.
@@ -131,7 +138,7 @@ export class AgentCache {
  * Create an AgentCache instance for managing HTTP agent pools.
  *
  * Returns a new {@link AgentCache} that manages connection pooling for
- * upstream HTTP/HTTPS connections with bounded size and LRU eviction.
+ * upstream HTTP/HTTPS proxy connections with bounded size (500 max) and LRU eviction.
  *
  * @returns A new AgentCache instance.
  */
@@ -139,10 +146,7 @@ export function createAgentCache(): AgentCache {
   return new AgentCache();
 }
 
-/**
- * Headers that cannot be modified by proxy transformations.
- * These are set by the HTTP stack or upstream and must be preserved as-is.
- */
+/** Headers that cannot be modified by proxy transformations. */
 const READONLY_HEADERS: Set<string> = new Set([
   'host',
   'connection',
@@ -203,7 +207,9 @@ function appendForwardedFor(
 
 /**
  * Serialize a query parameter value to string or string array, JSON-encoding non-string values.
+ *
  * Arrays are mapped: string items pass through, non-string items are JSON-stringified.
+ * Used when building query strings for upstream proxy requests.
  * @param v - The query parameter value to serialize.
  * @returns The serialized value as a string or string array.
  */
@@ -216,9 +222,12 @@ export function serializeQueryParam(v: unknown): string | string[] {
 
 /**
  * Build a {@link RequestContext} from a Hono context object.
+ *
+ * Extracts method, path, headers, params, query, and body from the Hono
+ * request and normalizes them into a consistent shape for route handlers.
  * @param c - The Hono request context.
  * @param body - Optional pre-parsed request body to include.
- * @returns A normalized RequestContext object.
+ * @returns A normalized {@link RequestContext} object.
  */
 export function buildRequestContextFromHono(c: Context, body?: unknown): RequestContext {
   return {

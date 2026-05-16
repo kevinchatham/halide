@@ -9,9 +9,9 @@ type AuthInput = Pick<SecurityAuthConfig, 'strategy' | 'secret'>;
  * A single validation error with field location and message.
  */
 export type ValidationError = {
-  /** Dot-notation path to the offending field. */
+  /** Dot-notation path to the offending field (e.g., `'security.auth.secret'`). */
   field: string;
-  /** Human-readable error description. */
+  /** Human-readable error description explaining what went wrong. */
   message: string;
 };
 
@@ -25,10 +25,11 @@ export type ValidationResult = {
   errors: ValidationError[];
   /** Whether validation passed (no errors). */
   valid: boolean;
-  /** Non-blocking warnings about config choices. */
+  /** Non-blocking warnings about config choices (e.g., rate limit without Redis). */
   warnings?: ValidationError[];
 };
 
+/** Collect non-blocking warnings from config that are not handled by Zod. */
 /** Collect non-blocking warnings from config that are not handled by Zod. */
 function collectValidationWarnings(config: Record<string, unknown>): ValidationError[] {
   const warnings: ValidationError[] = [];

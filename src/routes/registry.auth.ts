@@ -8,6 +8,7 @@ import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
 
+/** Wrap a string secret in a fetcher function for compatibility with the cached secret resolver. */
 function stringSecretFetcher(s: string): () => string | Promise<string> {
   return () => s;
 }

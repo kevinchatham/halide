@@ -2,10 +2,7 @@ import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody';
 
-/**
- * HTTP methods that carry a request body and are parsed by the body middleware.
- * GET, HEAD, DELETE, and other methods are skipped.
- */
+/** HTTP methods that carry a request body and are parsed by the body middleware. */
 type BodyMethod = 'post' | 'put' | 'patch';
 
 /**

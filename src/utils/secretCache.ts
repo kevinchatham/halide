@@ -4,11 +4,9 @@ import type { Logger } from '../types/app';
 
 /**
  * Internal cache entry for a resolved JWT secret with expiration timestamp.
- * @property expiresAt - Timestamp (Date.now()) when this cache entry expires.
- * @property value - The resolved secret string.
  */
 interface CachedSecret {
-  /** Timestamp (Date.now()) when this cache entry expires. After this time the cache is invalidated. */
+  /** Timestamp (`Date.now()`) when this cache entry expires. After this time the cache is invalidated. */
   expiresAt: number;
   /** The resolved secret string. */
   value: string;
@@ -21,10 +19,13 @@ interface CachedSecret {
  * fetcher is called, the result is cached until TTL expires. If TTL is 0,
  * caching is disabled and the fetcher is called every time.
  *
+ * Deduplicates concurrent calls — if a fetch is already in progress,
+ * subsequent calls await the same promise. Errors are logged via the internal logger.
+ *
  * @typeParam TLogScope - The type of the structured log scope object.
- * @param ttlSeconds - Time-to-live for cached secrets in seconds.
- * @param logger - Logger instance.
- * @returns An async function that resolves secrets with caching, accepting a fetcher callback.
+ * @param ttlSeconds - Time-to-live for cached secrets in seconds. Set to 0 to disable caching.
+ * @param logger - Logger instance for reporting secret refresh failures.
+ * @returns An async function that resolves secrets with caching, accepting a secret fetcher callback.
  */
 export function createSecretCache<TLogScope = unknown>(
   ttlSeconds: number,

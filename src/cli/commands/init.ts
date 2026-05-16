@@ -14,7 +14,10 @@ import {
 /**
  * Execute a shell command silently, capturing stderr and rethrowing on failure.
  *
- * @param cmd - The shell command to execute.
+ * Used to run package manager commands without producing noisy output.
+ * Stderr is written to `process.stderr` before rethrowing the error.
+ *
+ * @param cmd - The shell command to execute (e.g., `'npm install halide'`).
  * @param cwd - The working directory for the command.
  */
 export function runQuietly(cmd: string, cwd: string): void {
@@ -29,11 +32,14 @@ export function runQuietly(cmd: string, cwd: string): void {
 }
 
 /**
- * Add halide:start and halide:build npm scripts to package.json if they don't already exist.
+ * Add `halide:start` and `halide:build` npm scripts to package.json if they don't already exist.
+ *
+ * `halide:start` runs `npm run halide:build && node dist/server.js`.
+ * `halide:build` runs `tsc --project tsconfig.server.json`.
  *
  * @param cwd - The project working directory.
  * @param dryRun - When true, logs what would be added without writing files.
- * @param force - When true, overwrites existing scripts.
+ * @param force - When true, overwrites existing scripts regardless.
  */
 export function addScriptsToPackageJson(cwd: string, dryRun = false, force = false): void {
   const pkgPath = path.join(cwd, 'package.json');
@@ -102,7 +108,7 @@ type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
  * Falls back to `'npm'` when no lock file is found.
  *
  * @param cwd - The project working directory.
- * @returns The detected package manager.
+ * @returns The detected package manager (`'npm'`, `'pnpm'`, `'yarn'`, or `'bun'`).
  */
 export function detectPackageManager(cwd: string): PackageManager {
   if (fs.existsSync(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
@@ -113,10 +119,10 @@ export function detectPackageManager(cwd: string): PackageManager {
 }
 
 /**
- * Get the install command for adding halide and @types/node with the given package manager.
+ * Get the install command for adding `halide` and `@types/node` with the given package manager.
  *
- * @param pkgManager - The detected package manager.
- * @returns The install command string.
+ * @param pkgManager - The detected package manager (`'npm'`, `'pnpm'`, `'yarn'`, or `'bun'`).
+ * @returns The install command string (e.g., `'npm install halide && npm install -D @types/node'`).
  */
 export function getInstallCmd(pkgManager: PackageManager): string {
   const cmds: Record<PackageManager, string> = {
@@ -129,9 +135,11 @@ export function getInstallCmd(pkgManager: PackageManager): string {
 }
 
 /**
- * Copy the halide skill directory from node_modules to .agents/skills/halide/.
+ * Copy the halide skill directory from `node_modules/halide` to `.agents/skills/halide/`.
  *
- * Docs are NOT copied — agents are directed to read them from node_modules/halide/docs/.
+ * Uses Node.js `require.resolve()` to locate the halide package, then copies
+ * the skill directory (excluding docs, which agents read from `node_modules/halide/docs/`).
+ * Silently logs a warning if the skill directory cannot be found.
  */
 export function installSkillsFromHalide(cwd: string): void {
   try {
@@ -175,6 +183,9 @@ export {
  *
  * Installs halide, creates server.ts, writes tsconfig.server.json, adds scripts
  * to package.json, and optionally installs AI coding skills.
+ *
+ * When `skillsOnly` is true, only installs skills without interactive prompts.
+ * When `dryRun` is true, previews all changes without writing files.
  *
  * @param options - Optional configuration. Set `skillsOnly` to skip project setup.
  *   Set `dryRun` to preview changes without writing files.

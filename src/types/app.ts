@@ -1,6 +1,9 @@
 import type { Hono } from 'hono';
 import type { BlankSchema } from 'hono/types';
 
+/**
+ * Hono application typed with {@link HalideVariables} for use throughout the framework.
+ */
 export type HonoApp = Hono<
   {
     Variables: HalideVariables;
@@ -13,17 +16,17 @@ export type HonoApp = Hono<
  * Normalized request context passed to route handlers and authorization functions.
  */
 export type RequestContext = {
-  /** HTTP method in lowercase. */
+  /** HTTP method in lowercase (e.g., `'get'`, `'post'`). */
   method: 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
-  /** URL path of the request. */
+  /** URL path of the request (e.g., `/users/:id`). */
   path: string;
-  /** Request headers, with support for multi-value headers. */
+  /** Request headers, with support for multi-value headers (arrays for headers like `set-cookie`). */
   headers: Record<string, string | string[]>;
-  /** Path parameters extracted from the route pattern. */
+  /** Path parameters extracted from the Hono route pattern (e.g., `{ id: '42' }` for `/users/:id`). */
   params: Record<string, string>;
-  /** Query string parameters, with support for multi-value params. */
+  /** Query string parameters, with support for multi-value params (arrays for repeated keys). */
   query: Record<string, string | string[]>;
-  /** Request body (available for POST, PUT, PATCH). */
+  /** Request body (available for POST, PUT, PATCH). Parsed by body middleware or hono-openapi validator. */
   body?: unknown;
 };
 
@@ -31,13 +34,13 @@ export type RequestContext = {
  * Context about the response, passed to the {@link ObservabilityConfig.onResponse} hook.
  */
 export type ResponseContext = {
-  /** HTTP status code of the response. */
+  /** HTTP status code of the response (e.g., 200, 404, 500). */
   statusCode: number;
-  /** Time in milliseconds from request start to response. */
+  /** Time in milliseconds from request start to response completion. */
   durationMs: number;
   /** Error thrown during request processing, if any. */
   error?: Error;
-  /** Response body, if available. */
+  /** Response body text, if collected (limited by `maxCollect` in {@link ObservabilityConfig}). */
   body?: unknown;
   /**
    * Indicates the format of the body field.
@@ -57,13 +60,13 @@ export type ResponseContext = {
  * consumer's `TLogScope` type parameter.
  */
 export type InternalLogger = {
-  /** Log a debug-level message with arbitrary scope. */
+  /** Log a debug-level message with arbitrary scope (e.g., validation errors, startup info). */
   debug: (scope: unknown, ...args: unknown[]) => void;
-  /** Log an error-level message with arbitrary scope. */
+  /** Log an error-level message with arbitrary scope (e.g., middleware failures). */
   error: (scope: unknown, ...args: unknown[]) => void;
-  /** Log an info-level message with arbitrary scope. */
+  /** Log an info-level message with arbitrary scope (e.g., server startup). */
   info: (scope: unknown, ...args: unknown[]) => void;
-  /** Log a warning-level message with arbitrary scope. */
+  /** Log a warning-level message with arbitrary scope (e.g., deprecated config). */
   warn: (scope: unknown, ...args: unknown[]) => void;
 };
 
@@ -72,13 +75,13 @@ export type InternalLogger = {
  * @typeParam TLogScope - The type of the structured log scope object passed to each log method.
  */
 export type Logger<TLogScope = unknown> = {
-  /** Log a debug-level message. */
+  /** Log a debug-level message with the typed log scope (e.g., request details). */
   debug: (scope: TLogScope, ...args: unknown[]) => void;
-  /** Log an error-level message. */
+  /** Log an error-level message with the typed log scope (e.g., error details). */
   error: (scope: TLogScope, ...args: unknown[]) => void;
-  /** Log an info-level message. */
+  /** Log an info-level message with the typed log scope (e.g., request lifecycle). */
   info: (scope: TLogScope, ...args: unknown[]) => void;
-  /** Log a warning-level message. */
+  /** Log a warning-level message with the typed log scope (e.g., deprecated usage). */
   warn: (scope: TLogScope, ...args: unknown[]) => void;
 };
 
@@ -89,9 +92,9 @@ export type Logger<TLogScope = unknown> = {
  * @typeParam TLogScope - The type of the structured log scope object.
  */
 export type HalideContext<TClaims = unknown, TLogScope = unknown> = {
-  /** Decoded JWT claims from the request (undefined if not authenticated). */
+  /** Decoded JWT claims from the request (undefined if the request is unauthenticated or public). */
   claims: TClaims | undefined;
-  /** Logger instance for recording observability events. */
+  /** Logger instance for recording observability events, scoped with per-request data when configured. */
   logger: Logger<TLogScope>;
 };
 
@@ -99,8 +102,11 @@ export type HalideContext<TClaims = unknown, TLogScope = unknown> = {
  * Hono context variables used internally by Halide middleware.
  */
 export type HalideVariables = {
+  /** Parsed request body, set by body parsing middleware (POST/PUT/PATCH). */
   parsedBody?: unknown;
+  /** Bundled app context with claims and logger, set by context middleware. */
   appCtx?: HalideContext;
+  /** Normalized request context, set by context middleware. */
   reqCtx?: RequestContext;
 };
 
@@ -111,6 +117,7 @@ export type HalideVariables = {
 export type AppConfig = {
   /**
    * URL prefix that should return 404 instead of the app fallback.
+   * Routes under this prefix (e.g., `/api/*`) are handled by API/proxy routes, not the SPA fallback.
    * Defaults to '/api'.
    */
   apiPrefix?: string;
@@ -126,6 +133,7 @@ export type AppConfig = {
   name?: string;
   /**
    * Port number to listen on. Defaults to 3553.
+   * Can be overridden by the `PORT` environment variable.
    */
   port?: number;
   /**
@@ -148,7 +156,8 @@ export type ObservabilityConfig<TClaims = unknown, TLogScope = unknown> = {
    */
   requestId?: boolean;
   /**
-   * Logger instance. If not provided, a styled default logger is used.
+   * Logger instance. If not provided, a styled default logger is used
+   * (colored in TTY, plain text otherwise).
    * The logger scope type is inferred from TLogScope.
    */
   logger?: Logger<TLogScope>;
@@ -182,22 +191,24 @@ export type ObservabilityConfig<TClaims = unknown, TLogScope = unknown> = {
   maxCollect?: number;
   /**
    * Hook called before each request is handled. Use for logging, metrics, or request tracing.
+   * Fired per-route unless `observe: false` is set on the route.
    */
   onRequest?: (
-    /** Normalized request context. */
+    /** Normalized request context with method, path, headers, params, query, and body. */
     ctx: RequestContext,
     /** Bundled app context with claims and logger. */
     app: HalideContext<TClaims, TLogScope>,
   ) => void | Promise<void>;
   /**
    * Hook called after each response is sent. Use for logging response times and status codes.
+   * Fired per-route unless `observe: false` is set on the route.
    */
   onResponse?: (
-    /** Normalized request context. */
+    /** Normalized request context with method, path, headers, params, query, and body. */
     ctx: RequestContext,
     /** Bundled app context with claims and logger. */
     app: HalideContext<TClaims, TLogScope>,
-    /** Response context including status code and duration. */
+    /** Response context including status code, duration, error, and body. */
     response: ResponseContext,
   ) => void | Promise<void>;
 };

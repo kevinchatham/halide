@@ -89,7 +89,13 @@ export const cspSchema = z
   .strict()
   .optional();
 
-/** Zod schema for bearer authentication config. */
+/**
+ * Zod schema for bearer authentication config.
+ *
+ * Validates `secret` (required, non-empty string or function), `secretTtl`
+ * (non-negative integer), `algorithms` (non-empty array), and `audience`
+ * (optional string). Uses `.superRefine()` to reject empty secrets.
+ */
 const bearerAuthSchema = z
   .object({
     algorithms: z.array(z.string()).optional(),
@@ -129,7 +135,12 @@ const bearerAuthSchema = z
     },
   );
 
-/** Zod schema for JWKS authentication config. */
+/**
+ * Zod schema for JWKS authentication config.
+ *
+ * Validates `jwksUri` (required string), `algorithms` (non-empty array),
+ * and `audience` (optional string). Strategy is locked to `'jwks'`.
+ */
 const jwksAuthSchema = z
   .object({
     algorithms: z.array(z.string()).optional(),
@@ -149,7 +160,12 @@ const jwksAuthSchema = z
     },
   );
 
-/** Zod schema for auth config — validates bearer (with secret) or jwks (with jwksUri) strategy. */
+/**
+ * Zod schema for auth config — validates bearer (with `secret`) or jwks (with `jwksUri`) strategy.
+ *
+ * Uses `.union()` to accept either bearer or jwks auth config. Both are optional
+ * at the top level (auth is nested under `security.auth`).
+ */
 export const authSchema = z.union([bearerAuthSchema, jwksAuthSchema]).optional();
 
 /**
@@ -220,10 +236,19 @@ export const proxyRouteSchema = z
     }),
   );
 
-/** Zod schema for route structural validation — union of API and proxy route schemas. */
+/**
+ * Zod schema for route structural validation — union of API and proxy route schemas.
+ *
+ * Accepts either an API route (with `handler`) or a proxy route (with `target` and `methods`).
+ */
 export const routeSchema = z.union([apiRouteSchema, proxyRouteSchema]);
 
-/** Zod schema for rate limit config structural validation. */
+/**
+ * Zod schema for rate limit config structural validation.
+ *
+ * Validates `maxRequests` (positive integer), `windowMs` (positive integer),
+ * `maxEntries` (positive integer), and `trustedProxies` (string array).
+ */
 export const rateLimitSchema = z
   .object({
     maxEntries: z.number().optional(),

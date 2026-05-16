@@ -1,13 +1,16 @@
 /**
  * Collect bytes from a proxy response body while piping the stream through.
  *
- * Splits the response body with tee() so the client receives data as chunks
+ * Splits the response body with `tee()` so the client receives data as chunks
  * arrive without waiting for the full body to buffer. One branch is returned
  * for the client; the other is read up to `maxCollect` bytes for observability.
  *
+ * Handles client disconnect via the abort signal — when aborted, the collection
+ * reader is cancelled and the piped response is returned unchanged.
+ *
  * @param response - The original proxy response.
  * @param signal - Abort signal for client disconnect detection.
- * @param maxCollect - Maximum bytes to collect for observability.
+ * @param maxCollect - Maximum bytes to collect for observability logging.
  * @returns Promise resolving to `{ response, body, error }` — the new piped Response, collected body text, or error.
  */
 export async function collectProxyBody(

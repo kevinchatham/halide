@@ -13,10 +13,11 @@ import { getClientIp } from '../utils/trustedProxies';
  *
  * Uses Redis for distributed rate limiting across multiple server instances.
  * Each client IP gets a key with a TTL matching the window duration.
+ * When the request count exceeds `maxRequests`, returns a 429 Too Many Requests response.
  *
- * @param client - A Redis client implementing the RedisClient interface.
- * @param config - Rate limit configuration (maxRequests and windowMs).
- * @returns Object containing the middleware and a dispose function.
+ * @param client - A Redis client implementing the {@link RedisClient} interface.
+ * @param config - Rate limit configuration (`maxRequests` and `windowMs`).
+ * @returns Object containing the middleware and a dispose function (no-op for Redis).
  */
 export function createRedisRateLimitStore(
   client: RedisClient,
@@ -69,9 +70,9 @@ export function createRedisRateLimitStore(
 export interface RateLimitStore {
   /** Remove the entry for the given key. */
   delete(key: string): Promise<void>;
-  /** Retrieve the current window entry for a key, or undefined if not found. */
+  /** Retrieve the current window entry for a key, or `undefined` if not found. */
   get(key: string): Promise<WindowEntry | undefined>;
-  /** Store a window entry for the given key. */
+  /** Store a window entry for the given key, evicting the oldest when at capacity. */
   set(key: string, entry: WindowEntry): Promise<void>;
   /** Remove expired entries from the store. Called periodically by the middleware. */
   sweep(now: number): Promise<void>;
@@ -144,10 +145,11 @@ function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitS
 /**
  * Create rate limiting middleware that restricts requests per client IP.
  *
- * Uses an in-memory store with periodic cleanup. Returns 429 when the client
- * has exceeded its window quota. The dispose function clears the cleanup timer.
+ * Uses an in-memory store with periodic cleanup and LRU eviction.
+ * Returns 429 Too Many Requests when the client has exceeded its window quota.
+ * The dispose function clears the cleanup timer.
  *
- * @param config - Rate limit configuration (maxRequests and windowMs).
+ * @param config - Rate limit configuration (`maxRequests` and `windowMs`).
  * @returns Object containing the middleware and a dispose function for cleanup.
  */
 export function createRateLimitMiddleware(config: RateLimitConfig): {

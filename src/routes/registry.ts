@@ -9,17 +9,19 @@ import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy';
 export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registerProxyRoute };
 
 /**
- * Hono method types that have direct app.* methods on the Hono app instance.
- * HEAD is handled separately via `app.on('HEAD', ...)`.
+ * Hono method types that have direct `app.*` methods on the Hono app instance.
+ * HEAD is handled separately via `app.on('HEAD', ...)` since Hono has no dedicated `app.head()`.
  */
 export type HonoMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
 
 /**
- * Register a route on the Hono app by calling the method-specific handler (e.g., app.get, app.post).
+ * Register a route on the Hono app by calling the method-specific handler (e.g., `app.get`, `app.post`).
+ *
  * HEAD requests use `app.on('HEAD', ...)` since Hono has no dedicated `app.head()` method.
+ *
  * @param app - The Hono application to register the route on.
- * @param method - The HTTP method. 'head' is mapped to `app.on('HEAD', ...)`.
- * @param path - The URL path pattern for this route.
+ * @param method - The HTTP method. `'head'` is mapped to `app.on('HEAD', ...)`.
+ * @param path - The URL path pattern for this route (supports Hono-style parameters like `/:id`).
  * @param handlers - One or more middleware handlers to execute for this route.
  */
 export function registerRouteOnApp(
@@ -51,7 +53,7 @@ export type RegisterRoutesOptions<TClaims = unknown, TLogScope = unknown> = {
   config: ServerConfig<TClaims, TLogScope>;
   /** Logger instance for observability. */
   logger: Logger<TLogScope>;
-  /** The HTTP agent cache for proxy connections. */
+  /** The HTTP agent cache for proxy connections, managing connection pooling. */
   agentCache: ReturnType<typeof createAgentCache>;
 };
 
