@@ -20,6 +20,9 @@ export const noopLogger: Logger<unknown> = createNoopLogger();
 /**
  * Options for configuring which middleware pipelines `createTestApp` applies.
  * All flags default to `false` for backward compatibility with existing tests.
+ *
+ * Use these flags to selectively enable middleware during testing without
+ * configuring them in the server config.
  */
 export type TestAppOptions = {
   /** Apply CORS + CSRF middleware (default: false) */

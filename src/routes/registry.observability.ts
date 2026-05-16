@@ -5,7 +5,7 @@ import type { HalideContext, Logger, ObservabilityConfig, RequestContext } from 
 /**
  * Context object capturing error, start time, and status code for the onResponse hook.
  */
-interface ResponseEmitContext {
+export interface ResponseEmitContext {
   /** Error thrown by the handler during request processing, if any. */
   handlerError: Error | undefined;
   /** Timestamp (Date.now()) when request processing started. */
@@ -52,8 +52,9 @@ interface ResponseEmitConfig<TClaims = unknown, TLogScope = unknown>
 /**
  * Emit the onRequest observability hook if configured and not disabled on the route.
  *
- * Skips the hook when `observe` is false or when no onRequest hook is configured.
- * Wraps callback invocations in try/catch to prevent async errors from silently failing.
+ * Skips the hook when `observe` is false or when no `onRequest` hook is configured
+ * in {@link ObservabilityConfig}. Wraps callback invocations in try/catch so that
+ * hook errors don't silently fail or disrupt request processing.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
@@ -82,9 +83,10 @@ export function emitOnRequest<TClaims = unknown, TLogScope = unknown>(
 /**
  * Emit the onResponse observability hook if configured and not disabled on the route.
  *
- * Skips the hook when `observe` is false or when no onResponse hook is configured.
- * Computes the response duration from the start timestamp.
- * Wraps callback invocations in try/catch to prevent async errors from silently failing.
+ * Skips the hook when `observe` is false or when no `onResponse` hook is configured
+ * in {@link ObservabilityConfig}. Computes the response duration from the start
+ * timestamp and wraps callback invocations in try/catch so that hook errors don't
+ * silently fail or disrupt request processing.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.

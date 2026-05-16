@@ -26,6 +26,7 @@ const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk
 
 const jwkRefreshLocks = new Map<string, Promise<void>>();
 
+/** Cache a JWKS middleware instance with its expiration timestamp. */
 function setJwkCacheEntry(
   jwksUri: string,
   expiresAt: number,
@@ -39,6 +40,7 @@ function setJwkCacheEntry(
   jwkCache.set(jwksUri, { algorithms, expiresAt, middleware });
 }
 
+/** Evict the oldest entry when a lock map reaches MAX_JWK_LOCKS. */
 function evictLock(map: Map<string, Promise<unknown>>): void {
   if (map.size >= MAX_JWK_LOCKS) {
     const firstKey = map.keys().next().value;
@@ -46,6 +48,12 @@ function evictLock(map: Map<string, Promise<unknown>>): void {
   }
 }
 
+/**
+ * Get or create a cached JWKS middleware instance for the given URI.
+ *
+ * Returns the cached middleware if it hasn't expired. Creates a new one
+ * with deduplication via fetch locks to avoid concurrent JWKS fetches.
+ */
 async function getCachedJwkMiddleware(
   jwksUri: string,
   algorithms?: string[],
@@ -140,6 +148,7 @@ const jwkBackgroundRefreshTimer =
       }, JWKS_CACHE_TTL_MS / 2);
 jwkBackgroundRefreshTimer?.unref();
 
+/** Check whether the JWT audience claim matches the expected value. */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
   const aud = payload.aud;
   if (aud === undefined) return false;
@@ -148,6 +157,7 @@ function matchesAudience(payload: Record<string, unknown>, audience: string): bo
   return false;
 }
 
+/** Decode the JWT header (first segment) without verification. Returns null on failure. */
 function decodeJwtHeader(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split('.');
@@ -163,6 +173,7 @@ function decodeJwtHeader(token: string): Record<string, unknown> | null {
   }
 }
 
+/** Resolve the JWT signing algorithm from the header, checking against allowed algorithms. */
 function resolveAlgorithm(token: string, allowedAlgorithms: string[]): string | null {
   const header = decodeJwtHeader(token);
   if (!header) return null;
@@ -172,6 +183,21 @@ function resolveAlgorithm(token: string, allowedAlgorithms: string[]): string | 
   return alg;
 }
 
+/**
+ * Extract JWT claims from the Authorization header using HS256 (or specified) signing algorithm.
+ *
+ * Reads the `authorization` header, resolves the signing algorithm by inspecting the
+ * JWT header, verifies the signature with the provided secret, and checks the audience
+ * claim when configured. Returns `null` when no valid bearer token is present or
+ * verification fails.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @param c - The Hono context.
+ * @param secret - The JWT signing secret.
+ * @param audience - Expected audience claim value.
+ * @param algorithms - Allowed signing algorithms. Defaults to `['HS256']`.
+ * @returns The decoded JWT claims, or `null` when extraction fails.
+ */
 export async function extractBearerClaims<TClaims = unknown>(
   c: Context,
   secret: string,
@@ -216,6 +242,20 @@ export async function extractBearerClaims<TClaims = unknown>(
   }
 }
 
+/**
+ * Extract JWT claims from the Authorization header using JWKS-based verification.
+ *
+ * Reads the `authorization` header, fetches the JWKS endpoint (cached), runs the
+ * hono/jwk middleware to verify the token, and checks the audience claim when
+ * configured. Returns `null` when no valid bearer token is present or verification fails.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @param c - The Hono context.
+ * @param jwksUri - JWKS endpoint URL.
+ * @param audience - Expected audience claim value.
+ * @param algorithms - Allowed signing algorithms.
+ * @returns The decoded JWT claims, or `null` when extraction fails.
+ */
 export async function extractJwksClaims<TClaims = unknown>(
   c: Context,
   jwksUri: string,

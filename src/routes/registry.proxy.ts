@@ -13,7 +13,23 @@ import { emitOnRequest, emitOnResponse } from './registry.observability';
 import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
 
-/** Register a proxy route with auth, observability, and proxy forwarding for each configured method. */
+/**
+ * Register a proxy route on the Hono app for each configured method with auth,
+ * body parsing (when a transform function is set), context middleware, and proxy handler.
+ *
+ * Iterates over `route.methods` and registers a handler for each method that
+ * forwards requests to the upstream target, with JWT auth and observability hooks.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register the route on.
+ * @param route - The proxy route definition.
+ * @param claimExtractor - JWT claim extractor function.
+ * @param observability - The observability configuration.
+ * @param logger - Logger instance for error reporting.
+ * @param agentCache - The HTTP agent cache for proxy connections.
+ * @param logScopeFactory - Optional per-request factory that produces a typed log scope.
+ */
 export function registerProxyRoute<TClaims = unknown, TLogScope = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ProxyRoute<TClaims, TLogScope>,

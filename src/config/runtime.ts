@@ -52,6 +52,10 @@ export interface CreateAppResult {
 
 /**
  * Apply CORS and optional CSRF middleware to the Hono app.
+ *
+ * Configures `hono/cors` with the provided CORS settings and adds `hono/csrf`
+ * when credentials are enabled (to prevent cross-site request forgery).
+ *
  * @internal
  */
 export function setupCorsAndCsrf<TClaims, TLogScope>(
@@ -84,6 +88,11 @@ export function setupCorsAndCsrf<TClaims, TLogScope>(
 
 /**
  * Apply rate limiting middleware to the Hono app.
+ *
+ * When `security.rateLimit` is configured, creates either a Redis-backed
+ * store ({@link createRedisRateLimitStore}) or an in-memory store with
+ * periodic cleanup. Returns a dispose function for cleanup.
+ *
  * @internal
  */
 export function setupRateLimit<TClaims, TLogScope>(
@@ -124,6 +133,11 @@ export function setupRateLimit<TClaims, TLogScope>(
 
 /**
  * Apply CSP overrides for OpenAPI/Swagger routes when OpenAPI is enabled.
+ *
+ * When OpenAPI UI is enabled, applies relaxed CSP directives (from
+ * {@link DEFAULTS.csp.openapiOverrides}) to the Swagger path so that
+ * the Scalar UI can load its scripts and styles.
+ *
  * @internal
  */
 export function setupOpenapi<TClaims, TLogScope>(
@@ -150,6 +164,10 @@ export function setupOpenapi<TClaims, TLogScope>(
 
 /**
  * Apply CSP security headers middleware to the Hono app.
+ *
+ * Registers the {@link createSecurityMiddleware} as global middleware to
+ * apply Content Security Policy headers to all responses.
+ *
  * @internal
  */
 export function setupSecurity<TClaims, TLogScope>(
@@ -161,6 +179,10 @@ export function setupSecurity<TClaims, TLogScope>(
 
 /**
  * Apply request ID middleware when `observability.requestId` is enabled.
+ *
+ * Registers the {@link createRequestIdMiddleware} to add a unique request
+ * ID to each request (reusing `x-request-id` if present, otherwise generating a UUID).
+ *
  * @internal
  */
 export function setupRequestId<TClaims, TLogScope>(
@@ -172,6 +194,7 @@ export function setupRequestId<TClaims, TLogScope>(
   }
 }
 
+/** Register all API and proxy routes on the Hono app. */
 function setupRoutes<TClaims = unknown, TLogScope = unknown>(
   app: HonoApp,
   agentCache: ReturnType<typeof createAgentCache>,
@@ -181,6 +204,7 @@ function setupRoutes<TClaims = unknown, TLogScope = unknown>(
   registerRoutes({ agentCache, app, config, logger });
 }
 
+/** Register OpenAPI/Scalar documentation routes on the Hono app. */
 function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,
   app: HonoApp,

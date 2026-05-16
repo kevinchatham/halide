@@ -11,7 +11,12 @@ import {
   writeTsconfigServer,
 } from './init.template';
 
-/** Execute a shell command silently, capturing stderr and rethrowing on failure. */
+/**
+ * Execute a shell command silently, capturing stderr and rethrowing on failure.
+ *
+ * @param cmd - The shell command to execute.
+ * @param cwd - The working directory for the command.
+ */
 export function runQuietly(cmd: string, cwd: string): void {
   try {
     execSync(cmd, { cwd, stdio: 'pipe' });
@@ -23,7 +28,13 @@ export function runQuietly(cmd: string, cwd: string): void {
   }
 }
 
-/** Add halide:start and halide:build npm scripts to package.json if they don't already exist. */
+/**
+ * Add halide:start and halide:build npm scripts to package.json if they don't already exist.
+ *
+ * @param cwd - The project working directory.
+ * @param dryRun - When true, logs what would be added without writing files.
+ * @param force - When true, overwrites existing scripts.
+ */
 export function addScriptsToPackageJson(cwd: string, dryRun = false, force = false): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -84,7 +95,15 @@ export function addScriptsToPackageJson(cwd: string, dryRun = false, force = fal
 /** Supported package managers for dependency installation. */
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
-/** Detect which package manager is used in the project by checking for lock files. */
+/**
+ * Detect which package manager is used in the project by checking for lock files.
+ *
+ * Checks for `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, and `bun.lockb` in order.
+ * Falls back to `'npm'` when no lock file is found.
+ *
+ * @param cwd - The project working directory.
+ * @returns The detected package manager.
+ */
 export function detectPackageManager(cwd: string): PackageManager {
   if (fs.existsSync(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
   if (fs.existsSync(path.join(cwd, 'yarn.lock'))) return 'yarn';
@@ -93,7 +112,12 @@ export function detectPackageManager(cwd: string): PackageManager {
   return 'npm';
 }
 
-/** Get the install command for adding halide and @types/node with the given package manager. */
+/**
+ * Get the install command for adding halide and @types/node with the given package manager.
+ *
+ * @param pkgManager - The detected package manager.
+ * @returns The install command string.
+ */
 export function getInstallCmd(pkgManager: PackageManager): string {
   const cmds: Record<PackageManager, string> = {
     bun: 'bun add halide && bun add -D @types/node',

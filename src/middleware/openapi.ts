@@ -12,18 +12,29 @@ import { buildHonoApp } from '../utils/hono';
 /** Allowed HTTP methods that can appear in OpenAPI operation definitions. */
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
-/** Cached OpenAPI spec and shared resolution promise for concurrency guard. */
+/**
+ * Cached OpenAPI spec and shared resolution promise for concurrency guard.
+ *
+ * Used to prevent concurrent OpenAPI spec resolution requests by sharing
+ * a single `specResolution` promise among all in-flight requests.
+ */
 export interface SpecCacheState {
   cachedSpec: Record<string, unknown> | null;
   specResolution: Promise<void> | null;
 }
 
-/** Create a fresh spec cache state for isolation. */
+/**
+ * Create a fresh spec cache state for isolation (used by tests).
+ * @returns A new `SpecCacheState` with null cache and resolution.
+ */
 export function createSpecCacheState(): SpecCacheState {
   return { cachedSpec: null, specResolution: null };
 }
 
-/** Reset the cached spec and resolution promise (used by tests). */
+/**
+ * Reset the cached spec and resolution promise (used by tests).
+ * @param state - The spec cache state to reset.
+ */
 export function resetOpenApiCache(state: SpecCacheState): void {
   state.cachedSpec = null;
   state.specResolution = null;
@@ -32,6 +43,9 @@ export function resetOpenApiCache(state: SpecCacheState): void {
 /**
  * Merge metadata overrides (summary, description, tags) from a proxy route
  * onto an OpenAPI operation object.
+ *
+ * @param operation - The OpenAPI operation object to modify in place.
+ * @param metadata - Route-level OpenAPI metadata to merge.
  */
 function applyMetadata<TClaims = unknown, TLogScope = unknown>(
   operation: Record<string, unknown>,
@@ -45,6 +59,10 @@ function applyMetadata<TClaims = unknown, TLogScope = unknown>(
 /**
  * Merge external OpenAPI spec paths into the inline spec's paths map,
  * respecting route method filtering and route-level metadata overrides.
+ *
+ * @param inlineSpec - The inline OpenAPI spec to merge into.
+ * @param resolvedSpecs - External specs paired with their owning routes.
+ * @returns The merged spec with external paths integrated.
  */
 function mergeExternalSpecs<TClaims = unknown, TLogScope = unknown>(
   inlineSpec: Record<string, unknown>,
@@ -69,6 +87,12 @@ function mergeExternalSpecs<TClaims = unknown, TLogScope = unknown>(
 /**
  * Merge a single path item from an external spec into the paths map,
  * filtering by allowed HTTP methods and applying route-level metadata.
+ *
+ * @param externalPath - The path key from the external spec.
+ * @param pathItem - The path item object to merge.
+ * @param routeMethods - HTTP methods allowed for this route.
+ * @param metadata - Route-level OpenAPI metadata to apply.
+ * @param paths - The paths map to merge into.
  */
 function mergePathItem<TClaims = unknown, TLogScope = unknown>(
   externalPath: string,
@@ -96,6 +120,10 @@ function mergePathItem<TClaims = unknown, TLogScope = unknown>(
 /**
  * Build the inline OpenAPI spec by creating a temporary Hono app and
  * fetching the OpenAPI route handler output.
+ *
+ * @param app - The Hono app to generate the spec for.
+ * @param options - OpenAPI options (title, version, description, servers).
+ * @returns The inline OpenAPI spec as a plain object.
  */
 async function buildInlineSpec(
   app: HonoApp,
@@ -141,6 +169,10 @@ async function buildInlineSpec(
 /**
  * Build the final OpenAPI spec, merging title, version, description, and servers
  * from options while preferring options over inline spec defaults.
+ *
+ * @param mergedSpec - The spec after merging external paths.
+ * @param options - OpenAPI options to apply.
+ * @returns The final OpenAPI spec with resolved info.
  */
 function buildFinalSpec(
   mergedSpec: Record<string, unknown>,
@@ -252,7 +284,7 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
  * @param inlineInfo - Inline info from the resolved spec.
  * @returns The resolved info object, or undefined if no info is available.
  */
-function resolveOpenApiInfo(
+export function resolveOpenApiInfo(
   options?: OpenApiOptions,
   inlineInfo?: Record<string, string | undefined>,
 ): Record<string, string | undefined> | undefined {

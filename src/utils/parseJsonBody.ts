@@ -1,7 +1,19 @@
 import type { Context } from 'hono';
 
+/**
+ * Error codes for JSON body parsing failures.
+ * - `'EMPTY_BODY'` — Request body was empty.
+ * - `'MALFORMED_JSON'` — Body contained invalid JSON syntax.
+ * - `'PARSE_ERROR'` — Generic parse failure (non-SyntaxError).
+ */
 export type BodyParseErrorCode = 'EMPTY_BODY' | 'MALFORMED_JSON' | 'PARSE_ERROR';
 
+/**
+ * Error thrown when JSON body parsing fails.
+ *
+ * Carries a descriptive `message`, a {@link BodyParseErrorCode} for programmatic
+ * handling, and the original error as `cause`. Always has `status: 400`.
+ */
 export class BodyParseError extends Error {
   public readonly status: number;
   public readonly code: BodyParseErrorCode;

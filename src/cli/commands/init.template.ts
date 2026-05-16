@@ -6,6 +6,10 @@ import stripJsonComments from 'strip-json-comments';
 /**
  * Generate the server.ts starter file content for a new Halide project.
  * Creates a basic server with a health check route.
+ *
+ * @param appName - The application name for the server config.
+ * @param port - The port number to listen on.
+ * @returns The server.ts file content as a string.
  */
 export function generateServerTs(appName: string, port: number): string {
   return `import { createServer, apiRoute } from 'halide';
@@ -49,7 +53,16 @@ export const TSCONFIG_SERVER = `{
 }
 `;
 
-/** Write tsconfig.server.json if it doesn't already exist in the project root. */
+/**
+ * Write tsconfig.server.json if it doesn't already exist in the project root.
+ *
+ * Creates a minimal TypeScript config targeting ES2022 with CommonJS modules
+ * for the server build. Skips if the file exists unless `force` is true.
+ *
+ * @param cwd - The project working directory.
+ * @param dryRun - When true, logs what would be written without creating files.
+ * @param force - When true, overwrites the existing file.
+ */
 export function writeTsconfigServer(cwd: string, dryRun = false, force = false): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
   if (!force && fs.existsSync(tsconfigServerPath)) {
@@ -64,7 +77,16 @@ export function writeTsconfigServer(cwd: string, dryRun = false, force = false):
   log('✓ Created tsconfig.server.json');
 }
 
-/** Add tsconfig.server.json reference to tsconfig.json, skipping if already referenced. */
+/**
+ * Add tsconfig.server.json reference to tsconfig.json, skipping if already referenced.
+ *
+ * Parses the project's tsconfig.json and appends a `{ "path": "./tsconfig.server.json" }`
+ * reference to the `references` array. Uses jsonc-parser for comment-aware editing.
+ *
+ * @param cwd - The project working directory.
+ * @param dryRun - When true, logs what would be added without modifying files.
+ * @param force - When true, removes existing reference before adding a new one.
+ */
 export function addServerReference(cwd: string, dryRun = false, force = false): void {
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
   if (!fs.existsSync(tsconfigPath)) return;
@@ -112,7 +134,15 @@ export interface ResolvedTsconfig {
   name: string;
 }
 
-/** Resolve the app tsconfig file, returning filename, raw content, and parsed references info. */
+/**
+ * Resolve the app tsconfig file, returning filename, raw content, and parsed references info.
+ *
+ * Checks for `tsconfig.app.json`, `tsconfig.web.json`, and `tsconfig.json` in order.
+ * Returns null when no app tsconfig is found.
+ *
+ * @param cwd - The project working directory.
+ * @returns The resolved tsconfig info, or null when not found.
+ */
 export function resolveAppTsconfig(cwd: string): ResolvedTsconfig | null {
   const candidates = ['tsconfig.app.json', 'tsconfig.web.json', 'tsconfig.json'];
 
@@ -134,7 +164,17 @@ export function resolveAppTsconfig(cwd: string): ResolvedTsconfig | null {
   return null;
 }
 
-/** Add server.ts to the app tsconfig exclude list, skipping if already excluded. */
+/**
+ * Add server.ts to the app tsconfig exclude list, skipping if already excluded.
+ *
+ * Parses the app tsconfig and adds `'server.ts'` to the `exclude` array.
+ * Uses jsonc-parser for comment-aware editing.
+ *
+ * @param cwd - The project working directory.
+ * @param dryRun - When true, logs what would be added without modifying files.
+ * @param force - When true, removes existing entry before adding a new one.
+ * @param cachedContent - Optional pre-read tsconfig content to avoid double reads.
+ */
 export function excludeServerFromApp(
   cwd: string,
   dryRun = false,

@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 import { MAX_COLLECT_BYTES } from './constants';
 
-/** Zod schema for app config structural validation. */
+/**
+ * Zod schema for app config structural validation.
+ *
+ * Validates `apiPrefix`, `fallback`, `name`, `port`, and `root` fields.
+ * Ensures `port` is an integer between 1 and 65535.
+ */
 export const appSchema = z
   .object({
     apiPrefix: z.string().optional(),
@@ -23,7 +28,11 @@ export const appSchema = z
     },
   );
 
-/** Zod schema for CORS config — validates wildcard origin + credentials conflict. */
+/**
+ * Zod schema for CORS config — validates wildcard origin + credentials conflict.
+ *
+ * Ensures that `credentials: true` is not used with a wildcard (`*`) origin.
+ */
 export const corsSchema = z
   .object({
     allowedHeaders: z.array(z.string()).optional(),
@@ -47,7 +56,12 @@ export const corsSchema = z
     },
   );
 
-/** Zod schema for CSP directives — strict camelCase directive keys only. */
+/**
+ * Zod schema for CSP directives — strict camelCase directive keys only.
+ *
+ * Validates all CSP directive fields as optional string arrays. Uses `.strict()`
+ * to reject unknown keys (kebab-case directives are rejected).
+ */
 export const cspSchema = z
   .object({
     baseUri: z.array(z.string()).optional(),
@@ -135,9 +149,15 @@ const jwksAuthSchema = z
     },
   );
 
+/** Zod schema for auth config — validates bearer (with secret) or jwks (with jwksUri) strategy. */
 export const authSchema = z.union([bearerAuthSchema, jwksAuthSchema]).optional();
 
-/** Zod schema for API route structural validation. */
+/**
+ * Zod schema for API route structural validation.
+ *
+ * Validates `access`, `handler`, `method`, `observe`, `path`, and `type` fields.
+ * Ensures `path` starts with `/`.
+ */
 export const apiRouteSchema = z
   .object({
     access: z.enum(['public', 'private']).optional(),
@@ -158,7 +178,13 @@ export const apiRouteSchema = z
     }),
   );
 
-/** Zod schema for proxy route structural validation. */
+/**
+ * Zod schema for proxy route structural validation.
+ *
+ * Validates `access`, `handler`, `methods`, `observe`, `path`, `proxyPath`,
+ * `target`, `timeout`, and `type` fields. Ensures `path` and `proxyPath`
+ * start with `/`.
+ */
 export const proxyRouteSchema = z
   .object({
     access: z.enum(['public', 'private']).optional(),
@@ -194,6 +220,7 @@ export const proxyRouteSchema = z
     }),
   );
 
+/** Zod schema for route structural validation — union of API and proxy route schemas. */
 export const routeSchema = z.union([apiRouteSchema, proxyRouteSchema]);
 
 /** Zod schema for rate limit config structural validation. */
@@ -216,7 +243,11 @@ export const rateLimitSchema = z
     },
   );
 
-/** Zod schema for security config — validates auth, cors, csp, and rateLimit sub-fields. */
+/**
+ * Zod schema for security config — validates auth, cors, csp, and rateLimit sub-fields.
+ *
+ * All sub-fields are optional but the schema is strict (no unknown keys allowed).
+ */
 export const securitySchema = z
   .object({
     auth: authSchema.optional(),
@@ -226,7 +257,11 @@ export const securitySchema = z
   })
   .strict();
 
-/** Zod schema for OpenAPI config structural validation. */
+/**
+ * Zod schema for OpenAPI config structural validation.
+ *
+ * Validates `enabled` (boolean) and `path` (string) fields. Strict mode rejects unknown keys.
+ */
 export const openApiSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -234,7 +269,12 @@ export const openApiSchema = z
   })
   .strict();
 
-/** Zod schema for observability config — validates maxCollect bounds. */
+/**
+ * Zod schema for observability config — validates maxCollect bounds.
+ *
+ * Validates `logger`, `logScopeFactory`, `maxCollect` (positive, not exceeding MAX_COLLECT_BYTES),
+ * `onRequest`, `onResponse`, and `requestId` fields.
+ */
 export const observabilitySchema = z
   .object({
     logger: z.any().optional(),

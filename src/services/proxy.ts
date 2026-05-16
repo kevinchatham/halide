@@ -127,7 +127,14 @@ export class AgentCache {
   }
 }
 
-/** Create an AgentCache instance for managing HTTP agent pools. */
+/**
+ * Create an AgentCache instance for managing HTTP agent pools.
+ *
+ * Returns a new {@link AgentCache} that manages connection pooling for
+ * upstream HTTP/HTTPS connections with bounded size and LRU eviction.
+ *
+ * @returns A new AgentCache instance.
+ */
 export function createAgentCache(): AgentCache {
   return new AgentCache();
 }
@@ -164,6 +171,12 @@ const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
  * Append the first IP from x-forwarded-for when the sender is a trusted proxy.
  * Only forwards when x-forwarded-for is in the allowlist, trustedProxies is configured,
  * and the socket IP matches a trusted proxy.
+ *
+ * @param headers - The headers object to modify.
+ * @param forwardHeaders - The allowlist of headers to forward.
+ * @param trustedProxies - Trusted proxy IPs/CIDRs.
+ * @param socketIp - The socket IP of the immediate sender.
+ * @param originalHeaders - The original request headers.
  */
 function appendForwardedFor(
   headers: Record<string, string>,
@@ -300,6 +313,12 @@ function filterForwardHeaders(
  *
  * Calls `route.identity(ctx, app)` to get a map of header names to values,
  * then sets each header only if it is writable (not readonly, not multi-value).
+ *
+ * @param headers - The headers object to modify.
+ * @param route - The proxy route configuration.
+ * @param app - Bundled app context with claims and logger.
+ * @param c - The Hono context.
+ * @param reqCtx - The normalized request context.
  */
 function applyIdentityHeaders<TClaims = unknown, TLogScope = unknown>(
   headers: Record<string, string | undefined>,
@@ -323,6 +342,7 @@ function applyIdentityHeaders<TClaims = unknown, TLogScope = unknown>(
 /**
  * Check if a header is writable: not readonly, not multi-value from the original
  * request, and not in the ARRAY_HEADERS set.
+ *
  * @param key - The header name to check.
  * @param multiValueKeys - Set of header keys that had array values in the original request.
  * @returns True if the header can be safely set/modified.
@@ -340,6 +360,13 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
  * When no transform is configured, returns the original request body.
  * When a transform exists, normalizes headers, calls the transform function,
  * and applies any modified headers back, respecting readonly constraints.
+ *
+ * @param route - The proxy route configuration.
+ * @param parsedBody - The parsed request body.
+ * @param c - The Hono context.
+ * @param headers - The headers object to modify.
+ * @param logger - Optional logger for error reporting.
+ * @returns The transformed body or the original request body.
  */
 function applyTransform<TClaims = unknown, TLogScope = unknown>(
   route: ProxyRoute<TClaims, TLogScope>,

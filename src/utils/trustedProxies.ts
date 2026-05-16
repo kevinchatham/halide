@@ -1,6 +1,15 @@
 import ipaddr from 'ipaddr.js';
 
-/** Check if an IP address matches a trusted proxy list using CIDR or exact matching. */
+/**
+ * Check if an IP address matches a trusted proxy list using CIDR or exact matching.
+ *
+ * Uses the `ipaddr.js` library to parse both IPv4 and IPv6 addresses and
+ * match them against CIDR ranges or exact IPs in the trusted proxy list.
+ *
+ * @param ip - The IP address to check.
+ * @param trustedProxies - List of trusted proxy IPs or CIDR ranges.
+ * @returns True if the IP matches a trusted proxy, false otherwise.
+ */
 export function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]): boolean {
   if (!trustedProxies?.length || !ip) return false;
   const addr = ipaddr.parse(ip);

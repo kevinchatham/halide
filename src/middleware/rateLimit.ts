@@ -63,8 +63,10 @@ export function createRedisRateLimitStore(
  *
  * Implementations can use Redis, DynamoDB, or any other distributed store
  * to share rate limit state across multiple server instances.
+ *
+ * @internal
  */
-interface RateLimitStore {
+export interface RateLimitStore {
   /** Remove the entry for the given key. */
   delete(key: string): Promise<void>;
   /** Retrieve the current window entry for a key, or undefined if not found. */
@@ -77,6 +79,8 @@ interface RateLimitStore {
 
 /**
  * Configuration for the in-memory rate limit store.
+ *
+ * @internal
  */
 interface RateLimitConfig {
   /** Maximum number of entries in the store. Oldest entries are evicted when exceeded. */
@@ -91,6 +95,8 @@ interface RateLimitConfig {
 
 /**
  * Internal storage for rate limit tracking per client IP.
+ *
+ * @internal
  */
 interface WindowEntry {
   /** Number of requests in current window. */
@@ -102,11 +108,11 @@ interface WindowEntry {
 /**
  * Create an in-memory rate limit store with LRU eviction.
  *
- * Uses a Map with LRU eviction when maxEntries is configured.
+ * Uses a Map with LRU eviction when `maxEntries` is configured.
  * Suitable for single-instance deployments.
  *
  * @param maxEntries - Maximum number of entries. Oldest entries are evicted when exceeded.
- * @returns A RateLimitStore implementation.
+ * @returns A {@link RateLimitStore} implementation.
  */
 function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitStore {
   const store = new Map<string, WindowEntry>();

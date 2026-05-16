@@ -5,6 +5,9 @@ import { collectProxyBody } from './proxy.body';
 
 /**
  * Result of response body collection with streaming.
+ *
+ * Returned by {@link observeAndPipeResponse} after piping a response body
+ * while collecting bytes for observability logging.
  */
 export type PipeResult = {
   /** The piped response (or original if no body). */

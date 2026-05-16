@@ -57,11 +57,14 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
 }
 
 /**
- * Resolve external OpenAPI specs from proxy routes.
+ * Resolve external OpenAPI specs from proxy routes that have `openapiSpec` configured.
  *
- * Filters proxy routes that have `openapiSpec` configured and resolves each
- * spec by fetching from URL or reading a local JSON file.
+ * Filters proxy routes for those with an `openapiSpec` property (pointing to a
+ * local JSON file or URL), fetches or reads each spec, and returns them paired
+ * with their owning route for later merging into the final OpenAPI document.
  *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param proxyRoutes - The proxy routes to check for external spec sources.
  * @returns A list of resolved specs paired with their owning routes.
  */
@@ -83,6 +86,10 @@ export async function resolveOpenApiSpec<TClaims = unknown, TLogScope = unknown>
 /**
  * Build OpenAPI describeRoute options from route metadata, including hidden flag
  * and request body schema.
+ *
+ * Extracts `summary`, `description`, and `tags` from `route.openapi`, sets
+ * `hide: true` when `observe` is false, and builds request body + response
+ * definitions from route schemas.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
@@ -111,6 +118,9 @@ export function buildDescribeRouteOptions<TClaims = unknown, TLogScope = unknown
  * Build OpenAPI request body configuration from route request schema, detecting
  * optional wrappers.
  *
+ * For API routes, extracts the `requestSchema` and wraps it with the hono-openapi
+ * resolver. Detects ZodOptional/ZodNullable wrappers to set `required: false`.
+ *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
  * @param route - The route with a potential request schema.
@@ -135,6 +145,10 @@ export function buildRequestBody<TClaims = unknown, TLogScope = unknown>(
 /**
  * Build OpenAPI responses object from route metadata or response schema,
  * defaulting to a 200 successful response.
+ *
+ * When `route.openapi.responses` is set, uses those status-code-to-schema
+ * mappings. For API routes with a `responseSchema`, generates a 200 response.
+ * Otherwise returns a minimal 200 response with just a description.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.

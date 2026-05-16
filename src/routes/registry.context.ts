@@ -10,7 +10,8 @@ import type { Logger, RequestContext } from '../types/app';
  * stores both on the Hono context for downstream middleware.
  *
  * This middleware must run after auth (so `claims` are available) but before
- * the handler.
+ * the handler. It extracts JWT claims, builds a normalized request context,
+ * and optionally bakes a per-request log scope into the logger.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.

@@ -11,14 +11,12 @@ type BodyMethod = 'post' | 'put' | 'patch';
 /**
  * Create a body parsing middleware for API routes without a requestSchema.
  *
- * Handles POST/PUT/PATCH body parsing via parseJsonBody(). Stores result in
- * c.set('parsedBody', body). Returns 400 on JSON parse error.
+ * Handles POST/PUT/PATCH body parsing via {@link parseJsonBody}. Stores result
+ * in `c.set('parsedBody', body)`. Returns 400 on JSON parse error.
  *
  * Skips body parsing for GET, HEAD, DELETE, and other methods without a body.
  * Also skips when `requestSchema` is set (hono-openapi validator already parses
  * the body before this middleware runs).
- *
- * Must call next() to continue the middleware chain when no body is returned.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
@@ -57,9 +55,10 @@ export function createApiBodyParser<TClaims = unknown, TLogScope = unknown>(
 /**
  * Create a body parsing middleware for proxy routes with a transform function.
  *
- * Parses body and stores via c.set('parsedBody'). Returns 400 on JSON parse error.
+ * Parses the request body via {@link parseJsonBody} and stores it via
+ * `c.set('parsedBody', body)`. Returns 400 on JSON parse error.
  *
- * Skips body parsing when no transform function is configured.
+ * Skips body parsing when no `transform` function is configured on the route.
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.

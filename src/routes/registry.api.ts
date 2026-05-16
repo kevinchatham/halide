@@ -18,7 +18,23 @@ import { emitOnRequest, emitOnResponse } from './registry.observability';
 import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
 
-/** Register an API route with validator, describeRoute, auth, and handler middleware. */
+/**
+ * Register an API route on the Hono app with validation, route description,
+ * auth middleware, context middleware, and handler middleware.
+ *
+ * Adds request body parsing (via hono-openapi when `requestSchema` is set,
+ * or a custom parser for POST/PUT/PATCH), OpenAPI `describeRoute` metadata,
+ * JWT auth, request context building, and the handler with observability hooks.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register the route on.
+ * @param route - The API route definition.
+ * @param claimExtractor - JWT claim extractor function.
+ * @param observability - The observability configuration.
+ * @param logger - Logger instance for error reporting.
+ * @param logScopeFactory - Optional per-request factory that produces a typed log scope.
+ */
 export function registerApiRoute<TClaims = unknown, TLogScope = unknown>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ApiRoute<TClaims, TLogScope>,
