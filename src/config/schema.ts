@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-/** Zod schema for app config — structural validation only. */
+/**
+ * Zod schema for app config structural validation.
+ *
+ * Validates the `app` field of `ServerConfig`: port range, string fields, and
+ * optional presence of `root`, `apiPrefix`, `fallback`, and `name`.
+ */
 export const appSchema = z
   .object({
     apiPrefix: z.string().optional(),
@@ -11,7 +16,12 @@ export const appSchema = z
   })
   .strict();
 
-/** Zod schema for CORS config — structural validation only. */
+/**
+ * Zod schema for CORS config structural validation.
+ *
+ * Validates the `security.cors` field: allowed methods, origins, credentials,
+ * max-age, and exposed/allowed headers.
+ */
 export const corsSchema = z
   .object({
     allowedHeaders: z.array(z.string()).optional(),
@@ -23,7 +33,13 @@ export const corsSchema = z
   })
   .strict();
 
-/** Zod schema for CSP directives — strict camelCase directive keys only. */
+/**
+ * Zod schema for CSP directives — strict camelCase directive keys only.
+ *
+ * Validates each Content Security Policy directive (baseUri, defaultSrc,
+ * scriptSrc, styleSrc, etc.) as an optional array of strings.
+ * Throws on kebab-case keys (e.g., `default-src`).
+ */
 export const cspSchema = z
   .object({
     baseUri: z.array(z.string()).optional(),
@@ -51,7 +67,12 @@ export const cspSchema = z
   .strict()
   .optional();
 
-/** Zod schema for bearer auth config. */
+/**
+ * Zod schema for bearer authentication config.
+ *
+ * Validates the `secret` field is non-empty when strategy is 'bearer'.
+ * Accepts either a plain string or a function returning a string/Promise.
+ */
 const bearerAuthSchema = z
   .object({
     algorithms: z.array(z.string()).optional(),
@@ -71,7 +92,11 @@ const bearerAuthSchema = z
     }
   });
 
-/** Zod schema for JWKS auth config. */
+/**
+ * Zod schema for JWKS authentication config.
+ *
+ * Validates that `strategy` is 'jwks' and `jwksUri` is present.
+ */
 const jwksAuthSchema = z
   .object({
     audience: z.string().optional(),
@@ -80,10 +105,19 @@ const jwksAuthSchema = z
   })
   .strict();
 
-/** Zod schema for auth config — discriminated union for bearer vs JWKS. */
+/**
+ * Zod schema for auth config — discriminated union for bearer vs JWKS.
+ *
+ * Accepts either `bearerAuthSchema` (with `secret`) or `jwksAuthSchema`
+ * (with `jwksUri`). Only one is valid at a time.
+ */
 export const authSchema = z.union([bearerAuthSchema, jwksAuthSchema]).optional();
 
-/** Zod schema for API route — structural validation only. */
+/**
+ * Zod schema for API route structural validation.
+ *
+ * Validates `access`, `path`, `method`, `type`, `handler`, and `observe` fields.
+ */
 export const apiRouteSchema = z.object({
   access: z.enum(['public', 'private']).optional(),
   handler: z.function().optional(),
@@ -93,7 +127,12 @@ export const apiRouteSchema = z.object({
   type: z.literal('api').optional(),
 });
 
-/** Zod schema for proxy route — structural validation only. */
+/**
+ * Zod schema for proxy route structural validation.
+ *
+ * Validates `access`, `path`, `methods`, `target`, `proxyPath`, `timeout`,
+ * `type`, `handler`, and `observe` fields.
+ */
 export const proxyRouteSchema = z.object({
   access: z.enum(['public', 'private']).optional(),
   handler: z.function().optional(),
@@ -106,10 +145,18 @@ export const proxyRouteSchema = z.object({
   type: z.literal('proxy').optional(),
 });
 
-/** Zod schema for individual route validation (union for api/proxy). */
+/**
+ * Zod schema for individual route validation — union of API and proxy route schemas.
+ *
+ * Used for validating each item in `apiRoutes` and `proxyRoutes` arrays.
+ */
 export const routeSchema = z.union([apiRouteSchema, proxyRouteSchema]);
 
-/** Zod schema for rate limit config — structural validation only. */
+/**
+ * Zod schema for rate limit config structural validation.
+ *
+ * Validates `maxRequests`, `windowMs`, `maxEntries`, and `trustedProxies` fields.
+ */
 export const rateLimitSchema = z
   .object({
     maxEntries: z.number().optional(),
@@ -119,7 +166,11 @@ export const rateLimitSchema = z
   })
   .strict();
 
-/** Zod schema for security config — structural validation only. */
+/**
+ * Zod schema for security config structural validation.
+ *
+ * Validates `auth`, `cors`, `csp`, and `rateLimit` sub-fields.
+ */
 export const securitySchema = z
   .object({
     auth: authSchema.optional(),
@@ -129,7 +180,11 @@ export const securitySchema = z
   })
   .strict();
 
-/** Zod schema for OpenAPI config. */
+/**
+ * Zod schema for OpenAPI config structural validation.
+ *
+ * Validates `enabled` and `path` fields for the `openapi` section of server config.
+ */
 export const openApiSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -137,7 +192,20 @@ export const openApiSchema = z
   })
   .strict();
 
-/** Zod schema for full server config — structural + cross-field validation. */
+/**
+ * Zod schema for full server config — structural and cross-field validation.
+ *
+ * Validates all top-level fields (`app`, `security`, `apiRoutes`, `proxyRoutes`,
+ * `observability`, `openapi`) and enforces cross-field rules:
+ * - CORS wildcard origin is incompatible with `credentials: true`.
+ * - Private routes require `security.auth` configuration.
+ * - Proxy route `target` must be a valid http/https URL.
+ * - Proxy route requires at least one `methods` entry.
+ * - `app.port` must be an integer between 1 and 65535.
+ * - `auth.secretTtl` must be a non-negative integer.
+ * - `auth.algorithms` must be a non-empty array.
+ * - `rateLimit.maxEntries` must be a positive integer.
+ */
 export const serverConfigSchema = z
   .object({
     apiRoutes: z.array(routeSchema).optional(),

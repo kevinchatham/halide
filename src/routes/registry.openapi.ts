@@ -18,7 +18,10 @@ function isOptionalSchema(schema: unknown): boolean {
   return s._def?.typeName === 'ZodOptional' || s._def?.typeName === 'ZodNullable';
 }
 
-/** Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file. */
+/**
+ * Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file.
+ * Accepts http/https URLs and file:// URIs in addition to plain file paths.
+ */
 async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<string, unknown>> {
   let isUrl = false;
   let path = source.path;

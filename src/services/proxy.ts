@@ -6,7 +6,7 @@ import { proxy } from 'hono/proxy';
 import { MAX_AGENT_CACHE } from '../config/constants';
 import { DEFAULTS } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
-import type { Logger, RequestContext } from '../types/app';
+import type { AnyHalideContext, Logger, RequestContext } from '../types/app';
 import { isTrustedProxy } from '../utils/trustedProxies';
 
 /** Cached HTTP agent pool with bounded size. */
@@ -14,8 +14,8 @@ export class AgentCache {
   private readonly cache = new Map<string, http.Agent>();
   private probeResults = new Map<string, boolean>();
 
-  getAgent(target: string, maxSockets?: number, maxFreeSockets?: number): http.Agent {
-    const key = `${target}|${maxSockets ?? 50}|${maxFreeSockets ?? 10}`;
+  getAgent(target: string): http.Agent {
+    const key = `${target}`;
     let agent = this.cache.get(key);
     if (!agent) {
       if (this.cache.size >= MAX_AGENT_CACHE) {
@@ -28,8 +28,8 @@ export class AgentCache {
       }
       agent = new http.Agent({
         keepAlive: true,
-        maxFreeSockets: maxFreeSockets ?? 10,
-        maxSockets: maxSockets ?? 50,
+        maxFreeSockets: DEFAULTS.proxy.maxFreeSockets,
+        maxSockets: DEFAULTS.proxy.maxSockets,
       });
       this.cache.set(key, agent);
     }
@@ -121,12 +121,15 @@ export class AgentCache {
   }
 }
 
-/** Create an AgentCache instance. */
+/** Create an AgentCache instance for managing HTTP agent pools. */
 export function createAgentCache(): AgentCache {
   return new AgentCache();
 }
 
-/** Headers that cannot be modified by proxy transformations. */
+/**
+ * Headers that cannot be modified by proxy transformations.
+ * These are set by the HTTP stack or upstream and must be preserved as-is.
+ */
 const READONLY_HEADERS: Set<string> = new Set([
   'host',
   'connection',
@@ -134,7 +137,10 @@ const READONLY_HEADERS: Set<string> = new Set([
   'transfer-encoding',
 ]);
 
-/** Default headers allowed to be forwarded to upstream when forwardHeaders is not specified. */
+/**
+ * Default headers allowed to be forwarded to upstream when forwardHeaders is not specified.
+ * Omits sensitive headers (authorization, cookie) and x-forwarded-for (requires trustedProxies).
+ */
 const DEFAULT_FORWARD_HEADERS: string[] = [
   'accept',
   'accept-encoding',
@@ -148,7 +154,11 @@ const DEFAULT_FORWARD_HEADERS: string[] = [
 /** Headers that can have multiple values and need special handling. */
 const ARRAY_HEADERS: Set<string> = new Set(['set-cookie']);
 
-/** Extract the first IP from an x-forwarded-for header when the sender is a trusted proxy. */
+/**
+ * Append the first IP from x-forwarded-for when the sender is a trusted proxy.
+ * Only forwards when x-forwarded-for is in the allowlist, trustedProxies is configured,
+ * and the socket IP matches a trusted proxy.
+ */
 function appendForwardedFor(
   headers: Record<string, string>,
   forwardHeaders: string[],
@@ -172,7 +182,12 @@ function appendForwardedFor(
   }
 }
 
-/** Serialize a query parameter value to string or string array, JSON-encoding non-string values. */
+/**
+ * Serialize a query parameter value to string or string array, JSON-encoding non-string values.
+ * Arrays are mapped: string items pass through, non-string items are JSON-stringified.
+ * @param v - The query parameter value to serialize.
+ * @returns The serialized value as a string or string array.
+ */
 export function serializeQueryParam(v: unknown): string | string[] {
   if (Array.isArray(v)) {
     return v.map((item) => (typeof item === 'string' ? item : JSON.stringify(item)));
@@ -201,7 +216,12 @@ export function buildRequestContextFromHono(c: Context, body?: unknown): Request
   };
 }
 
-/** Normalize headers to string values, joining array values with ', '. Tracks which keys had multiple values. */
+/**
+ * Normalize header values to strings, joining arrays with ', ' and tracking
+ * which keys had array values for multi-value handling.
+ * @param headers - The raw headers with potentially non-string values.
+ * @returns Normalized headers and a set of keys that originally had array values.
+ */
 function normalizeHeaders(headers: Record<string, unknown>): {
   headers: Record<string, string>;
   multiValueKeys: Set<string>;
@@ -223,7 +243,18 @@ function normalizeHeaders(headers: Record<string, unknown>): {
   return { headers: normalized, multiValueKeys };
 }
 
-/** Filter headers through the forwardHeaders allowlist, returning only allowed headers. Uses a default allowlist when forwardHeaders is undefined. */
+/**
+ * Filter request headers through the forwardHeaders allowlist, applying
+ * x-forwarded-for logic when the sender is a trusted proxy.
+ *
+ * When `forwardHeaders` is undefined, uses the default allowlist.
+ * When `forwardHeaders` is an empty array, forwards no headers.
+ * @param headers - The original request headers.
+ * @param forwardHeaders - Allowlist of headers to forward. Undefined uses defaults.
+ * @param trustedProxies - Trusted proxy IPs/CIDRs for x-forwarded-for validation.
+ * @param socketIp - The socket IP of the immediate sender.
+ * @returns The filtered headers ready for upstream forwarding.
+ */
 function filterForwardHeaders(
   headers: Record<string, string | undefined>,
   forwardHeaders?: string[],
@@ -257,8 +288,14 @@ function filterForwardHeaders(
   return filtered;
 }
 
-/** Apply identity headers from JWT claims to the upstream request headers map, respecting readonly and multi-value constraints. */
-function applyIdentityHeaders<TApp extends HalideContext>(
+/**
+ * Apply identity headers from JWT claims to upstream request headers,
+ * respecting readonly header constraints and multi-value header rules.
+ *
+ * Calls `route.identity(ctx, app)` to get a map of header names to values,
+ * then sets each header only if it is writable (not readonly, not multi-value).
+ */
+function applyIdentityHeaders<TApp extends AnyHalideContext>(
   headers: Record<string, string | undefined>,
   route: ProxyRoute<TApp>,
   app: TApp,
@@ -277,7 +314,13 @@ function applyIdentityHeaders<TApp extends HalideContext>(
   }
 }
 
-/** Check if a header name is writable — not readonly, not in ARRAY_HEADERS, and not already multi-valued. */
+/**
+ * Check if a header is writable: not readonly, not multi-value from the original
+ * request, and not in the ARRAY_HEADERS set.
+ * @param key - The header name to check.
+ * @param multiValueKeys - Set of header keys that had array values in the original request.
+ * @returns True if the header can be safely set/modified.
+ */
 function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   const lowerKey = key.toLowerCase();
   return (
@@ -285,8 +328,14 @@ function isWritableHeader(key: string, multiValueKeys: Set<string>): boolean {
   );
 }
 
-/** Apply a configured body transformation, returning the transformed body or original request body, logging errors on failure. */
-function applyTransform<TApp extends HalideContext>(
+/**
+ * Apply the route's transform function to the request body, logging errors on failure.
+ *
+ * When no transform is configured, returns the original request body.
+ * When a transform exists, normalizes headers, calls the transform function,
+ * and applies any modified headers back, respecting readonly constraints.
+ */
+function applyTransform<TApp extends AnyHalideContext>(
   route: ProxyRoute<TApp>,
   parsedBody: unknown,
   c: Context,
@@ -334,7 +383,7 @@ function applyTransform<TApp extends HalideContext>(
  * @param parsedBody - Optional pre-parsed request body.
  * @returns A function that handles the proxy request.
  */
-export function createProxyService<TApp extends HalideContext = HalideContext>(
+export function createProxyService<TApp extends AnyHalideContext = HalideContext>(
   route: ProxyRoute<TApp>,
   app: TApp,
   agentCache: AgentCache,
@@ -405,32 +454,27 @@ export function createProxyService<TApp extends HalideContext = HalideContext>(
 
     const body = applyTransform(route, parsedBody, c, headers, logger);
 
-    const signal = AbortSignal.timeout(timeoutMs);
-
-    const agent =
-      route.agent ??
-      agentCache.getAgent(target, route.connection?.maxSockets, route.connection?.maxFreeSockets);
+    const agent = route.agent ?? agentCache.getAgent(target);
     const proxyRequest = new Request(targetUrl, {
       agent,
       body,
       duplex: 'half',
       headers: headers as Record<string, string>,
       method: c.req.method,
-      signal,
     } as RequestInit & { agent?: http.Agent });
 
-    const proxyPromise = proxy(proxyRequest);
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      signal.addEventListener(
-        'abort',
-        () => {
-          reject(
-            new DOMException(`Upstream request timed out after ${timeoutMs}ms`, 'TimeoutError'),
-          );
-        },
-        { once: true },
-      );
+    return new Promise<Response>((resolve, reject) => {
+      const ac = new AbortController();
+      const id = setTimeout(() => {
+        ac.abort();
+        reject(new DOMException(`Upstream request timed out after ${timeoutMs}ms`, 'TimeoutError'));
+      }, timeoutMs);
+      proxy(proxyRequest, { signal: ac.signal })
+        .then(resolve)
+        .catch((err) => {
+          if (err.name !== 'AbortError') reject(err);
+        })
+        .finally(() => clearTimeout(id));
     });
-    return Promise.race([proxyPromise, timeoutPromise]);
   };
 }

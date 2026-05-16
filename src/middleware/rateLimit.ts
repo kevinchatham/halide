@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono';
 import { getClientIp } from '../utils/trustedProxies';
 
-/** Default maximum number of entries in the in-memory rate limit store. */
+/** Default maximum number of entries in the in-memory rate limit store (10,000). */
 const DEFAULT_MAX_ENTRIES = 10_000;
 
 /** Minimal Redis client interface for rate limiting. */
@@ -82,7 +82,31 @@ interface RateLimitStore {
 }
 
 /**
- * In-memory rate limit store implementation.
+ * Configuration for the in-memory rate limit store.
+ */
+interface RateLimitConfig {
+  /** Maximum number of entries in the store. Oldest entries are evicted when exceeded. */
+  maxEntries?: number;
+  /** Maximum requests allowed per window. */
+  maxRequests: number;
+  /** Trusted proxy IPs/CIDRs for x-forwarded-for header validation. */
+  trustedProxies?: string[];
+  /** Time window in milliseconds. */
+  windowMs: number;
+}
+
+/**
+ * Internal storage for rate limit tracking per client IP.
+ */
+interface WindowEntry {
+  /** Number of requests in current window. */
+  count: number;
+  /** Timestamp (Date.now()) when the window resets. */
+  resetTime: number;
+}
+
+/**
+ * Create an in-memory rate limit store with LRU eviction.
  *
  * Uses a Map with LRU eviction when maxEntries is configured.
  * Suitable for single-instance deployments.
@@ -115,26 +139,6 @@ function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitS
       }
     },
   };
-}
-
-/** Configuration for rate limiting. */
-interface RateLimitConfig {
-  /** Maximum number of entries in the store. Oldest entries are evicted when exceeded. */
-  maxEntries?: number;
-  /** Maximum requests allowed per window. */
-  maxRequests: number;
-  /** Trusted proxy IPs/CIDRs for x-forwarded-for header validation. */
-  trustedProxies?: string[];
-  /** Time window in milliseconds. */
-  windowMs: number;
-}
-
-/** Internal storage for rate limit tracking per client IP. */
-interface WindowEntry {
-  /** Number of requests in current window. */
-  count: number;
-  /** Timestamp (Date.now()) when the window resets. */
-  resetTime: number;
 }
 
 /**

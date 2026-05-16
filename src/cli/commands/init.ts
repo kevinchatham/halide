@@ -10,7 +10,7 @@ import {
   writeTsconfigServer,
 } from './init.template';
 
-/** Run a shell command silently, capturing stderr and rethrowing on failure. */
+/** Execute a shell command silently, capturing stderr and rethrowing on failure. */
 export function runQuietly(cmd: string, cwd: string): void {
   try {
     execSync(cmd, { cwd, stdio: 'pipe' });
@@ -22,7 +22,7 @@ export function runQuietly(cmd: string, cwd: string): void {
   }
 }
 
-/** Add halide:start and halide:build scripts to package.json if they don't already exist. */
+/** Add halide:start and halide:build npm scripts to package.json if they don't already exist. */
 export function addScriptsToPackageJson(cwd: string): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
@@ -64,7 +64,7 @@ export function detectPackageManager(cwd: string): PackageManager {
   return 'npm';
 }
 
-/** Get the npm/pnpm/yarn/bun install command for adding halide and @types/node. */
+/** Get the install command for adding halide and @types/node with the given package manager. */
 export function getInstallCmd(pkgManager: PackageManager): string {
   const cmds: Record<PackageManager, string> = {
     bun: 'bun add halide && bun add -D @types/node',
@@ -76,8 +76,8 @@ export function getInstallCmd(pkgManager: PackageManager): string {
 }
 
 /**
- * Copy skill directory from the installed halide package
- * to .agents/skills/halide/ in the consumer project.
+ * Copy the halide skill directory from node_modules to .agents/skills/halide/.
+ *
  * Docs are NOT copied — agents are directed to read them from node_modules/halide/docs/.
  */
 export function installSkillsFromHalide(cwd: string): void {
@@ -103,7 +103,7 @@ export function installSkillsFromHalide(cwd: string): void {
   }
 }
 
-/** Output a message to stdout with a trailing newline. Used for CLI progress reporting. */
+/** Output a message to stdout with a trailing newline for CLI progress reporting. */
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }

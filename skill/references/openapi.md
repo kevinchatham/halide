@@ -34,7 +34,22 @@ openapi: {
 }
 ```
 
-Zod schemas from `requestSchema` and `responseSchema` are automatically converted to JSON Schema in the generated spec.
+Zod schemas from `requestSchema` and `responseSchema` are automatically converted to JSON Schema in the generated spec via `hono-openapi`.
+
+## External OpenAPI Specs
+
+Proxy routes can include an external OpenAPI spec source for documenting the proxied API:
+
+```typescript
+proxyRoute({
+  path: '/api/external',
+  methods: ['get', 'post'],
+  target: 'http://external-api.internal',
+  openapiSpec: { path: 'https://external-api.internal/openapi.json' },
+});
+```
+
+The external spec is merged with the inline spec. Route-level `openapi` metadata (summary, description, tags) is applied to the merged operations. Only allowed HTTP methods (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`) are included.
 
 ## Types
 
@@ -46,7 +61,7 @@ type OpenApiConfig = {
 };
 
 type OpenApiOptions = {
-  title?: string;
+  title?: string; // default: 'Halide API'
   version?: string; // default: '1.0.0'
   description?: string;
   servers?: Array<{ url: string; description?: string }>;
@@ -65,7 +80,7 @@ type OpenApiSource = {
 
 type ResolvedOpenApiSpec = {
   spec: Record<string, unknown>;
-  route: ProxyRoute<unknown>;
+  route: ProxyRoute<HalideContext>;
 };
 ```
 
@@ -74,5 +89,3 @@ type ResolvedOpenApiSpec = {
 The documentation UI uses [Scalar](https://github.com/scalar/scalar) (`@scalar/hono-api-reference`), not Swagger UI. The Scalar agent, MCP server, client button, and developer tools are all disabled by default.
 
 When OpenAPI is enabled, a warning is logged at startup: Swagger routes use relaxed CSP directives, and custom CSP settings do not apply to these routes. This should be disabled in production.
-
-Set `observe: false` on a route to hide it from OpenAPI docs.

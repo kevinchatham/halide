@@ -3,7 +3,10 @@ import type { ApiRoute, ProxyRoute } from '../types/api';
 import type { HalideContext } from '../types/app';
 import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody';
 
-/** Hono method types that have a request body. */
+/**
+ * HTTP methods that carry a request body and are parsed by the body middleware.
+ * GET, HEAD, DELETE, and other methods are skipped.
+ */
 type BodyMethod = 'post' | 'put' | 'patch';
 
 /**

@@ -13,11 +13,15 @@ observability: {
     info: (scope) => myLogger.info(scope),
     warn: (scope) => myLogger.warn(scope),
   },
+  logScopeFactory: (ctx, app) => ({
+    requestId: ctx.path,
+    userId: app.claims?.sub ?? undefined,
+  }),
   onRequest: (ctx, app) => {
     app.logger.info(ctx, `${ctx.method} ${ctx.path}`);
   },
   onResponse: (ctx, app, response) => {
-    app.logger.info(ctx, `${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms - body:`, response.body);
+    app.logger.info(ctx, `${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`);
   },
 }
 ```
@@ -26,13 +30,14 @@ Per-route observability is controlled with the `observe` flag. Set `observe: fal
 
 ### Configuration fields
 
-| Field        | Default | Description                                                                                           |
-| ------------ | ------- | ----------------------------------------------------------------------------------------------------- |
-| `requestId`  | `false` | Enable `x-request-id` header propagation.                                                             |
-| `logger`     | (none)  | Custom logger instance. Styled default logger used when omitted.                                      |
-| `maxCollect` | `1024`  | Maximum bytes to collect from proxy responses for observability logging. Full response is unmodified. |
-| `onRequest`  | (none)  | Hook called before each request is handled.                                                           |
-| `onResponse` | (none)  | Hook called after each response is sent.                                                              |
+| Field             | Default               | Description                                                                                           |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `requestId`       | `false`               | Enable `x-request-id` header propagation.                                                             |
+| `logger`          | Styled default logger | Custom logger instance. Colored in TTY, plain text otherwise.                                         |
+| `logScopeFactory` | (none)                | Factory that produces a typed log scope per request. Automatically passed to every logger call.       |
+| `maxCollect`      | `1024`                | Maximum bytes to collect from proxy responses for observability logging. Full response is unmodified. |
+| `onRequest`       | (none)                | Hook called before each request is handled.                                                           |
+| `onResponse`      | (none)                | Hook called after each response is sent.                                                              |
 
 ## Logger interface
 
@@ -47,25 +52,30 @@ interface Logger<TLogScope = unknown> {
 }
 ```
 
-If no logger is provided, a styled default logger is used (colored in TTY, plain text otherwise).
+Built-in logger factories:
+
+- **`createDefaultLogger()`** — styled logger with colored, level-prefixed messages. Uses `node:util.styleText` for colors in TTY, plain text otherwise.
+- **`createNoopLogger()`** — discards all log messages.
+- **`createScopedLogger(logger, scope)`** — wraps a logger so every method automatically applies a fixed scope.
 
 ## Lifecycle hooks
 
 - **`onRequest(ctx, app)`** — called after auth/authorization, before handler
 - **`onResponse(ctx, app, response)`** — called after handler completes (including on error)
 
-The `app` parameter is a `THalideApp<TClaims, TLogScope>` containing `claims` (decoded JWT) and `logger` (structured logger).
+The `app` parameter is a `HalideContext<TClaims, TLogScope>` containing `claims` (decoded JWT) and `logger` (structured logger).
 
 The `response` object (type `ResponseContext`) has the following shape:
 
-| Field        | Type      | Description                                   |
-| ------------ | --------- | --------------------------------------------- |
-| `statusCode` | `number`  | HTTP status code of the response              |
-| `durationMs` | `number`  | Time in milliseconds from request start       |
-| `error?`     | `Error`   | Error thrown by the handler (undefined if OK) |
-| `body?`      | `unknown` | Response body returned by the handler         |
+| Field        | Type                 | Description                             |
+| ------------ | -------------------- | --------------------------------------- |
+| `statusCode` | `number`             | HTTP status code of the response        |
+| `durationMs` | `number`             | Time in milliseconds from request start |
+| `error?`     | `Error`              | Error thrown during request processing  |
+| `body?`      | `unknown`            | Response body returned by the handler   |
+| `bodyType?`  | `'text' \| 'binary'` | Format of the body field                |
 
-Note: `ResponseContext` is exported from `index.ts` and used by the `onResponse` hook.
+`ResponseContext` is exported from `index.ts` and used by the `onResponse` hook.
 
 ## Request ID middleware
 

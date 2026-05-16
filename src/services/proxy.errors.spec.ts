@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
-import type { Logger, THalideApp } from '../types/app';
+import type { HalideContext, Logger } from '../types/app';
 import { createAgentCache, createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
@@ -10,7 +10,7 @@ const noopLogger: Logger<unknown> = {
   warn: (_scope: unknown) => {},
 };
 
-const createApp = (claims?: unknown): THalideApp => ({
+const createApp = (claims?: unknown): HalideContext => ({
   claims,
   logger: noopLogger,
 });
@@ -58,7 +58,7 @@ describe('createProxyService — errors', () => {
       warn: (_scope: unknown) => {},
     };
 
-    const appWithErrorLogger: THalideApp = { claims: undefined, logger: errorLogger };
+    const appWithErrorLogger: HalideContext = { claims: undefined, logger: errorLogger };
     const handler = createProxyService(route, appWithErrorLogger, agentCache, { original: true });
 
     const app = new Hono();

@@ -263,9 +263,10 @@ describe('registerRoutes — auth', () => {
       const agentCache = createAgentCache();
 
       app.use('*', createSecurityMiddleware({ defaultSrc: ["'self'"] }));
-      registerRoutes(
+      registerRoutes({
+        agentCache,
         app,
-        {
+        config: {
           apiRoutes: [
             {
               access: 'private',
@@ -277,9 +278,8 @@ describe('registerRoutes — auth', () => {
           app: { root: '/var/www' },
           security: { auth: { secret: () => secret, strategy: 'bearer' } },
         },
-        noopLogger,
-        agentCache,
-      );
+        logger: noopLogger,
+      });
       createOpenApiRoutes({} as ServerConfig, app as unknown as Hono);
 
       const res = await app.request('/profile');
@@ -293,9 +293,10 @@ describe('registerRoutes — auth', () => {
       const agentCache = createAgentCache();
 
       app.use('*', createSecurityMiddleware({ defaultSrc: ["'none'"] }));
-      registerRoutes(
+      registerRoutes({
+        agentCache,
         app,
-        {
+        config: {
           apiRoutes: [
             {
               access: 'private',
@@ -310,9 +311,8 @@ describe('registerRoutes — auth', () => {
             auth: { secret: () => secret, strategy: 'bearer' },
           },
         },
-        noopLogger,
-        agentCache,
-      );
+        logger: noopLogger,
+      });
       createOpenApiRoutes({} as ServerConfig, app as unknown as Hono);
 
       const token = await createValidToken({ role: 'admin', sub: 'user-123' });

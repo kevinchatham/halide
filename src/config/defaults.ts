@@ -57,6 +57,8 @@ export const DEFAULTS = {
     version: '1.0.0',
   },
   proxy: {
+    maxFreeSockets: 10,
+    maxSockets: 50,
     timeoutMs: 10_000,
   },
   rateLimit: {
@@ -68,7 +70,7 @@ export const DEFAULTS = {
   },
 } as const;
 
-/** Default authorization function that allows all requests. */
+/** Default authorization function that permits all requests without checking claims. */
 export const defaultAuthorize: AuthorizeFn<unknown> = async (_ctx: RequestContext, _app: unknown) =>
   true;
 
@@ -128,5 +130,30 @@ export function createDefaultLogger<T = unknown>(): Logger<T> {
       // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
       console.log(format(['yellow', 'bold'], msg));
     },
+  };
+}
+
+/**
+ * Wrap a logger so every method automatically applies a fixed scope.
+ *
+ * Used by the framework to create per-request loggers: the `logScopeFactory`
+ * produces a scope value for the current request, and `createScopedLogger`
+ * bakes it into every log call so handlers and hooks don't need to pass
+ * scope manually.
+ *
+ * @typeParam TLogScope - The type of the log scope object.
+ * @param logger - The underlying logger implementation.
+ * @param scope - The fixed scope value to pass as the first argument.
+ * @returns A new {@link Logger} that pre-applies `scope` to every method.
+ */
+export function createScopedLogger<TLogScope>(
+  logger: Logger<TLogScope>,
+  scope: TLogScope,
+): Logger<TLogScope> {
+  return {
+    debug: (_scope: TLogScope, ...args: unknown[]) => logger.debug(scope, ...args),
+    error: (_scope: TLogScope, ...args: unknown[]) => logger.error(scope, ...args),
+    info: (_scope: TLogScope, ...args: unknown[]) => logger.info(scope, ...args),
+    warn: (_scope: TLogScope, ...args: unknown[]) => logger.warn(scope, ...args),
   };
 }

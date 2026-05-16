@@ -13,14 +13,23 @@ import { createSecurityMiddleware } from '../middleware/security';
 import { createAppHandler } from '../routes/app';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
-import type { AppConfig, HalideContext, HalideVariables, Logger } from '../types/app';
+import type {
+  AnyHalideContext,
+  AppConfig,
+  AppLogger,
+  AppLogScope,
+  HalideContext,
+  HalideVariables,
+  Logger,
+} from '../types/app';
 import type { CspDirectives } from '../types/csp';
 import type { ServerConfig } from '../types/server-config';
 import { createDefaultLogger, DEFAULTS } from './defaults';
-import { validateServerConfigSync } from './validate';
+import { validateServerConfig, validateServerConfigSync } from './validate';
 
 /**
  * Halide HTTP server with lifecycle management.
+ * Created by {@link createServer}. Call `start()` to begin listening and `stop()` to shut down gracefully.
  */
 export interface Server {
   /** Promise that resolves when the server is ready to accept connections. */
@@ -35,7 +44,8 @@ export interface Server {
 }
 
 /**
- * Result of createApp, containing the Hono app and cleanup functions.
+ * Result of {@link createApp}, containing the Hono app and cleanup functions.
+ * Call `proxyDispose()` and `rateLimitDispose()` when shutting down to release resources.
  */
 export interface CreateAppResult {
   /** The configured Hono application. */
@@ -58,11 +68,27 @@ export interface CreateAppResult {
  * @param configInput - The server configuration.
  * @returns An object containing the Hono app and cleanup functions.
  */
-export function createApp<TApp extends HalideContext = HalideContext>(
+export function createApp<TApp extends AnyHalideContext = HalideContext>(
   configInput: ServerConfig<TApp>,
 ): CreateAppResult {
   const logger = configInput.observability?.logger ?? createDefaultLogger();
-  validateServerConfigSync(configInput, logger);
+  const logScopeFactory = configInput.observability?.logScopeFactory;
+  const auth = configInput.security?.auth;
+  const hasFunctionSecret = auth?.secret && typeof auth.secret === 'function';
+
+  if (hasFunctionSecret) {
+    void validateServerConfig(configInput).then((result) => {
+      if (!result.valid) {
+        logger.error(
+          { errors: result.errors } as unknown as AppLogScope<TApp>,
+          'Async auth secret validation failed at startup:',
+          result.errors.map((e) => e.message).join(', '),
+        );
+      }
+    });
+  } else {
+    validateServerConfigSync(configInput, logger as Logger<unknown>);
+  }
 
   const app = new Hono<{ Variables: HalideVariables }>();
   const agentCache = createAgentCache();
@@ -143,11 +169,15 @@ export function createApp<TApp extends HalideContext = HalideContext>(
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes(app, configInput, logger, agentCache);
+  registerRoutes({ agentCache, app, config: configInput, logger: logger as AppLogger<TApp> });
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
 
-  createOpenApiRoutes(configInput, app as unknown as Hono, specCacheState);
+  createOpenApiRoutes(
+    configInput as ServerConfig<HalideContext>,
+    app as unknown as Hono,
+    specCacheState,
+  );
 
   if (configInput.app?.root) {
     const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
@@ -158,7 +188,7 @@ export function createApp<TApp extends HalideContext = HalideContext>(
     app.all('/*', cspMiddleware, appFallback);
   }
 
-  app.onError(createErrorHandler(logger));
+  app.onError(createErrorHandler<unknown, TApp>(logger, logScopeFactory));
 
   return { app, logger, proxyDispose: () => agentCache.dispose(), rateLimitDispose };
 }
@@ -189,7 +219,7 @@ export function createApp<TApp extends HalideContext = HalideContext>(
  * server.start();
  * ```
  */
-export function createServer<TApp extends HalideContext = HalideContext>(
+export function createServer<TApp extends AnyHalideContext = HalideContext>(
   configInput: ServerConfig<TApp>,
 ): Server {
   const { app, proxyDispose, rateLimitDispose, logger } = createApp<TApp>(configInput);
@@ -210,7 +240,7 @@ export function createServer<TApp extends HalideContext = HalideContext>(
 
   void ready.catch(() => {});
 
-  /** Shared shutdown logic: dispose resources, drain connections, and close the HTTP server. */
+  /** Dispose proxy/rate-limit resources, drain active connections, and close the HTTP server. */
   const shutdownServer = async (exitCode?: number): Promise<void> => {
     rateLimitDispose?.();
     proxyDispose?.();
@@ -235,7 +265,7 @@ export function createServer<TApp extends HalideContext = HalideContext>(
     }
   };
 
-  /** Gracefully shut down the server on SIGINT/SIGTERM. */
+  /** Handle SIGINT/SIGTERM: set shutdown flag, log the signal, and drain connections. */
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;

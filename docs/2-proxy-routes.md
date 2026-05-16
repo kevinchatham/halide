@@ -28,12 +28,14 @@ const productsProxy = proxyRoute({
 
 - **`methods` is required** — unlike `apiRoute`'s optional `method`, proxy routes require an array of methods. Supported: `'get'`, `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'`.
 - **`proxyPath` defaults to `path`** — if omitted, the route path is used as-is for path prefix rewriting.
-- **`timeout` defaults to `60000`** (60 seconds) — uses `AbortSignal.timeout()` to abort slow requests.
+- **`timeout` defaults to `10000`** (10 seconds) — aborts slow upstream requests.
 - **`identity(ctx, app)`** — only called when `app.claims` is defined (private routes with successful auth). Returns a record of headers to inject into the proxied request.
 - **`transform({ method, body, headers })`** — called when present. `method` is the lowercase HTTP method. `body` is the already-parsed JSON from the request. Headers are normalized to lowercase keys. The transform result's body is JSON-stringified before forwarding. Without transform, the raw request body is forwarded as-is.
 - **`openapiSpec`** — provides an external OpenAPI spec source (local file path or URL) for documenting the proxied API in the Scalar UI. The spec is merged into the inline OpenAPI documentation.
-- **`forwardHeaders`** — controls which request headers are forwarded to upstream. Defaults to a safe subset: `accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-type`, `content-length`, `origin`, `user-agent`. Set to an empty array `[]` to forward no headers. Headers are matched case-insensitively.
+- **`forwardHeaders`** — controls which request headers are forwarded to upstream. Defaults to a safe subset: `accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-type`, `origin`, `user-agent`. Omitting `authorization`, `cookie`, and `x-forwarded-for` headers. Set to an empty array `[]` to forward no headers. Headers are matched case-insensitively.
+- **`trustedProxies`** — trusted proxy IPs/CIDRs for `x-forwarded-for` header validation. When configured, `x-forwarded-for` is only forwarded if the immediate sender matches a trusted proxy.
 - **`agent`** — Node.js HTTP agent for upstream connections. Use `http.Agent({ keepAlive: true })` for connection pooling.
+- **`connection`** — connection pool settings for the default agent when `agent` is not set. `maxSockets` (default: 50) and `maxFreeSockets` (default: 10).
 
 ## Path rewriting
 

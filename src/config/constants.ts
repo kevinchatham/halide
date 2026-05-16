@@ -8,10 +8,10 @@ export const MAX_JWK_CACHE = 100;
 export const MAX_JWK_LOCKS = 100;
 
 /** Maximum number of HTTP agent pool entries. */
-export const MAX_AGENT_CACHE = 100;
+export const MAX_AGENT_CACHE = 500;
 
 /** Maximum number of entries in the claim extractor cache. */
-export const MAX_EXTRACTOR_CACHE = 50;
+export const MAX_EXTRACTOR_CACHE = 200;
 
 /** Default maximum number of entries for the rate limit in-memory store. */
 export const DEFAULT_MAX_ENTRIES = 10000;

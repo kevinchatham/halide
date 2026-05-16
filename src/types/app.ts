@@ -68,23 +68,27 @@ export type HalideContext<TClaims = unknown, TLogScope = unknown> = {
 };
 
 /**
- * Bundled app context type that combines claims and logger.
- * Passed to handlers instead of separate claims and logger parameters.
+ * Minimal constraint for type parameters that need to accept any HalideContext
+ * variant without contravariance issues on Logger's type parameter.
  *
- * @example
- * ```ts
- * type MyApp = THalideApp<UserClaims, { requestId: string }>;
- *
- * apiRoute({
- *   access: 'private',
- *   path: '/users',
- *   handler: async (ctx, app: MyApp) => {
- *     app.logger.info({ requestId: app.claims.sub }, 'fetching user');
- *   },
- * });
- * ```
+ * Uses `Logger<any>` because Logger is contravariant in TLogScope, which
+ * prevents `HalideContext<UserClaims, LogScope>` from satisfying
+ * `extends HalideContext<unknown, unknown>`. The `any` is intentional to
+ * break contravariance at the constraint boundary.
  */
-export type THalideApp<TClaims = unknown, TLogScope = unknown> = HalideContext<TClaims, TLogScope>;
+// biome-ignore lint/suspicious/noExplicitAny: required to accept any HalideContext variant
+export type AnyHalideContext = { claims: unknown; logger: Logger<any> };
+
+/** Extract the claims type from a context-like type. */
+export type AppClaims<TApp> = TApp extends { claims: infer C } ? C : unknown;
+
+/** Extract the logger type from a context-like type. */
+export type AppLogger<TApp> = TApp extends { logger: Logger<infer S> }
+  ? Logger<S>
+  : Logger<unknown>;
+
+/** Extract the log scope type from a context-like type. */
+export type AppLogScope<TApp> = TApp extends { logger: Logger<infer S> } ? S : unknown;
 
 /**
  * Configuration for app hosting (static files and/or API backend).
@@ -139,8 +143,31 @@ export type ObservabilityConfig<TApp = HalideContext> = {
   requestId?: boolean;
   /**
    * Logger instance. If not provided, a styled default logger is used.
+   * The logger scope type is inferred from TApp's TLogScope parameter.
    */
-  logger?: Logger<unknown>;
+  logger?: AppLogger<TApp>;
+  /**
+   * Factory that builds a typed log scope object for each request.
+   * Receives the normalized request context and the bundled app context
+   * (with claims and logger), and returns a TLogScope value that will be
+   * automatically passed to every logger call within the request.
+   *
+   * This eliminates the need to manually construct and pass scope objects
+   * in every `logger.info(scope, ...)` call — the framework does it for you.
+   *
+   * @example
+   * ```ts
+   * const server = createServer<HalideContext<UserClaims, { requestId: string }>>>({
+   *   observability: {
+   *     logScopeFactory: (ctx, app) => ({
+   *       requestId: ctx.path,
+   *       userId: app.claims?.sub ?? undefined,
+   *     }),
+   *   },
+   * });
+   * ```
+   */
+  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>;
   /**
    * Maximum bytes to collect from proxy responses for observability logging.
    * The full response is always piped through unmodified; this only limits

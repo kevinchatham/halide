@@ -2,17 +2,30 @@ import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE, MAX_JWK_LOCKS } from '../config/constants';
 
-/** Per-URI JWKS cache entry with TTL. */
+/**
+ * Per-URI JWKS cache entry with expiration timestamp.
+ * When the entry expires, a new JWKS middleware is fetched on the next request.
+ */
 type JwkCacheEntry = {
+  /** The cached JWKS middleware instance. */
   middleware: ReturnType<typeof import('hono/jwk').jwk>;
+  /** Timestamp (Date.now()) when this cache entry expires. */
   expiresAt: number;
 };
 
+/** Cache of JWKS middleware instances keyed by JWKS URI. */
 const jwkCache = new Map<string, JwkCacheEntry>();
+
+/** In-flight promise map for concurrent JWKS fetch coalescing. */
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
+
+/** In-flight promise map for concurrent JWKS refresh coalescing. */
 const jwkRefreshLocks = new Map<string, Promise<void>>();
 
-/** Enforce MAX_JWK_CACHE before inserting a new entry, evicting the oldest (FIFO). */
+/**
+ * Insert a JWKS cache entry, evicting the oldest entry (FIFO) when the cache
+ * is full (exceeds MAX_JWK_CACHE).
+ */
 function setJwkCacheEntry(
   jwksUri: string,
   expiresAt: number,
@@ -25,7 +38,10 @@ function setJwkCacheEntry(
   jwkCache.set(jwksUri, { expiresAt, middleware });
 }
 
-/** Evict the oldest lock map entry (FIFO) when the map exceeds MAX_JWK_LOCKS. */
+/**
+ * Evict the oldest lock map entry (FIFO) when the map exceeds MAX_JWK_LOCKS.
+ * Prevents unbounded memory growth during concurrent JWKS fetches or refreshes.
+ */
 function evictLock(map: Map<string, Promise<unknown>>): void {
   if (map.size >= MAX_JWK_LOCKS) {
     const firstKey = map.keys().next().value;
@@ -34,7 +50,7 @@ function evictLock(map: Map<string, Promise<unknown>>): void {
 }
 
 /**
- * Get a JWKS middleware instance for the given JWKS URI.
+ * Retrieve a cached JWKS middleware instance for the given URI, fetching and caching a new one if stale.
  * Caches middleware with TTL eviction; returns a fresh instance in tests.
  * @param jwksUri - The JWKS endpoint URL.
  * @returns The JWKS middleware function.
@@ -82,7 +98,7 @@ async function getCachedJwkMiddleware(
   return fetchPromise;
 }
 
-/** Periodically evict stale JWKS cache entries. */
+/** Periodically evict stale JWKS cache entries every 10 minutes. */
 const jwkSweepTimer =
   typeof vi !== 'undefined'
     ? null
@@ -132,7 +148,10 @@ const jwkBackgroundRefreshTimer =
       }, JWKS_CACHE_TTL_MS / 2); // 30 minutes
 jwkBackgroundRefreshTimer?.unref();
 
-/** Check whether the JWT audience claim matches the expected value. */
+/**
+ * Check whether the JWT audience claim matches the expected value.
+ * Supports both string and array `aud` claim types per JWT spec.
+ */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
   const aud = payload.aud;
   if (aud === undefined) return false;

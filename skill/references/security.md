@@ -17,11 +17,11 @@ security: {
 }
 ```
 
-**Defaults:** `origin: ['*']`, `credentials: false`, `methods: ['get', 'post', 'put', 'delete', 'patch']`.
+**Defaults:** `origin: []`, `credentials: false`, `methods: ['get', 'post', 'put', 'delete', 'patch']`.
 
 | Field            | Default                                     | Description                              |
 | ---------------- | ------------------------------------------- | ---------------------------------------- |
-| `origin`         | `['*']`                                     | Allowed origins (string or string array) |
+| `origin`         | `[]`                                        | Allowed origins (string or string array) |
 | `credentials`    | `false`                                     | Include credentials in CORS requests     |
 | `methods`        | `['get', 'post', 'put', 'delete', 'patch']` | Allowed HTTP methods                     |
 | `allowedHeaders` | `undefined`                                 | Allowed request headers                  |
@@ -30,6 +30,8 @@ security: {
 
 **Gotcha:** Wildcard origin (`'*'`) cannot be combined with `credentials: true` — the validator will throw.
 
+When `credentials` is true, CSRF protection is also enabled with the CORS origins.
+
 ## CSP
 
 Applied via `hono/secure-headers` using `createSecurityMiddleware()`. Always active — defaults to a restrictive policy if not specified.
@@ -37,24 +39,27 @@ Applied via `hono/secure-headers` using `createSecurityMiddleware()`. Always act
 ```typescript
 security: {
   csp: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", 'https://api.example.com'],
-      styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:'],
-      fontSrc: ["'self'", 'https:', 'data:'],
-      frameAncestors: ["'self'"],
-      formAction: ["'self'"],
-      objectSrc: ["'none'"],
-      scriptSrcAttr: ["'none'"],
-      upgradeInsecureRequests: [],
-    },
+    baseUri: ["'self'"],
+    defaultSrc: ["'self'"],
+    fontSrc: ["'self'", 'https:', 'data:'],
+    formAction: ["'self'"],
+    frameAncestors: ["'self'"],
+    frameSrc: ["'self'"],
+    imgSrc: ["'self'", 'data:'],
+    objectSrc: ["'none'"],
+    scriptSrc: ["'self'"],
+    scriptSrcAttr: ["'none'"],
+    styleSrc: ["'self'"],
+    upgradeInsecureRequests: [],
   },
 }
 ```
 
 **Gotcha:** CSP directive keys must use **camelCase** (`defaultSrc`), NOT kebab-case (`default-src`). The validator throws on kebab-case keys.
+
+### CSP Directive Values
+
+Each directive accepts `string | ContentSecurityPolicyOptionHandler` (from `hono/secure-headers`).
 
 ### Available CSP Directives
 
@@ -84,8 +89,6 @@ All directive keys use camelCase:
 | `upgradeInsecureRequests` | `CspDirectiveValue[]` |
 | `workerSrc`               | `CspDirectiveValue[]` |
 
-`CspDirectiveValue` is `string | ContentSecurityPolicyOptionHandler`.
-
 ### Default CSP Directives
 
 If no CSP is specified, these defaults apply:
@@ -101,7 +104,7 @@ imgSrc: ["'self'", 'data:']
 objectSrc: ["'none'"]
 scriptSrc: ["'self'"]
 scriptSrcAttr: ["'none'"]
-styleSrc: ["'self'", 'https:']
+styleSrc: ["'self'"]
 upgradeInsecureRequests: []
 ```
 
@@ -120,11 +123,12 @@ security: {
     windowMs: 900000,       // default: 900000 (15 minutes)
     trustedProxies: ['10.0.0.0/8'],  // optional — trust x-forwarded-for from these IPs/CIDRs
     maxEntries: 1000,       // optional — max store entries; oldest evicted when exceeded
+    redisClient?: RedisClient,  // optional — distributed rate limiting
   },
 }
 ```
 
-Client IP is extracted from `x-forwarded-for` (first value) when socket IP matches a trusted proxy, or falls back to socket IP. Returns `429 Too Many Requests` with `Retry-After` header. Uses an in-memory store with periodic cleanup.
+Client IP is extracted from `x-forwarded-for` (first value) when socket IP matches a trusted proxy, or falls back to socket IP. Returns `429 Too Many Requests` with `Retry-After` header. Uses an in-memory store with periodic cleanup (dispose-based).
 
 | Field            | Default     | Description                                            |
 | ---------------- | ----------- | ------------------------------------------------------ |
@@ -132,3 +136,4 @@ Client IP is extracted from `x-forwarded-for` (first value) when socket IP match
 | `windowMs`       | `900000`    | Window duration in ms (15 minutes)                     |
 | `trustedProxies` | `[]`        | Trusted proxy IPs/CIDRs for x-forwarded-for validation |
 | `maxEntries`     | `undefined` | Max store entries; oldest evicted when exceeded        |
+| `redisClient`    | `undefined` | Redis client for distributed rate limiting             |

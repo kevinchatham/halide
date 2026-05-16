@@ -41,16 +41,16 @@ The handler receives two arguments:
 | Parameter | Type                               | Description                                              |
 | --------- | ---------------------------------- | -------------------------------------------------------- |
 | `ctx`     | `RequestContext & { body: TBody }` | Method, path, headers, params, query, and validated body |
-| `app`     | `THalideApp`                       | Bundled app context with `claims` and `logger`           |
+| `app`     | `TApp`                             | Bundled app context with `claims` and `logger`           |
 
-`app` is a `THalideApp<TClaims, TLogScope>` object containing:
+`app` is a `HalideContext<TClaims, TLogScope>` object containing:
 
 - `claims` — decoded JWT claims (undefined for public routes)
 - `logger` — structured logger instance
 
 `ctx` is a **plain object** (not a Hono Context). It is constructed from the Hono request with normalized method, path, headers, params, query, and body.
 
-Handler return values are JSON-serialized via `c.json(result)`.
+Handler return values are JSON-serialized. Returning a native `Response` bypasses serialization and returns it directly.
 
 ## Supported methods
 

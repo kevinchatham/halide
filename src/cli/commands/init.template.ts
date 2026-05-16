@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import stripJsonComments from 'strip-json-comments';
 
-/** Generate the server.ts content for a new Halide project. */
+/**
+ * Generate the server.ts starter file content for a new Halide project.
+ * Creates a basic server with a health check route.
+ */
 export function generateServerTs(appName: string, port: number): string {
   return `import { createServer, apiRoute } from 'halide';
 
@@ -26,7 +29,10 @@ server.start();
 `;
 }
 
-/** TypeScript configuration for the server build. Used by `writeTsconfigServer`. */
+/**
+ * TypeScript configuration for the server build.
+ * Used by `writeTsconfigServer` to create tsconfig.server.json.
+ */
 export const TSCONFIG_SERVER = `{
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
@@ -42,7 +48,7 @@ export const TSCONFIG_SERVER = `{
 }
 `;
 
-/** Write tsconfig.server.json if it doesn't already exist. */
+/** Write tsconfig.server.json if it doesn't already exist in the project root. */
 export function writeTsconfigServer(cwd: string): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
   if (fs.existsSync(tsconfigServerPath)) {
@@ -73,7 +79,7 @@ export function addServerReference(cwd: string): void {
   log('✓ Added tsconfig.server.json reference to tsconfig.json');
 }
 
-/** Exclude server.ts from tsconfig.app.json, adding it to the exclude list if not already present. */
+/** Add server.ts to tsconfig.app.json exclude list, skipping if already excluded. */
 export function excludeServerFromApp(cwd: string): void {
   const appPath = path.join(cwd, 'tsconfig.app.json');
   if (!fs.existsSync(appPath)) return;
@@ -95,7 +101,7 @@ export function excludeServerFromApp(cwd: string): void {
   log('✓ Added server.ts to tsconfig.app.json exclude list');
 }
 
-/** Output a message to stdout with a trailing newline. Used for CLI progress reporting. */
+/** Output a message to stdout with a trailing newline for CLI progress reporting. */
 function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }

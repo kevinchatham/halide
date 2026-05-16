@@ -13,27 +13,29 @@
 - `npm run cli` — `node dist/cli/index.js`.
 - `npm run sonar` — `npm run test && npx dotenv -- npx sonar`. Coverage excluded: `*.spec.ts`, `scripts/`, `src/demo.ts`.
 
-Pre-commit order: `lint:fix` → `typecheck` → `test`. Coverage thresholds: 80% (all metrics).
+CI jobs (`.github/workflows/ci.yml`): `lint` → `build` → `test` (separate jobs, not chained).
 
 ## Linting — Biome vs Prettier
 
-- **Biome** owns `.ts`, `.css`, `.json` — single quotes, semicolons, trailing commas, 100 char width.
-- **Prettier** owns `.html`, `.yml`, `.yaml`, `.md` only (see `.prettierignore`).
-- Do not run Prettier on `.ts`. Do not run Biome on `.html` (formatter disabled in `biome.json`).
+- **Biome** formats `.ts`, `.css`, `.json` — single quotes, semicolons, trailing commas, 100 char width.
+- **Prettier** formats `.html`, `.yml`, `.yaml`, `.md`, `package.json` only (see `.prettierignore`).
+- Biome does **not** format HTML (formatter disabled in `biome.json`), but it does lint HTML.
+- Do not run Prettier on `.ts`. Do not expect Biome to format HTML.
 
 ## Architecture
 
 - **Framework**: Hono (not Express). All HTTP types come from `hono`.
-- **Entry**: `src/index.ts` → re-exports `createServer`, `createApp`, `apiRoute`, `proxyRoute`, and types.
+- **Entry**: `src/index.ts` → re-exports `createServer`, `createApp`, `apiRoute`, `proxyRoute`, `createDefaultLogger`, `createNoopLogger`, `createScopedLogger`, and types.
 - `ServerConfig` uses **separate arrays**: `apiRoutes` (type `'api'`) + `proxyRoutes` (type `'proxy'`), not a single `routes` array.
 - Auth config is nested: `security.auth.strategy` (`'bearer'` | `'jwks'`), not a top-level `auth` key.
 - API route handler signature: `(ctx, app)` — 2 params. `ctx` is `RequestContext & { body: TBody }` (plain object, not Hono Context). `app` bundles `{ claims, logger }`.
 - Auth uses `hono/jwt` (bearer) and `hono/jwk` (JWKS) — not `jose`.
 - Validation uses Zod schemas in `src/config/schema.ts` with custom cross-field validators in `src/config/validate.ts` — Zod only for route body validation and OpenAPI schemas.
 - CSP directives use camelCase (`defaultSrc`), not kebab-case (`default-src`) — validator throws on kebab.
-- Default logger is styled (colored in TTY, plain text otherwise) via `createDefaultLogger()` in `defaults.ts`. Falls back to plain `[LEVEL] message` when output is not a TTY. Use `createNoopLogger()` for silent output.
+- Default logger is styled (colored in TTY, plain text otherwise) via `createDefaultLogger()` in `defaults.ts`. Falls back to plain `[LEVEL] message` when output is not a TTY. Use `createNoopLogger()` for silent output. Use `createScopedLogger(logger, scope)` to pre-bake a scope into every log call.
 - App `apiPrefix` defaults to `'/api'` — paths under that prefix get 404 instead of app fallback (set `apiPrefix: ''` to disable).
 - `src/demo.ts` is **not exported** — demo apps only.
+- `src/test-utils/index.ts` exports `createTestApp(config)` and `noopLogger` for unit testing.
 
 Directory structure:
 
@@ -43,6 +45,7 @@ Directory structure:
 - **src/services/** — `proxy.ts` (proxy handler)
 - **src/utils/** — `secretCache.ts` (JWT secret caching)
 - **src/cli/** — CLI commands (`npx halide init`)
+- **test/fixtures/** — integration test fixtures
 
 ## Testing
 
@@ -50,6 +53,7 @@ Directory structure:
 - Vitest `globals: true` — use `describe`/`it`/`expect`/`vi` without imports.
 - Auth tests use real `hono/jwt` `sign()` and `Hono` app instances (no mocking).
 - Test environment: `node`.
+- Use `createTestApp(config)` from `src/test-utils` to build a Hono app with routes registered for testing.
 
 ## TypeScript
 
@@ -70,6 +74,7 @@ Directory structure:
 - `noGlobalIsFinite` — use `Number.isFinite()` instead of `isFinite()`.
 - Biome assist auto-runs on `lint:fix`: organizes imports, sorts interface members, object keys, attributes.
 - Default port: 3553 (from `process.env.PORT` fallback in `runtime.ts`).
+- `.npmrc` has `engine-strict=true` — npm will fail if Node version doesn't match `>=24.0.0`.
 - Private routes require `security.auth` configured — validation throws otherwise.
 - `"type": "module"` — ESM project. Node >=24.0.0 (enforced in `engines`).
 - CORS wildcard origin (`*`) + `credentials: true` throws — validator rejects.
@@ -81,5 +86,6 @@ Directory structure:
 - `security.auth.secret` can be async; `secretTtl` (default 60s) controls cache.
 - Proxy routes support `identity`, `transform`, and `authorize` per route.
 - Proxy routes do **not** forward `x-forwarded-for` by default — it is not in `DEFAULT_FORWARD_HEADERS`. To enable it, include `'x-forwarded-for'` in `forwardHeaders` **and** configure `trustedProxies`; the header is only forwarded when the socket IP matches a trusted proxy. To suppress it entirely, set `forwardHeaders: []`.
+- Proxy default timeout: 10000ms (10s). Rate limit defaults: 100 requests per 900000ms (15 min).
 - Rate limit uses in-memory store with internal `dispose` cleanup.
 - Published files: `dist`, `LICENSE`, `package.json`, `README.md` (see `files` in `package.json`).

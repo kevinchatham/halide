@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
-import type { Logger, THalideApp } from '../types/app';
+import type { HalideContext, Logger } from '../types/app';
 import { createAgentCache, createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
@@ -10,7 +10,7 @@ const noopLogger: Logger<unknown> = {
   warn: (_scope: unknown) => {},
 };
 
-const createApp = (claims?: unknown): THalideApp => ({
+const createApp = (claims?: unknown): HalideContext => ({
   claims,
   logger: noopLogger,
 });
@@ -74,7 +74,7 @@ describe('createProxyService', () => {
   it('applies identity headers when claims are provided', async () => {
     const route: ProxyRoute = {
       access: 'private',
-      identity: (_ctx: unknown, app: THalideApp) => ({
+      identity: (_ctx: unknown, app: HalideContext) => ({
         'x-user-id': (app.claims as { sub: string }).sub,
       }),
       methods: ['get'],
@@ -222,26 +222,14 @@ describe('createProxyService', () => {
 describe('AgentCache', () => {
   const ac = createAgentCache();
   it('returns the same agent for identical keys', () => {
-    const agent1 = ac.getAgent('https://api.example.com', 50, 10);
-    const agent2 = ac.getAgent('https://api.example.com', 50, 10);
+    const agent1 = ac.getAgent('https://api.example.com');
+    const agent2 = ac.getAgent('https://api.example.com');
     expect(agent1).toBe(agent2);
   });
 
   it('returns different agents for different targets', () => {
-    const agent1 = ac.getAgent('https://api.example.com', 50, 10);
-    const agent2 = ac.getAgent('https://other.example.com', 50, 10);
-    expect(agent1).not.toBe(agent2);
-  });
-
-  it('returns different agents for different pool settings', () => {
-    const agent1 = ac.getAgent('https://api.example.com', 25, 5);
-    const agent2 = ac.getAgent('https://api.example.com', 50, 10);
-    expect(agent1).not.toBe(agent2);
-  });
-
-  it('returns the same agent when defaults are used', () => {
     const agent1 = ac.getAgent('https://api.example.com');
-    const agent2 = ac.getAgent('https://api.example.com', 50, 10);
-    expect(agent1).toBe(agent2);
+    const agent2 = ac.getAgent('https://other.example.com');
+    expect(agent1).not.toBe(agent2);
   });
 });

@@ -30,12 +30,6 @@ describe('AgentCache', () => {
       expect(agent1).not.toBe(agent2);
     });
 
-    it('creates separate agents for different maxSockets', () => {
-      const agent1 = cache.getAgent('https://example.com', 25);
-      const agent2 = cache.getAgent('https://example.com', 50);
-      expect(agent1).not.toBe(agent2);
-    });
-
     it('evicts oldest agent when cache is full', () => {
       for (let i = 0; i < 100; i++) {
         cache.getAgent(`https://evict${i}.example.com`);

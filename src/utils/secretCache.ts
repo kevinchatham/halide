@@ -1,6 +1,10 @@
 import type { Logger } from '../types/app';
 
-/** Internal cache entry for a resolved JWT secret. */
+/**
+ * Internal cache entry for a resolved JWT secret with expiration timestamp.
+ * @property expiresAt - Timestamp (Date.now()) when this cache entry expires.
+ * @property value - The resolved secret string.
+ */
 interface CachedSecret {
   /** Timestamp (Date.now()) when this cache entry expires. After this time the cache is invalidated. */
   expiresAt: number;
@@ -46,7 +50,7 @@ export function createSecretCache<TLogScope = unknown>(
         return value;
       } catch (err) {
         logger.error(
-          { error: 'secret_refresh_failed' } as unknown as TLogScope,
+          { error: 'secret_refresh_failed' } as TLogScope,
           'Failed to refresh JWT secret from secret provider:',
           err instanceof Error ? err.message : String(err),
         );

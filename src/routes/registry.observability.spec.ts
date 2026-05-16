@@ -77,9 +77,10 @@ describe('registerRoutes — observability', () => {
 
       const app = new Hono<{ Variables: HalideVariables }>();
       app.onError(() => new Response(null, { status: 500 }));
-      await registerRoutes(
+      await registerRoutes({
+        agentCache: createAgentCache(),
         app,
-        {
+        config: {
           apiRoutes: [
             {
               access: 'public',
@@ -93,9 +94,8 @@ describe('registerRoutes — observability', () => {
           app: { root: '/var/www' },
           observability: { onResponse },
         },
-        noopLogger,
-        createAgentCache(),
-      );
+        logger: noopLogger,
+      });
 
       await app.request('/items');
 
@@ -137,9 +137,10 @@ describe('registerRoutes — observability', () => {
 
       const app = new Hono<{ Variables: HalideVariables }>();
       const agentCache = createAgentCache();
-      await registerRoutes(
+      await registerRoutes({
+        agentCache,
         app,
-        {
+        config: {
           apiRoutes: [
             {
               access: 'public',
@@ -151,9 +152,8 @@ describe('registerRoutes — observability', () => {
           app: { root: '/var/www' },
           observability: { onRequest, onResponse },
         },
-        errorLogger as unknown as typeof noopLogger,
-        agentCache,
-      );
+        logger: errorLogger as unknown as typeof noopLogger,
+      });
 
       const res = await app.request('/items');
       expect(res.status).toBe(200);
@@ -175,9 +175,10 @@ describe('registerRoutes — observability', () => {
 
       const app = new Hono<{ Variables: HalideVariables }>();
       const agentCache = createAgentCache();
-      await registerRoutes(
+      await registerRoutes({
+        agentCache,
         app,
-        {
+        config: {
           apiRoutes: [
             {
               access: 'public',
@@ -189,9 +190,8 @@ describe('registerRoutes — observability', () => {
           app: { root: '/var/www' },
           observability: { onRequest, onResponse },
         },
-        errorLogger as unknown as typeof noopLogger,
-        agentCache,
-      );
+        logger: errorLogger as unknown as typeof noopLogger,
+      });
 
       const res = await app.request('/items');
       expect(res.status).toBe(200);
@@ -209,9 +209,10 @@ describe('registerRoutes — observability', () => {
 
       const app = new Hono<{ Variables: HalideVariables }>();
       const agentCache = createAgentCache();
-      await registerRoutes(
+      await registerRoutes({
+        agentCache,
         app,
-        {
+        config: {
           apiRoutes: [
             {
               access: 'public',
@@ -223,9 +224,8 @@ describe('registerRoutes — observability', () => {
           app: { root: '/var/www' },
           observability: { onRequest, onResponse },
         },
-        errorLogger as unknown as typeof noopLogger,
-        agentCache,
-      );
+        logger: errorLogger as unknown as typeof noopLogger,
+      });
 
       const res = await app.request('/items');
       expect(res.status).toBe(200);

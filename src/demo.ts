@@ -15,6 +15,7 @@ import { z } from 'zod';
 import type {
   ApiRoute,
   AppConfig,
+  HalideContext,
   ObservabilityConfig,
   OpenApiConfig,
   ProxyRoute,
@@ -23,8 +24,16 @@ import type {
   SecurityConfig,
   Server,
   ServerConfig,
-  THalideApp,
 } from './index';
+
+/** Structured log scope shape for typed logging throughout the application. */
+interface LogScope {
+  /** Unique request identifier from the x-request-id header. */
+  requestId: string;
+  /** Authenticated user subject, when available. */
+  userId?: string;
+}
+
 import { apiRoute, createServer, proxyRoute } from './index';
 
 /** Custom JWT payload shape used across all authenticated routes in this demo. */
@@ -35,8 +44,8 @@ interface UserClaims {
   sub: string;
 }
 
-/** Bundled app context for this demo, combining UserClaims JWT payload with default log scope. */
-type DemoApp = THalideApp<UserClaims>;
+/** Bundled app context for this demo, combining UserClaims JWT payload with typed log scope. */
+type DemoApp = HalideContext<UserClaims, LogScope>;
 
 /** Zod schema validating the request body for creating a new user (email and name fields). */
 const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> = z.object({
@@ -149,26 +158,35 @@ const ordersProxyRoute: ProxyRoute<DemoApp> = proxyRoute<DemoApp>({
 
 /**
  * Observability hooks for request/response lifecycle logging.
+ *
+ * Uses `logScopeFactory` to automatically provide a typed scope object
+ * (containing requestId and userId) to every logger call within a request.
+ * This eliminates the need to manually construct and pass scope objects
+ * in each `logger.info(scope, ...)` call — the framework does it for you.
+ * Handlers still pass a scope as the first arg (it's ignored by the scoped logger).
+ *
  * - `onRequest`: called on every incoming request with the request context and app
  * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
  */
 const observability: ObservabilityConfig<DemoApp> = {
-  logger: {
-    debug: (_scope: unknown, ..._args: unknown[]) => {},
-    error: (_scope: unknown, ..._args: unknown[]) => {},
-    info: (_scope: unknown, ..._args: unknown[]) => {},
-    warn: (_scope: unknown, ..._args: unknown[]) => {},
-  },
+  logScopeFactory: (ctx: RequestContext, app: DemoApp) => ({
+    requestId: ctx.path,
+    userId: app.claims?.sub ?? undefined,
+  }),
   onRequest: (ctx: RequestContext, app: DemoApp) => {
     app.logger.info(
-      ctx,
-      `[Request] ${ctx.method} ${ctx.path} (user: ${app.claims?.sub ?? 'anonymous'})`,
+      {
+        requestId: ctx.path,
+      },
+      `[Request] ${ctx.method} ${ctx.path}`,
     );
   },
   onResponse: (ctx: RequestContext, app: DemoApp, { statusCode, durationMs }: ResponseContext) => {
     app.logger.info(
-      ctx,
-      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms (user: ${app.claims?.sub ?? 'anonymous'})`,
+      {
+        requestId: ctx.path,
+      },
+      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`,
     );
   },
 };
@@ -251,7 +269,7 @@ const exampleConfig: ServerConfig<DemoApp> = {
   security,
 };
 
-const server: Server = createServer(exampleConfig);
+const server: Server = createServer<DemoApp>(exampleConfig);
 
 server.start((port) => {
   // biome-ignore lint/suspicious/noConsole: demo

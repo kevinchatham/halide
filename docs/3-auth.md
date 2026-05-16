@@ -54,6 +54,6 @@ apiRoute({
 });
 ```
 
-The `authorize` function receives `(ctx: RequestContext, app: TApp)` where `app` is a `THalideApp` containing `claims` and `logger`. Returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
+The `authorize` function receives `(ctx: RequestContext, app: TApp)` where `app` is a `HalideContext` containing `claims` and `logger`. Returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
 
 The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.

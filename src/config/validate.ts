@@ -2,10 +2,12 @@ import type { Logger } from '../types/app';
 import type { SecurityAuthConfig } from '../types/security';
 import { serverConfigSchema } from './schema';
 
-/** Partial auth config for async secret validation. */
+/** Partial auth config subset used for async secret validation. */
 type AuthInput = Pick<SecurityAuthConfig, 'strategy' | 'secret'>;
 
-/** A single validation error with field location and message. */
+/**
+ * A single validation error with field location and message.
+ */
 export type ValidationError = {
   /** Dot-notation path to the offending field. */
   field: string;
@@ -13,7 +15,11 @@ export type ValidationError = {
   message: string;
 };
 
-/** Result of validation with collected errors and warnings. */
+/**
+ * Result of validation with collected errors and warnings.
+ * When `valid` is true, `errors` is empty and `warnings` may contain
+ * non-blocking advisory messages about config choices.
+ */
 export type ValidationResult = {
   /** List of accumulated validation errors. Empty when `valid` is true. */
   errors: ValidationError[];
@@ -46,12 +52,21 @@ function collectValidationWarnings(config: Record<string, unknown>): ValidationE
         'Rate limiting is configured without trustedProxies. Client IP detection may be inaccurate behind proxies; set trustedProxies to use x-forwarded-for from known proxy IPs.',
     });
   }
+  if (rateLimit && !rateLimit.redisClient) {
+    warnings.push({
+      field: 'security.rateLimit',
+      message:
+        'Rate limiting is configured without redisClient. Fallback to in-memory store is per-instance only and will not share state across multiple server instances; configure redisClient for distributed rate limiting.',
+    });
+  }
   return warnings;
 }
 
 /**
- * Shared sync validation: parse Zod schema and collect warnings.
- * Returns a tuple of (errors, warnings) without throwing.
+ * Parse the Zod schema and collect cross-field warnings, returning (errors, warnings) without throwing.
+ * @typeParam TConfig - The server configuration type.
+ * @param config - The server configuration to validate.
+ * @returns An object containing `errors` and `warnings` arrays.
  */
 function parseConfig<TConfig extends Record<string, unknown>>(
   config: TConfig,

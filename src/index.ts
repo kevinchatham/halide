@@ -1,6 +1,8 @@
+export { createDefaultLogger, createNoopLogger, createScopedLogger } from './config/defaults';
 export { type CreateAppResult, createApp, createServer, type Server } from './config/runtime';
 export { apiRoute } from './routes/apiRoute';
 export { proxyRoute } from './routes/proxyRoute';
+export type { RegisterRoutesOptions } from './routes/registry';
 export type {
   ApiRoute,
   ApiRouteHandler,
@@ -12,12 +14,12 @@ export type {
 } from './types/api';
 export type {
   AppConfig,
+  AppLogScope,
   HalideContext,
   Logger,
   ObservabilityConfig,
   RequestContext,
   ResponseContext,
-  THalideApp,
 } from './types/app';
 export type {
   CspDirectives,

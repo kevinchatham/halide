@@ -1,6 +1,6 @@
 import ipaddr from 'ipaddr.js';
 
-/** Check if an IP address matches a trusted proxy list (CIDR or exact). */
+/** Check if an IP address matches a trusted proxy list using CIDR or exact matching. */
 export function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]): boolean {
   if (!trustedProxies?.length || !ip) return false;
   const addr = ipaddr.parse(ip);
@@ -15,7 +15,7 @@ export function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]
 }
 
 /**
- * Extract client IP from request headers, falling back to socket IP.
+ * Extract the client IP from request headers, falling back to socket IP.
  * Uses X-Forwarded-For only when the socket IP is from a trusted proxy.
  */
 export function getClientIp(

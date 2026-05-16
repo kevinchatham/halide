@@ -1,7 +1,7 @@
 # Full example
 
 ```ts
-import { createServer, apiRoute, proxyRoute, type THalideApp } from 'halide';
+import { createServer, apiRoute, proxyRoute, type HalideContext } from 'halide';
 import { z } from 'zod';
 
 interface UserClaims {
@@ -11,7 +11,7 @@ interface UserClaims {
 
 type LogScope = { requestId: string; service: string };
 
-type App = THalideApp<UserClaims, LogScope>;
+type App = HalideContext<UserClaims, LogScope>;
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -31,11 +31,9 @@ const server = createServer<App>({
       methods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
     },
     csp: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        connectSrc: ["'self'"],
-      },
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
     },
     auth: {
       strategy: 'jwks',

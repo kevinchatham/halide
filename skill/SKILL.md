@@ -1,70 +1,61 @@
 ---
 name: halide
-description: Halide BFF framework — server creation, API/proxy routes, auth, security, observability
+description: Backend framework for building API backends and BFF layers with Hono, JWT auth, proxy routes, and OpenAPI/Scalar UI.
 ---
 
-# Halide Agent Guide
+# Halide
+
+A lightweight backend framework for Node.js built on Hono. Provides API routes, proxy forwarding, JWT auth, and auto-generated OpenAPI docs.
 
 ## Primary Resources
 
-| Topic                            | File                                               |
-| -------------------------------- | -------------------------------------------------- |
-| App hosting                      | [docs/0-app.md](docs/0-app.md)                     |
-| API routes                       | [docs/1-api-routes.md](docs/1-api-routes.md)       |
-| Proxy routes                     | [docs/2-proxy-routes.md](docs/2-proxy-routes.md)   |
-| Auth & authorization             | [docs/3-auth.md](docs/3-auth.md)                   |
-| Security (CORS, CSP, rate limit) | [docs/4-security.md](docs/4-security.md)           |
-| Observability                    | [docs/5-observability.md](docs/5-observability.md) |
-| OpenAPI / Scalar UI              | [docs/6-openapi.md](docs/6-openapi.md)             |
-| Full example                     | [docs/7-full-example.md](docs/7-full-example.md)   |
-| API reference                    | [docs/8-api-reference.md](docs/8-api-reference.md) |
-| CLI                              | [docs/9-cli.md](docs/9-cli.md)                     |
+| Topic               | Docs                      | Reference                           |
+| ------------------- | ------------------------- | ----------------------------------- |
+| App Config          | `docs/0-app.md`           | `skill/references/config.md`        |
+| API Routes          | `docs/1-api-routes.md`    | `skill/references/routes.md`        |
+| Proxy Routes        | `docs/2-proxy-routes.md`  | `skill/references/routes.md`        |
+| Authentication      | `docs/3-auth.md`          | `skill/references/auth.md`          |
+| Security (CORS/CSP) | `docs/4-security.md`      | `skill/references/security.md`      |
+| Observability       | `docs/5-observability.md` | `skill/references/observability.md` |
+| OpenAPI/Scalar UI   | `docs/6-openapi.md`       | `skill/references/openapi.md`       |
+| CLI                 | `docs/9-cli.md`           | —                                   |
 
-## Detailed References
-
-| Topic         | File                                                                   | Source                                                                     |
-| ------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Config types  | [skill/references/config.md](skill/references/config.md)               | `src/types/server-config.ts`, `src/types/app.ts`, `src/config/defaults.ts` |
-| Route types   | [skill/references/routes.md](skill/references/routes.md)               | `src/routes/apiRoute.ts`, `src/routes/proxyRoute.ts`, `src/types/api.ts`   |
-| Auth          | [skill/references/auth.md](skill/references/auth.md)                   | `src/middleware/auth.ts`, `src/routes/registry.auth.ts`                    |
-| Security      | [skill/references/security.md](skill/references/security.md)           | `src/types/security.ts`, `src/types/csp.ts`, `src/middleware/security.ts`  |
-| OpenAPI       | [skill/references/openapi.md](skill/references/openapi.md)             | `src/types/openapi.ts`, `src/routes/registry.openapi.ts`                   |
-| Observability | [skill/references/observability.md](skill/references/observability.md) | `src/types/app.ts`, `src/routes/registry.auth.ts`                          |
-
-## Type Reference
+## Complete Type Reference
 
 ```ts
+import {
+  apiRoute,
+  proxyRoute,
+  createApp,
+  createServer,
+  createDefaultLogger,
+  createNoopLogger,
+  createScopedLogger,
+} from 'halide';
 import type {
-  ApiRoute,
-  ApiRouteHandler,
-  ApiRouteInput,
-  AuthorizeFn,
-  ProxyRoute,
-  ProxyRouteInput,
-  TransformFn,
-  CspDirectiveValue,
+  ServerConfig,
+  HalideContext,
+  AppConfig,
+  SecurityConfig,
+  CorsConfig,
   CspDirectives,
-  CspOptions,
   OpenApiConfig,
   OpenApiOptions,
   OpenApiRouteMeta,
-  OpenApiSource,
-  ResolvedOpenApiSpec,
-  ClaimExtractor,
-  CorsConfig,
-  SecurityAuthConfig,
-  SecurityConfig,
-  AppConfig,
-  Logger,
   ObservabilityConfig,
+  Logger,
   RequestContext,
   ResponseContext,
-  THalideApp,
-  ServerConfig,
+  ApiRoute,
+  ApiRouteHandler,
+  ProxyRoute,
+  AuthorizeFn,
+  TransformFn,
+  ClaimExtractor,
+  RegisterRoutesOptions,
   Server,
   CreateAppResult,
 } from 'halide';
-import { createApp, createServer, apiRoute, proxyRoute } from 'halide';
 ```
 
 ## Minimal Example
@@ -82,17 +73,14 @@ server.start();
 
 ## Key Gotchas
 
-- CSP directive keys must use **camelCase** (`defaultSrc`), not kebab-case (`default-src`) — validator throws
-- Wildcard CORS origin (`'*'`) cannot be combined with `credentials: true` — validator throws
-- Private routes require `security.auth` configured — validation throws if missing
-- `ServerConfig` uses separate `apiRoutes` and `proxyRoutes` arrays, not a single `routes` array
-- `apiRoute.method` is optional (defaults to `'get'`); `proxyRoute.methods` is required (array)
-- Proxy route strips `host`, `connection`, `content-length`, `transfer-encoding`, `set-cookie` headers
-- OpenAPI UI disabled by default — warns about relaxed CSP; should be disabled in production
-- `onRequest`/`onResponse` hooks fire per-route; set `observe: false` to skip
-- `apiPrefix` defaults to `'/api'` — paths with this prefix get 404; set `''` to disable
+- **CSP uses camelCase** — `defaultSrc`, not `default-src`. Validator throws on kebab-case.
+- **Wildcard CORS origin + `credentials: true`** is forbidden — validator throws.
+- **Private routes require `security.auth`** — validator throws at startup if missing.
+- **`ServerConfig` uses separate arrays** — `apiRoutes` and `proxyRoutes`, not a single `routes`.
+- **`apiPrefix` defaults to `/api`** — paths under that prefix get 404 instead of app fallback. Set `apiPrefix: ''` to disable.
+- **Proxy `timeout` defaults to 10000ms** (10s). Rate limit defaults: 100 requests per 900000ms (15 min).
 
-## Fallback Reference
+## Fallback References
 
-- `node_modules/halide/dist/index.d.ts` — full TypeScript types
-- `node_modules/halide/dist/index.js` — runtime behavior
+- Type declarations: `node_modules/halide/dist/index.d.ts`
+- Runtime source: `node_modules/halide/dist/index.js`

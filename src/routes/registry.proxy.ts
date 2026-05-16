@@ -4,11 +4,14 @@ import type { AgentCache } from '../services/proxy';
 import { createProxyService } from '../services/proxy';
 import type { ProxyRoute } from '../types/api';
 import type {
+  AnyHalideContext,
+  AppClaims,
+  AppLogger,
+  AppLogScope,
   HalideContext,
   HalideVariables,
   ObservabilityConfig,
   RequestContext,
-  THalideApp,
 } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
@@ -18,20 +21,21 @@ import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
 
 /** Register a proxy route with auth, observability, and proxy forwarding for each configured method. */
-export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
+export function registerProxyRoute<TApp extends AnyHalideContext = HalideContext>(
   app: Hono<{ Variables: HalideVariables }>,
   route: ProxyRoute<TApp>,
-  claimExtractor: ClaimExtractor<THalideApp<TApp>['claims']> | undefined,
+  claimExtractor: ClaimExtractor<AppClaims<TApp>> | undefined,
   observability: ObservabilityConfig<TApp> | undefined,
-  logger: THalideApp['logger'],
+  logger: AppLogger<TApp>,
   agentCache: AgentCache,
+  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>,
 ): void {
   for (const method of route.methods) {
     const middlewares: MiddlewareHandler[] = [describeRoute(buildDescribeRouteOptions(route))];
 
     middlewares.push(
       createProxyBodyParser(route),
-      createAuthMiddleware(route, claimExtractor, logger),
+      createAuthMiddleware(route, claimExtractor, logger, logScopeFactory),
       createProxyHandler(route, agentCache, observability, logger),
     );
 
@@ -43,6 +47,10 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
  * Create a proxy handler middleware that executes the proxy service and manages
  * response collection and observability hooks.
  *
+ * Calls `createProxyService` to forward the request, pipes the response for
+ * observability, and emits onRequest/onResponse hooks. Returns 502 if the
+ * pipe fails or 500 on handler errors.
+ *
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @param route - The proxy route definition.
  * @param agentCache - The HTTP agent cache for proxy connections.
@@ -50,11 +58,11 @@ export function registerProxyRoute<TApp extends HalideContext = HalideContext>(
  * @param logger - Logger instance for error reporting.
  * @returns A Hono middleware handler.
  */
-function createProxyHandler<TApp extends HalideContext = HalideContext>(
+function createProxyHandler<TApp extends AnyHalideContext = HalideContext>(
   route: ProxyRoute<TApp>,
   agentCache: AgentCache,
   observability: ObservabilityConfig<TApp> | undefined,
-  logger: THalideApp['logger'],
+  logger: AppLogger<TApp>,
 ): MiddlewareHandler {
   return async (c: Context) => {
     const start = Date.now();
@@ -78,7 +86,12 @@ function createProxyHandler<TApp extends HalideContext = HalideContext>(
         return response;
       }
 
-      const pipeResult = await observeAndPipeResponse(c, response, observability, route.observe);
+      const pipeResult = await observeAndPipeResponse(
+        c,
+        response,
+        observability as ObservabilityConfig<HalideContext> | undefined,
+        route.observe,
+      );
 
       if (pipeResult.aborted) {
         handlerError = new Error('Client disconnected');

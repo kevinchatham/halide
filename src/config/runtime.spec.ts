@@ -343,4 +343,107 @@ describe('createApp', () => {
     const res = await app.request('/docs');
     expect(res.status).toBe(200);
   });
+
+  it('logs an error when async secret resolves to empty string', async () => {
+    const logger = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+    createApp({
+      ...minimalConfig,
+      observability: { logger },
+      security: { auth: { secret: async () => '', strategy: 'bearer' } },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(logger.error).toHaveBeenCalled();
+    const errorCall = logger.error.mock.calls[0]!;
+    expect(errorCall[1]).toContain('Async auth secret validation failed at startup');
+  });
+
+  it('logs an error when async secret rejects', async () => {
+    const logger = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+    createApp({
+      ...minimalConfig,
+      observability: { logger },
+      security: {
+        auth: {
+          secret: async () => {
+            throw new Error('vault error');
+          },
+          strategy: 'bearer',
+        },
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(logger.error).toHaveBeenCalled();
+    const errorCall = logger.error.mock.calls[0]!;
+    expect(errorCall[1]).toContain('Async auth secret validation failed at startup');
+  });
+
+  it('does not log when async secret resolves to a valid value', async () => {
+    const logger = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+    createApp({
+      ...minimalConfig,
+      observability: { logger },
+      security: { auth: { secret: async () => 'valid-secret', strategy: 'bearer' } },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('provides scoped logger when logScopeFactory is configured', async () => {
+    const infoFn = vi.fn();
+    const logger = {
+      debug: (_scope: unknown) => {},
+      error: (_scope: unknown) => {},
+      info: infoFn,
+      warn: (_scope: unknown) => {},
+    };
+    const { app } = createApp({
+      ...minimalConfig,
+      apiRoutes: [
+        {
+          access: 'public',
+          handler: async (
+            _ctx: unknown,
+            appCtx: {
+              claims: unknown;
+              logger: { info: (...args: unknown[]) => void };
+            },
+          ) => {
+            (appCtx.logger.info as (...args: unknown[]) => void)(
+              { ignored: true },
+              'handler message',
+            );
+            return { ok: true };
+          },
+          path: '/scoped',
+          type: 'api',
+        },
+      ],
+      observability: {
+        logger,
+        logScopeFactory: (ctx: import('../types/app').RequestContext, _app: unknown) => ({
+          requestId: ctx.path,
+        }),
+      },
+    });
+    await app.request('/scoped');
+    expect(infoFn).toHaveBeenCalled();
+    const call = infoFn.mock.calls[0]!;
+    expect(call[0]).toEqual({ requestId: '/scoped' });
+    expect(call[1]).toBe('handler message');
+  });
 });

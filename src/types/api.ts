@@ -179,7 +179,7 @@ export type ApiRouteInput<TApp, TBody = unknown, TResponse = unknown> = Omit<
 export type ProxyRouteInput<TApp = HalideContext> = Omit<ProxyRoute<TApp>, 'type'>;
 
 /**
- * Union of all route types.
+ * Union of all route types — either an API route or a proxy route.
  * @typeParam TApp - The bundled app context type combining claims and logger.
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.

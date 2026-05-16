@@ -7,7 +7,7 @@ import type { HalideContext, ProxyRoute } from '../types/api';
 import type { OpenApiOptions } from '../types/openapi';
 import type { ServerConfig } from '../types/server-config';
 
-/** Allowed HTTP methods for OpenAPI operations. */
+/** Allowed HTTP methods that can appear in OpenAPI operation definitions. */
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Cached OpenAPI spec and shared resolution promise for concurrency guard. */
@@ -27,7 +27,10 @@ export function resetOpenApiCache(state: SpecCacheState): void {
   state.specResolution = null;
 }
 
-/** Merge metadata overrides (summary, description, tags) onto an OpenAPI operation object. */
+/**
+ * Merge metadata overrides (summary, description, tags) from a proxy route
+ * onto an OpenAPI operation object.
+ */
 function applyMetadata(
   operation: Record<string, unknown>,
   metadata: ProxyRoute<HalideContext>['openapi'],
@@ -37,7 +40,10 @@ function applyMetadata(
   if (metadata?.tags?.length) operation.tags = metadata.tags;
 }
 
-/** Merge external OpenAPI spec paths into the inline spec's paths map, respecting route method filtering. */
+/**
+ * Merge external OpenAPI spec paths into the inline spec's paths map,
+ * respecting route method filtering and route-level metadata overrides.
+ */
 function mergeExternalSpecs(
   inlineSpec: Record<string, unknown>,
   resolvedSpecs: Array<{ spec: Record<string, unknown>; route: ProxyRoute<HalideContext> }>,
@@ -58,7 +64,10 @@ function mergeExternalSpecs(
   return { ...inlineSpec, paths };
 }
 
-/** Merge a single path item from an external spec into the paths map, filtering by allowed methods. */
+/**
+ * Merge a single path item from an external spec into the paths map,
+ * filtering by allowed HTTP methods and applying route-level metadata.
+ */
 function mergePathItem(
   externalPath: string,
   pathItem: Record<string, unknown>,
@@ -82,7 +91,10 @@ function mergePathItem(
   }
 }
 
-/** Build the inline OpenAPI spec by fetching from a temporary Hono app using hono-openapi. */
+/**
+ * Build the inline OpenAPI spec by creating a temporary Hono app and
+ * fetching the OpenAPI route handler output.
+ */
 async function buildInlineSpec(
   app: Hono,
   options: OpenApiOptions | undefined,
@@ -124,7 +136,10 @@ async function buildInlineSpec(
   }
 }
 
-/** Build the final OpenAPI spec with title, version, description, and servers, preferring options over inline defaults. */
+/**
+ * Build the final OpenAPI spec, merging title, version, description, and servers
+ * from options while preferring options over inline spec defaults.
+ */
 function buildFinalSpec(
   mergedSpec: Record<string, unknown>,
   options: OpenApiOptions | undefined,
