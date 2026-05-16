@@ -32,26 +32,9 @@ export type ValidationResult = {
 /** Collect non-blocking warnings from config that are not handled by Zod. */
 function collectValidationWarnings(config: Record<string, unknown>): ValidationError[] {
   const warnings: ValidationError[] = [];
-  const auth = (config.security as Record<string, unknown> | undefined)?.auth as
-    | Record<string, unknown>
-    | undefined;
-  if (auth?.algorithms !== undefined && auth?.strategy === 'jwks') {
-    warnings.push({
-      field: 'auth.algorithms',
-      message:
-        'auth.algorithms is ignored when strategy is jwks (algorithm is resolved from JWKS endpoint)',
-    });
-  }
   const rateLimit = (config.security as Record<string, unknown> | undefined)?.rateLimit as
     | Record<string, unknown>
     | undefined;
-  if (rateLimit && !rateLimit.trustedProxies) {
-    warnings.push({
-      field: 'security.rateLimit',
-      message:
-        'Rate limiting is configured without trustedProxies. Client IP detection may be inaccurate behind proxies; set trustedProxies to use x-forwarded-for from known proxy IPs.',
-    });
-  }
   if (rateLimit && !rateLimit.redisClient) {
     warnings.push({
       field: 'security.rateLimit',

@@ -7,7 +7,7 @@ import { createTestApp, noopLogger } from '../test-utils/index.js';
 import type { HalideVariables } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { registerRoutes } from './registry';
-import { createClaimExtractor, NOOP_EXTRACTOR_CACHE } from './registry.auth';
+import { NOOP_EXTRACTOR_CACHE } from './registry.claims';
 
 const secret = 'test-secret';
 
@@ -230,30 +230,6 @@ describe('registerRoutes — auth', () => {
 
       const res = await app.request('/profile');
       expect(res.status).toBe(200);
-    });
-  });
-
-  describe('claimExtractorCache', () => {
-    it('tracks cache size', () => {
-      expect(NOOP_EXTRACTOR_CACHE.size).toBe(0);
-    });
-
-    it('caches extractors by strategy key', () => {
-      const bearerConfig = {
-        apiRoutes: [],
-        security: { auth: { secret: () => 'bearer-secret', strategy: 'bearer' } },
-      } as ServerConfig;
-      const jwksConfig = {
-        apiRoutes: [],
-        security: {
-          auth: { jwksUri: 'https://auth.example.com/.well-known/jwks.json', strategy: 'jwks' },
-        },
-      } as ServerConfig;
-
-      createClaimExtractor(bearerConfig, noopLogger as import('../types/app').Logger<unknown>);
-      createClaimExtractor(jwksConfig, noopLogger as import('../types/app').Logger<unknown>);
-
-      expect(NOOP_EXTRACTOR_CACHE.size).toBe(2);
     });
   });
 

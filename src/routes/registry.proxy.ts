@@ -6,8 +6,9 @@ import type { HalideContext, ProxyRoute } from '../types/api';
 import type { HalideVariables, Logger, ObservabilityConfig, RequestContext } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
-import { createAuthMiddleware, emitOnRequest, emitOnResponse } from './registry.auth';
+import { createAuthMiddleware } from './registry.auth';
 import { createProxyBodyParser } from './registry.body';
+import { emitOnRequest, emitOnResponse } from './registry.observability';
 import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
 

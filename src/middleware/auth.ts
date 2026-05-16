@@ -2,6 +2,18 @@ import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 import { JWKS_CACHE_TTL_MS, MAX_JWK_CACHE, MAX_JWK_LOCKS } from '../config/constants';
 
+type AsymmetricAlgorithm =
+  | 'RS256'
+  | 'RS384'
+  | 'RS512'
+  | 'PS256'
+  | 'PS384'
+  | 'PS512'
+  | 'ES256'
+  | 'ES384'
+  | 'ES512'
+  | 'EdDSA';
+
 /**
  * Per-URI JWKS cache entry with expiration timestamp.
  * When the entry expires, a new JWKS middleware is fetched on the next request.
@@ -11,6 +23,8 @@ type JwkCacheEntry = {
   middleware: ReturnType<typeof import('hono/jwk').jwk>;
   /** Timestamp (Date.now()) when this cache entry expires. */
   expiresAt: number;
+  /** JWT algorithms used when creating this middleware. */
+  algorithms: string[];
 };
 
 /** Cache of JWKS middleware instances keyed by JWKS URI. */
@@ -30,12 +44,13 @@ function setJwkCacheEntry(
   jwksUri: string,
   expiresAt: number,
   middleware: ReturnType<typeof import('hono/jwk').jwk>,
+  algorithms: string[],
 ): void {
   if (jwkCache.size >= MAX_JWK_CACHE) {
     const firstKey = jwkCache.keys().next().value;
     if (firstKey) jwkCache.delete(firstKey);
   }
-  jwkCache.set(jwksUri, { expiresAt, middleware });
+  jwkCache.set(jwksUri, { algorithms, expiresAt, middleware });
 }
 
 /**
@@ -57,11 +72,13 @@ function evictLock(map: Map<string, Promise<unknown>>): void {
  */
 async function getCachedJwkMiddleware(
   jwksUri: string,
+  algorithms?: string[],
 ): Promise<ReturnType<typeof import('hono/jwk').jwk>> {
+  const alg = (algorithms ?? ['RS256']) as AsymmetricAlgorithm[];
   if (typeof vi !== 'undefined') {
     const { jwk } = await import('hono/jwk');
     return jwk({
-      alg: ['RS256'],
+      alg,
       jwks_uri: jwksUri,
     });
   }
@@ -85,10 +102,10 @@ async function getCachedJwkMiddleware(
     try {
       const { jwk } = await import('hono/jwk');
       const middleware = jwk({
-        alg: ['RS256'],
+        alg,
         jwks_uri: jwksUri,
       });
-      setJwkCacheEntry(jwksUri, now + JWKS_CACHE_TTL_MS, middleware);
+      setJwkCacheEntry(jwksUri, now + JWKS_CACHE_TTL_MS, middleware, alg);
       return middleware;
     } finally {
       jwkFetchLocks.delete(jwksUri);
@@ -131,11 +148,12 @@ const jwkBackgroundRefreshTimer =
             const refreshPromise = (async () => {
               try {
                 const { jwk } = await import('hono/jwk');
+                const alg = entry.algorithms as AsymmetricAlgorithm[];
                 const middleware = jwk({
-                  alg: ['RS256'],
+                  alg,
                   jwks_uri: uri,
                 });
-                setJwkCacheEntry(uri, now + JWKS_CACHE_TTL_MS, middleware);
+                setJwkCacheEntry(uri, now + JWKS_CACHE_TTL_MS, middleware, alg);
               } catch {
                 // Fire-and-forget: don't block other refreshes
               } finally {
@@ -220,12 +238,14 @@ export async function extractBearerClaims<TClaims = unknown>(
  * @param c - The Hono context.
  * @param jwksUri - The JWKS endpoint URL.
  * @param audience - Optional expected audience claim.
+ * @param algorithms - Optional JWT algorithms accepted. Defaults to ['RS256'].
  * @returns The decoded claims or null if extraction fails.
  */
 export async function extractJwksClaims<TClaims = unknown>(
   c: Context,
   jwksUri: string,
   audience?: string,
+  algorithms?: string[],
 ): Promise<TClaims | null> {
   const authHeader = c.req.header('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -233,7 +253,7 @@ export async function extractJwksClaims<TClaims = unknown>(
   }
   const _token = authHeader.slice(7);
   try {
-    const jwkMiddleware = await getCachedJwkMiddleware(jwksUri);
+    const jwkMiddleware = await getCachedJwkMiddleware(jwksUri, algorithms);
     await jwkMiddleware(c, async () => {});
     const payload = c.get('jwtPayload') as TClaims | undefined;
     if (!payload) return null;

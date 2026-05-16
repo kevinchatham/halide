@@ -71,7 +71,17 @@ export const DEFAULTS = {
   },
 } as const;
 
-/** Default authorization function that permits all requests without checking claims. */
+/**
+ * Default authorization function that permits any request with a valid JWT.
+ *
+ * This implements an "any authenticated user" policy — the JWT has already been
+ * validated (signature, expiration, audience) by the time this function runs.
+ * Routes with `access: 'private'` and no explicit `authorize` function accept
+ * any holder of a valid token.
+ *
+ * To restrict access to specific roles or claims, provide an `authorize`
+ * function on the route definition.
+ */
 export const defaultAuthorize: AuthorizeFn<unknown, unknown> = async (
   _ctx: RequestContext,
   _app: HalideContext,

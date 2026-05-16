@@ -218,4 +218,92 @@ describe('extractJwksClaims', () => {
     expect(res2.status).toBeLessThan(600);
     expect(fetchCountAfter - fetchCountBefore).toBe(1);
   });
+
+  it('passes default RS256 algorithm when not specified', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { role: 'admin', sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(c, 'https://auth-rs256.example.com/jwks.json');
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+
+    expect(result).toMatchObject(payload);
+    const lastCall = mockJwk.mock.calls.at(-1)!;
+    const lastCallArgs = lastCall[0] as { alg: string[]; jwks_uri: string };
+    expect(lastCallArgs.alg).toEqual(['RS256']);
+    expect(lastCallArgs.jwks_uri).toBe('https://auth-rs256.example.com/jwks.json');
+  });
+
+  it('passes custom ES256 algorithm when specified', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { role: 'admin', sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(
+        c,
+        'https://auth-es256.example.com/jwks.json',
+        undefined,
+        ['ES256'],
+      );
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+
+    expect(result).toMatchObject(payload);
+    const lastCall = mockJwk.mock.calls.at(-1)!;
+    const lastCallArgs = lastCall[0] as { alg: string[]; jwks_uri: string };
+    expect(lastCallArgs.alg).toEqual(['ES256']);
+    expect(lastCallArgs.jwks_uri).toBe('https://auth-es256.example.com/jwks.json');
+  });
+
+  it('passes multiple algorithms when specified', async () => {
+    const { jwk } = await import('hono/jwk');
+    const mockJwk = vi.mocked(jwk);
+    const payload = { role: 'admin', sub: 'user-123' };
+    mockJwk.mockImplementation((): import('hono').MiddlewareHandler => {
+      return async (c: import('hono').Context, next: import('hono').Next) => {
+        c.set('jwtPayload', payload);
+        await next();
+      };
+    });
+
+    const app = new Hono();
+    let result: TestClaims | null = null;
+    app.get('/test', async (c) => {
+      result = await extractJwksClaims<TestClaims>(
+        c,
+        'https://auth-multi.example.com/jwks.json',
+        undefined,
+        ['RS256', 'ES256'],
+      );
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: 'Bearer some-token' } });
+
+    expect(result).toMatchObject(payload);
+    const lastCall = mockJwk.mock.calls.at(-1)!;
+    const lastCallArgs = lastCall[0] as { alg: string[]; jwks_uri: string };
+    expect(lastCallArgs.alg).toEqual(['RS256', 'ES256']);
+    expect(lastCallArgs.jwks_uri).toBe('https://auth-multi.example.com/jwks.json');
+  });
 });

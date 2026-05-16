@@ -141,7 +141,7 @@ describe('createApiBodyParser', () => {
     });
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json).toEqual({ error: 'Invalid JSON in request body' });
+    expect(json).toEqual({ error: 'Malformed JSON in request body' });
   });
 
   it('sets parsedBody and calls next() on success', async () => {
@@ -246,6 +246,6 @@ describe('createProxyBodyParser', () => {
     });
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json).toEqual({ error: 'Invalid JSON in request body' });
+    expect(json).toEqual({ error: 'Malformed JSON in request body' });
   });
 });

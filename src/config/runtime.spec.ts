@@ -345,6 +345,7 @@ describe('createApp', () => {
   });
 
   it('logs an error when async secret resolves to empty string', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const logger = {
       debug: vi.fn(),
       error: vi.fn(),
@@ -360,9 +361,12 @@ describe('createApp', () => {
     expect(logger.error).toHaveBeenCalled();
     const errorCall = logger.error.mock.calls[0]!;
     expect(errorCall[1]).toContain('Async auth secret validation failed at startup');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 
   it('logs an error when async secret rejects', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     const logger = {
       debug: vi.fn(),
       error: vi.fn(),
@@ -385,6 +389,8 @@ describe('createApp', () => {
     expect(logger.error).toHaveBeenCalled();
     const errorCall = logger.error.mock.calls[0]!;
     expect(errorCall[1]).toContain('Async auth secret validation failed at startup');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 
   it('does not log when async secret resolves to a valid value', async () => {

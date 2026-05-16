@@ -99,6 +99,7 @@ const bearerAuthSchema = z
  */
 const jwksAuthSchema = z
   .object({
+    algorithms: z.array(z.string()).optional(),
     audience: z.string().optional(),
     jwksUri: z.string(),
     strategy: z.literal('jwks'),

@@ -13,7 +13,7 @@ import { createSecurityMiddleware } from '../middleware/security';
 import { createAppHandler } from '../routes/app';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
-import type { AppConfig, HalideVariables, Logger } from '../types/app';
+import type { AppConfig, HalideVariables, Logger, RequestContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { asInternalLogger, createDefaultLogger, DEFAULTS } from './defaults';
 import { validateServerConfig, validateServerConfigSync } from './validate';
@@ -49,6 +49,147 @@ export interface CreateAppResult {
   rateLimitDispose: (() => void) | undefined;
 }
 
+function setupCorsAndCsrf<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  const security = config.security;
+  const corsConfig = security?.cors;
+  const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
+  const corsOrigin = corsConfig?.origin ?? DEFAULTS.cors.origin;
+  const corsCredentials = corsConfig?.credentials ?? DEFAULTS.cors.credentials;
+
+  app.use(
+    '*',
+    cors({
+      allowHeaders: corsConfig?.allowedHeaders,
+      allowMethods: corsMethods.map((m: string) => m.toUpperCase()),
+      credentials: corsCredentials,
+      exposeHeaders: corsConfig?.exposedHeaders,
+      maxAge: corsConfig?.maxAge,
+      origin: corsOrigin,
+    }),
+  );
+
+  if (corsCredentials) {
+    const origins = Array.isArray(corsOrigin) ? corsOrigin : [corsOrigin];
+    app.use('*', csrf({ origin: origins }));
+  }
+}
+
+function setupRateLimit<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  security: ServerConfig<TClaims, TLogScope>['security'],
+): (() => void) | undefined {
+  if (!security?.rateLimit) return undefined;
+
+  const rl = security.rateLimit;
+  let middleware: (c: Context, next: Next) => Promise<Response | undefined>;
+  let dispose: (() => void) | undefined;
+
+  if (rl.redisClient) {
+    const { middleware: redisMw, dispose: redisDispose } = createRedisRateLimitStore(
+      rl.redisClient,
+      {
+        maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+        trustedProxies: rl.trustedProxies,
+        windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
+      },
+    );
+    middleware = redisMw;
+    dispose = redisDispose;
+  } else {
+    const { middleware: memMw, dispose: memDispose } = createRateLimitMiddleware({
+      maxEntries: rl.maxEntries,
+      maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+      trustedProxies: rl.trustedProxies,
+      windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
+    });
+    middleware = memMw;
+    dispose = memDispose;
+  }
+
+  app.use('*', middleware);
+  return dispose;
+}
+
+function setupOpenapi<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  config: ServerConfig<TClaims, TLogScope>,
+  logger: Logger<Record<string, unknown>>,
+): void {
+  const openapiEnabled = config.openapi?.enabled ?? false;
+  if (!openapiEnabled) return;
+
+  const appName = config.app?.name ?? DEFAULTS.app.name;
+  const security = config.security;
+  const cspOverrides = DEFAULTS.csp.openapiOverrides;
+  const swaggerPath = config.openapi?.path ?? DEFAULTS.openapi.path;
+
+  logger.warn(
+    { appName },
+    `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
+  );
+
+  app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
+  app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
+}
+
+function setupSecurity<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  app.use('*', createSecurityMiddleware(config.security?.csp ?? {}));
+}
+
+function setupRequestId<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  if (config.observability?.requestId) {
+    app.use('*', createRequestIdMiddleware());
+  }
+}
+
+function setupRoutes<TClaims = unknown, TLogScope = unknown>(
+  app: Hono<{ Variables: HalideVariables }>,
+  agentCache: ReturnType<typeof createAgentCache>,
+  config: ServerConfig<TClaims, TLogScope>,
+  logger: Logger<TLogScope>,
+): void {
+  registerRoutes({ agentCache, app, config, logger });
+}
+
+function setupOpenapiRoutes<TClaims, TLogScope>(
+  config: ServerConfig<TClaims, TLogScope>,
+  app: Hono,
+  specCacheState: SpecCacheState,
+): void {
+  createOpenApiRoutes(config, app, specCacheState);
+}
+
+function setupAppHandler<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  if (!config.app?.root) return;
+
+  const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
+    config.app as AppConfig & { root: string },
+    config.security?.csp,
+  );
+  app.get('/*', cspMiddleware, staticMiddleware);
+  app.all('/*', cspMiddleware, appFallback);
+}
+
+function setupErrorHandling<TClaims, TLogScope>(
+  app: Hono<{ Variables: HalideVariables }>,
+  logger: Logger<TLogScope>,
+  logScopeFactory: ((ctx: RequestContext, claims: TClaims | undefined) => TLogScope) | undefined,
+): void {
+  app.onError(createErrorHandler<TClaims, TLogScope>(logger, logScopeFactory));
+}
+
 /**
  * Create a configured Hono application with all middleware, routes, and handlers.
  *
@@ -77,6 +218,7 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
           'Async auth secret validation failed at startup:',
           result.errors.map((e) => e.message).join(', '),
         );
+        process.exit(1);
       }
     });
   } else {
@@ -86,98 +228,18 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
   const app = new Hono<{ Variables: HalideVariables }>();
   const agentCache = createAgentCache();
 
-  const appName = config.app?.name ?? DEFAULTS.app.name;
-  const security = config.security;
-  const corsConfig = security?.cors;
-  const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
-  const corsOrigin = corsConfig?.origin ?? DEFAULTS.cors.origin;
-  const corsCredentials = corsConfig?.credentials ?? DEFAULTS.cors.credentials;
-
-  app.use(
-    '*',
-    cors({
-      allowHeaders: corsConfig?.allowedHeaders,
-      allowMethods: corsMethods.map((m: string) => m.toUpperCase()),
-      credentials: corsCredentials,
-      exposeHeaders: corsConfig?.exposedHeaders,
-      maxAge: corsConfig?.maxAge,
-      origin: corsOrigin,
-    }),
-  );
-
-  if (corsCredentials) {
-    const origins = Array.isArray(corsOrigin) ? corsOrigin : [corsOrigin];
-    app.use('*', csrf({ origin: origins }));
-  }
-
-  let rateLimitDispose: (() => void) | undefined;
-
-  if (security?.rateLimit) {
-    const rl = security.rateLimit;
-    let middleware: (c: Context, next: Next) => Promise<Response | undefined>;
-    let dispose: (() => void) | undefined;
-
-    if (rl.redisClient) {
-      const { middleware: redisMw, dispose: redisDispose } = createRedisRateLimitStore(
-        rl.redisClient,
-        {
-          maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
-          trustedProxies: rl.trustedProxies,
-          windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
-        },
-      );
-      middleware = redisMw;
-      dispose = redisDispose;
-    } else {
-      const { middleware: memMw, dispose: memDispose } = createRateLimitMiddleware({
-        maxEntries: rl.maxEntries,
-        maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
-        trustedProxies: rl.trustedProxies,
-        windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
-      });
-      middleware = memMw;
-      dispose = memDispose;
-    }
-
-    app.use('*', middleware);
-    rateLimitDispose = dispose;
-  }
-
-  const openapiEnabled = config.openapi?.enabled ?? false;
-
-  if (openapiEnabled) {
-    internalLogger.warn(
-      { appName },
-      `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
-    );
-    const cspOverrides = DEFAULTS.csp.openapiOverrides;
-    const swaggerPath = config.openapi?.path ?? DEFAULTS.openapi.path;
-    app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
-    app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
-  }
-
-  app.use('*', createSecurityMiddleware(security?.csp ?? {}));
-
-  if (config.observability?.requestId) {
-    app.use('*', createRequestIdMiddleware());
-  }
-
-  registerRoutes({ agentCache, app, config, logger });
+  setupCorsAndCsrf(app, config);
+  const rateLimitDispose = setupRateLimit(app, config.security);
+  setupOpenapi(app, config, internalLogger);
+  setupSecurity(app, config);
+  setupRequestId(app, config);
+  setupRoutes(app, agentCache, config, logger);
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
+  setupOpenapiRoutes(config, app as unknown as Hono, specCacheState);
 
-  createOpenApiRoutes(config, app as unknown as Hono, specCacheState);
-
-  if (config.app?.root) {
-    const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
-      config.app as AppConfig & { root: string },
-      security?.csp,
-    );
-    app.get('/*', cspMiddleware, staticMiddleware);
-    app.all('/*', cspMiddleware, appFallback);
-  }
-
-  app.onError(createErrorHandler<TClaims, TLogScope>(logger, logScopeFactory));
+  setupAppHandler(app, config);
+  setupErrorHandling(app, logger, logScopeFactory);
 
   return {
     app,

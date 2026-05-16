@@ -7,7 +7,7 @@ import {
   type ClaimExtractorCache,
   createClaimExtractor,
   NOOP_EXTRACTOR_CACHE,
-} from './registry.auth';
+} from './registry.claims';
 import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy';
 
 export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registerProxyRoute };

@@ -37,7 +37,7 @@ describe('parseJsonBody', () => {
     });
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Invalid JSON in request body' });
+    expect(body).toEqual({ error: 'Malformed JSON in request body' });
   });
 
   it('returns 400 on non-JSON content', async () => {
