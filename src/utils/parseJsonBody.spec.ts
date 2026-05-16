@@ -1,9 +1,12 @@
-import { Hono } from 'hono';
+import type { HonoApp } from '../types/app';
+import { buildHonoApp } from './hono';
 import { BodyParseError, parseJsonBody } from './parseJsonBody';
 
 describe('parseJsonBody', () => {
-  function createApp(handler: (c: Parameters<typeof parseJsonBody>[0]) => Promise<unknown>): Hono {
-    const app = new Hono();
+  function createApp(
+    handler: (c: Parameters<typeof parseJsonBody>[0]) => Promise<unknown>,
+  ): HonoApp {
+    const app = buildHonoApp();
     app.post('/test', async (c) => {
       try {
         const body = await handler(c);

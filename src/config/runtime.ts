@@ -1,9 +1,9 @@
 import type { ServerResponse } from 'node:http';
 import { serve } from '@hono/node-server';
-import type { Context, Next } from 'hono';
-import { Hono } from 'hono';
+import { type Context, Hono, type Next } from 'hono';
 import { cors } from 'hono/cors';
 import { csrf } from 'hono/csrf';
+import type { BlankSchema } from 'hono/types';
 import { createErrorHandler } from '../middleware/errorHandler';
 import type { SpecCacheState } from '../middleware/openapi';
 import { createOpenApiRoutes } from '../middleware/openapi';
@@ -13,8 +13,9 @@ import { createSecurityMiddleware } from '../middleware/security';
 import { createAppHandler } from '../routes/app';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
-import type { AppConfig, HalideVariables, Logger, RequestContext } from '../types/app';
+import type { AppConfig, HalideVariables, HonoApp, Logger, RequestContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
+import { MAX_DRAIN_TIMEOUT_MS } from './constants';
 import { asInternalLogger, createDefaultLogger, DEFAULTS } from './defaults';
 import { validateServerConfig, validateServerConfigSync } from './validate';
 
@@ -40,7 +41,7 @@ export interface Server {
  */
 export interface CreateAppResult {
   /** The configured Hono application. */
-  app: Hono<{ Variables: HalideVariables }>;
+  app: HonoApp;
   /** Logger instance used throughout the server. */
   logger: Logger<unknown>;
   /** Function to dispose of proxy HTTP agent connections. */
@@ -54,7 +55,7 @@ export interface CreateAppResult {
  * @internal
  */
 export function setupCorsAndCsrf<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
   const security = config.security;
@@ -86,7 +87,7 @@ export function setupCorsAndCsrf<TClaims, TLogScope>(
  * @internal
  */
 export function setupRateLimit<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   security: ServerConfig<TClaims, TLogScope>['security'],
 ): (() => void) | undefined {
   if (!security?.rateLimit) return undefined;
@@ -126,7 +127,7 @@ export function setupRateLimit<TClaims, TLogScope>(
  * @internal
  */
 export function setupOpenapi<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   config: ServerConfig<TClaims, TLogScope>,
   logger: Logger<Record<string, unknown>>,
 ): void {
@@ -152,7 +153,7 @@ export function setupOpenapi<TClaims, TLogScope>(
  * @internal
  */
 export function setupSecurity<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
   app.use('*', createSecurityMiddleware(config.security?.csp ?? {}));
@@ -163,7 +164,7 @@ export function setupSecurity<TClaims, TLogScope>(
  * @internal
  */
 export function setupRequestId<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
   if (config.observability?.requestId) {
@@ -172,7 +173,7 @@ export function setupRequestId<TClaims, TLogScope>(
 }
 
 function setupRoutes<TClaims = unknown, TLogScope = unknown>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   agentCache: ReturnType<typeof createAgentCache>,
   config: ServerConfig<TClaims, TLogScope>,
   logger: Logger<TLogScope>,
@@ -182,7 +183,7 @@ function setupRoutes<TClaims = unknown, TLogScope = unknown>(
 
 function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,
-  app: Hono,
+  app: HonoApp,
   specCacheState: SpecCacheState,
   logger?: Logger<TLogScope>,
 ): void {
@@ -194,7 +195,7 @@ function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
  * @internal
  */
 export function setupAppHandler<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
   if (!config.app?.root) return;
@@ -212,7 +213,7 @@ export function setupAppHandler<TClaims, TLogScope>(
  * @internal
  */
 export function setupErrorHandling<TClaims, TLogScope>(
-  app: Hono<{ Variables: HalideVariables }>,
+  app: HonoApp,
   logger: Logger<TLogScope>,
   logScopeFactory: ((ctx: RequestContext, claims: TClaims | undefined) => TLogScope) | undefined,
 ): void {
@@ -254,7 +255,13 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
     validateServerConfigSync(config, logger as Logger<unknown>);
   }
 
-  const app = new Hono<{ Variables: HalideVariables }>();
+  const app = new Hono<
+    {
+      Variables: HalideVariables;
+    },
+    BlankSchema,
+    '/'
+  >();
   const agentCache = createAgentCache();
 
   setupCorsAndCsrf(app, config);
@@ -265,7 +272,7 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
   setupRoutes(app, agentCache, config, logger);
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
-  setupOpenapiRoutes(config, app as unknown as Hono, specCacheState, logger);
+  setupOpenapiRoutes(config, app, specCacheState, logger);
 
   setupAppHandler(app, config);
   setupErrorHandling(app, logger, logScopeFactory);
@@ -339,7 +346,7 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
       const http = server as import('node:http').Server;
       http.closeAllConnections?.();
       http.close();
-      await new Promise<void>((resolve) => {
+      const drainPromise = new Promise<void>((resolve) => {
         const checkDrain = (): void => {
           if (activeRequests.size === 0) {
             resolve();
@@ -349,6 +356,16 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
         };
         checkDrain();
       });
+      const timeoutPromise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          logger.warn(
+            { appName },
+            `Drain timeout after ${MAX_DRAIN_TIMEOUT_MS}ms, forcing shutdown`,
+          );
+          resolve();
+        }, MAX_DRAIN_TIMEOUT_MS).unref();
+      });
+      await Promise.race([drainPromise, timeoutPromise]);
     }
     if (exitCode !== undefined) {
       process.exitCode = exitCode;

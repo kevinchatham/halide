@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
 import type { Logger } from '../types/app';
+import { buildHonoApp } from '../utils/hono';
 import { buildRequestContextFromHono, serializeQueryParam } from './proxy';
 
 const _noopLogger: Logger = {
@@ -30,7 +30,7 @@ describe('serializeQueryParam', () => {
 
 describe('buildRequestContextFromHono', () => {
   it('builds context from Hono request', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: ReturnType<typeof buildRequestContextFromHono> | undefined;
     app.get('/users/:id', (c) => {
       result = buildRequestContextFromHono(c, { name: 'test' });
@@ -50,7 +50,7 @@ describe('buildRequestContextFromHono', () => {
   });
 
   it('handles requests without query params', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: ReturnType<typeof buildRequestContextFromHono> | undefined;
     app.get('/test', (c) => {
       result = buildRequestContextFromHono(c);

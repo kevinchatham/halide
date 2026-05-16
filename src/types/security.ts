@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
-import type { RedisClient } from '../middleware/rateLimit';
 import type { CspDirectives } from './csp';
+import type { RedisClient } from './redis-client';
 
 /**
  * Function that extracts JWT claims from a request context.

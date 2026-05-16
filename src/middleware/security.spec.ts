@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { buildHonoApp } from '../utils/hono';
 import { createSecurityMiddleware } from './security';
 
 describe('createSecurityMiddleware', () => {
@@ -8,7 +8,7 @@ describe('createSecurityMiddleware', () => {
   });
 
   it('applies secureHeaders with default directives', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use('*', createSecurityMiddleware({}));
     app.get('/test', (c) => c.json({ ok: true }));
 
@@ -19,7 +19,7 @@ describe('createSecurityMiddleware', () => {
   });
 
   it('uses custom directives when provided', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use(
       '*',
       createSecurityMiddleware({
@@ -36,7 +36,7 @@ describe('createSecurityMiddleware', () => {
   });
 
   it('calls next after applying secureHeaders', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use('*', createSecurityMiddleware({}));
     app.get('/test', (c) => c.json({ ok: true }));
 
@@ -46,7 +46,7 @@ describe('createSecurityMiddleware', () => {
   });
 
   it('merges overrides into CSP directives', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use(
       '*',
       createSecurityMiddleware(

@@ -2,12 +2,7 @@ import { z } from 'zod';
 
 import { MAX_COLLECT_BYTES } from './constants';
 
-/**
- * Zod schema for app config structural validation.
- *
- * Validates the `app` field of `ServerConfig`: port range, string fields, and
- * optional presence of `root`, `apiPrefix`, `fallback`, and `name`.
- */
+/** Zod schema for app config structural validation. */
 export const appSchema = z
   .object({
     apiPrefix: z.string().optional(),
@@ -16,14 +11,19 @@ export const appSchema = z
     port: z.number().optional(),
     root: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      if (data.port === undefined) return true;
+      return Number.isInteger(data.port) && data.port >= 1 && data.port <= 65535;
+    },
+    {
+      message: 'app.port must be an integer between 1 and 65535',
+      path: ['port'],
+    },
+  );
 
-/**
- * Zod schema for CORS config structural validation.
- *
- * Validates the `security.cors` field: allowed methods, origins, credentials,
- * max-age, and exposed/allowed headers.
- */
+/** Zod schema for CORS config — validates wildcard origin + credentials conflict. */
 export const corsSchema = z
   .object({
     allowedHeaders: z.array(z.string()).optional(),
@@ -33,15 +33,21 @@ export const corsSchema = z
     methods: z.array(z.string()).optional(),
     origin: z.union([z.string(), z.array(z.string())]).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      if (!data.credentials) return true;
+      const origin = data.origin;
+      const isWildcard = origin === '*' || (Array.isArray(origin) && origin.includes('*'));
+      return !isWildcard;
+    },
+    {
+      message: 'Wildcard origin cannot be used with credentials: true',
+      path: ['origin'],
+    },
+  );
 
-/**
- * Zod schema for CSP directives — strict camelCase directive keys only.
- *
- * Validates each Content Security Policy directive (baseUri, defaultSrc,
- * scriptSrc, styleSrc, etc.) as an optional array of strings.
- * Throws on kebab-case keys (e.g., `default-src`).
- */
+/** Zod schema for CSP directives — strict camelCase directive keys only. */
 export const cspSchema = z
   .object({
     baseUri: z.array(z.string()).optional(),
@@ -69,12 +75,7 @@ export const cspSchema = z
   .strict()
   .optional();
 
-/**
- * Zod schema for bearer authentication config.
- *
- * Validates the `secret` field is non-empty when strategy is 'bearer'.
- * Accepts either a plain string or a function returning a string/Promise.
- */
+/** Zod schema for bearer authentication config. */
 const bearerAuthSchema = z
   .object({
     algorithms: z.array(z.string()).optional(),
@@ -92,13 +93,29 @@ const bearerAuthSchema = z
         path: ['secret'],
       });
     }
-  });
+  })
+  .refine(
+    (data) => {
+      if (data.secretTtl === undefined) return true;
+      return Number.isInteger(data.secretTtl) && data.secretTtl >= 0;
+    },
+    {
+      message: 'auth.secretTtl must be a non-negative integer (seconds)',
+      path: ['secretTtl'],
+    },
+  )
+  .refine(
+    (data) => {
+      if (data.algorithms === undefined) return true;
+      return Array.isArray(data.algorithms) && data.algorithms.length > 0;
+    },
+    {
+      message: 'auth.algorithms must be a non-empty array of strings',
+      path: ['algorithms'],
+    },
+  );
 
-/**
- * Zod schema for JWKS authentication config.
- *
- * Validates that `strategy` is 'jwks' and `jwksUri` is present.
- */
+/** Zod schema for JWKS authentication config. */
 const jwksAuthSchema = z
   .object({
     algorithms: z.array(z.string()).optional(),
@@ -106,60 +123,80 @@ const jwksAuthSchema = z
     jwksUri: z.string(),
     strategy: z.literal('jwks'),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      if (data.algorithms === undefined) return true;
+      return Array.isArray(data.algorithms) && data.algorithms.length > 0;
+    },
+    {
+      message: 'auth.algorithms must be a non-empty array of strings',
+      path: ['algorithms'],
+    },
+  );
 
-/**
- * Zod schema for auth config — discriminated union for bearer vs JWKS.
- *
- * Accepts either `bearerAuthSchema` (with `secret`) or `jwksAuthSchema`
- * (with `jwksUri`). Only one is valid at a time.
- */
 export const authSchema = z.union([bearerAuthSchema, jwksAuthSchema]).optional();
 
-/**
- * Zod schema for API route structural validation.
- *
- * Validates `access`, `path`, `method`, `type`, `handler`, and `observe` fields.
- */
-export const apiRouteSchema = z.object({
-  access: z.enum(['public', 'private']).optional(),
-  handler: z.function().optional(),
-  method: z.enum(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']).optional(),
-  observe: z.boolean().optional(),
-  path: z.string().optional(),
-  type: z.literal('api').optional(),
-});
+/** Zod schema for API route structural validation. */
+export const apiRouteSchema = z
+  .object({
+    access: z.enum(['public', 'private']).optional(),
+    handler: z.function().optional(),
+    method: z.enum(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']).optional(),
+    observe: z.boolean().optional(),
+    path: z.string().optional(),
+    type: z.literal('api').optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.path === undefined) return true;
+      return data.path.startsWith('/');
+    },
+    (data) => ({
+      message: `Route path must start with / (api): ${data.path}`,
+      path: ['path'],
+    }),
+  );
 
-/**
- * Zod schema for proxy route structural validation.
- *
- * Validates `access`, `path`, `methods`, `target`, `proxyPath`, `timeout`,
- * `type`, `handler`, and `observe` fields.
- */
-export const proxyRouteSchema = z.object({
-  access: z.enum(['public', 'private']).optional(),
-  handler: z.function().optional(),
-  methods: z.array(z.enum(['get', 'post', 'put', 'patch', 'delete', 'head', 'options'])).optional(),
-  observe: z.boolean().optional(),
-  path: z.string().optional(),
-  proxyPath: z.string().optional(),
-  target: z.string().optional(),
-  timeout: z.number().optional(),
-  type: z.literal('proxy').optional(),
-});
+/** Zod schema for proxy route structural validation. */
+export const proxyRouteSchema = z
+  .object({
+    access: z.enum(['public', 'private']).optional(),
+    handler: z.function().optional(),
+    methods: z
+      .array(z.enum(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']))
+      .optional(),
+    observe: z.boolean().optional(),
+    path: z.string().optional(),
+    proxyPath: z.string().optional(),
+    target: z.string().optional(),
+    timeout: z.number().optional(),
+    type: z.literal('proxy').optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.path === undefined) return true;
+      return data.path.startsWith('/');
+    },
+    (data) => ({
+      message: `Route path must start with / (proxy): ${data.path}`,
+      path: ['path'],
+    }),
+  )
+  .refine(
+    (data) => {
+      if (data.proxyPath === undefined) return true;
+      return data.proxyPath.startsWith('/');
+    },
+    (data) => ({
+      message: `Proxy route proxyPath must start with /: ${data.proxyPath}`,
+      path: ['proxyPath'],
+    }),
+  );
 
-/**
- * Zod schema for individual route validation — union of API and proxy route schemas.
- *
- * Used for validating each item in `apiRoutes` and `proxyRoutes` arrays.
- */
 export const routeSchema = z.union([apiRouteSchema, proxyRouteSchema]);
 
-/**
- * Zod schema for rate limit config structural validation.
- *
- * Validates `maxRequests`, `windowMs`, `maxEntries`, and `trustedProxies` fields.
- */
+/** Zod schema for rate limit config structural validation. */
 export const rateLimitSchema = z
   .object({
     maxEntries: z.number().optional(),
@@ -167,13 +204,19 @@ export const rateLimitSchema = z
     trustedProxies: z.array(z.string()).optional(),
     windowMs: z.number().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      if (data.maxEntries === undefined) return true;
+      return Number.isInteger(data.maxEntries) && data.maxEntries >= 1;
+    },
+    {
+      message: 'rateLimit.maxEntries must be a positive integer',
+      path: ['maxEntries'],
+    },
+  );
 
-/**
- * Zod schema for security config structural validation.
- *
- * Validates `auth`, `cors`, `csp`, and `rateLimit` sub-fields.
- */
+/** Zod schema for security config — validates auth, cors, csp, and rateLimit sub-fields. */
 export const securitySchema = z
   .object({
     auth: authSchema.optional(),
@@ -183,11 +226,7 @@ export const securitySchema = z
   })
   .strict();
 
-/**
- * Zod schema for OpenAPI config structural validation.
- *
- * Validates `enabled` and `path` fields for the `openapi` section of server config.
- */
+/** Zod schema for OpenAPI config structural validation. */
 export const openApiSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -195,13 +234,7 @@ export const openApiSchema = z
   })
   .strict();
 
-/**
- * Zod schema for observability config structural validation.
- *
- * Validates the `maxCollect` field: must be a positive integer bounded by
- * `MAX_COLLECT_BYTES` (1024 KB) to prevent excessive memory allocation when
- * collecting proxy response bodies for observability logging.
- */
+/** Zod schema for observability config — validates maxCollect bounds. */
 export const observabilitySchema = z
   .object({
     logger: z.any().optional(),
@@ -216,8 +249,7 @@ export const observabilitySchema = z
 /**
  * Zod schema for full server config — structural and cross-field validation.
  *
- * Validates all top-level fields (`app`, `security`, `apiRoutes`, `proxyRoutes`,
- * `observability`, `openapi`) and enforces cross-field rules:
+ * Validates all top-level fields and enforces cross-field rules:
  * - CORS wildcard origin is incompatible with `credentials: true`.
  * - Private routes require `security.auth` configuration.
  * - Proxy route `target` must be a valid http/https URL.
@@ -227,6 +259,9 @@ export const observabilitySchema = z
  * - `auth.algorithms` must be a non-empty array.
  * - `rateLimit.maxEntries` must be a positive integer.
  * - `observability.maxCollect` must be a positive integer not exceeding 1024 KB.
+ * - API route paths and proxy route paths must start with `/`.
+ * - Proxy route `proxyPath` must start with `/`.
+ * - API routes require a `handler` function.
  */
 export const serverConfigSchema = z
   .object({
@@ -239,20 +274,6 @@ export const serverConfigSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    // CORS wildcard + credentials: true rejection
-    if (data.security?.cors?.credentials) {
-      const origin = data.security.cors.origin;
-      const isWildcard = origin === '*' || (Array.isArray(origin) && origin.includes('*'));
-      if (isWildcard) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Wildcard origin cannot be used with credentials: true',
-          path: ['security', 'cors', 'origin'],
-        });
-      }
-    }
-
-    // Private routes require security.auth
     const allRoutes = [...(data.apiRoutes ?? []), ...(data.proxyRoutes ?? [])];
     const hasPrivateRoute = allRoutes.some((r) => r.access === 'private');
     if (hasPrivateRoute && !data.security?.auth) {
@@ -263,26 +284,7 @@ export const serverConfigSchema = z
       });
     }
 
-    // Port range
-    if (data.app?.port !== undefined) {
-      if (!Number.isInteger(data.app.port) || data.app.port < 1 || data.app.port > 65535) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'app.port must be an integer between 1 and 65535',
-          path: ['app', 'port'],
-        });
-      }
-    }
-
-    // API route path and handler checks
     for (const [routeIdx, route] of (data.apiRoutes ?? []).entries()) {
-      if (route.path && !route.path.startsWith('/')) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Route path must start with / (api): ${route.path}`,
-          path: ['apiRoutes', routeIdx, 'path'],
-        });
-      }
       if (!route.handler) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -292,17 +294,8 @@ export const serverConfigSchema = z
       }
     }
 
-    // Proxy route checks
     for (const [routeIdx, route] of (data.proxyRoutes ?? []).entries()) {
       if (route.type !== 'proxy') continue;
-
-      if (route.path && !route.path.startsWith('/')) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Route path must start with / (proxy): ${route.path}`,
-          path: ['proxyRoutes', routeIdx, 'path'],
-        });
-      }
 
       if (route.target == null || route.target === '') {
         ctx.addIssue({
@@ -334,49 +327,6 @@ export const serverConfigSchema = z
           code: z.ZodIssueCode.custom,
           message: 'Proxy route requires at least one method',
           path: ['proxyRoutes', routeIdx, 'methods'],
-        });
-      }
-
-      if (route.proxyPath && !route.proxyPath.startsWith('/')) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Proxy route proxyPath must start with /: ${route.proxyPath}`,
-          path: ['proxyRoutes', routeIdx, 'proxyPath'],
-        });
-      }
-    }
-
-    const auth = data.security?.auth as { secretTtl?: unknown; algorithms?: unknown } | undefined;
-    if (auth?.secretTtl !== undefined) {
-      if (!Number.isInteger(auth.secretTtl) || (auth.secretTtl as number) < 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'auth.secretTtl must be a non-negative integer (seconds)',
-          path: ['security', 'auth', 'secretTtl'],
-        });
-      }
-    }
-
-    if (auth?.algorithms !== undefined) {
-      if (!Array.isArray(auth.algorithms) || (auth.algorithms as string[]).length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'auth.algorithms must be a non-empty array of strings',
-          path: ['security', 'auth', 'algorithms'],
-        });
-      }
-    }
-
-    // Rate limit maxEntries positive integer
-    if (data.security?.rateLimit?.maxEntries !== undefined) {
-      if (
-        !Number.isInteger(data.security.rateLimit.maxEntries) ||
-        data.security.rateLimit.maxEntries < 1
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'rateLimit.maxEntries must be a positive integer',
-          path: ['security', 'rateLimit', 'maxEntries'],
         });
       }
     }

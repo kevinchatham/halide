@@ -1,5 +1,6 @@
-import { Hono } from 'hono';
-import type { RedisClient } from './rateLimit';
+import type { HonoApp } from '../types/app';
+import type { RedisClient } from '../types/redis-client';
+import { buildHonoApp } from '../utils/hono';
 import { createRateLimitMiddleware, createRedisRateLimitStore } from './rateLimit';
 
 describe('createRedisRateLimitStore', () => {
@@ -58,8 +59,8 @@ describe('createRedisRateLimitStore', () => {
     mockClient: ReturnType<typeof createMockClient>,
     config: { maxRequests: number; windowMs: number; trustedProxies?: string[] },
     socketIp?: string,
-  ): Hono {
-    const app = new Hono();
+  ): HonoApp {
+    const app = buildHonoApp();
     const { middleware } = createRedisRateLimitStore(mockClient.client, config);
 
     const wrappedMiddleware = async (
@@ -166,8 +167,8 @@ describe('createRateLimitMiddleware', () => {
       trustedProxies?: string[];
     },
     socketIp?: string,
-  ): Hono {
-    const app = new Hono();
+  ): HonoApp {
+    const app = buildHonoApp();
     const { middleware, dispose } = createRateLimitMiddleware(config);
     disposeFns.push(dispose);
 

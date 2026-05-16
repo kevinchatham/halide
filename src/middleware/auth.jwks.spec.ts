@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { buildHonoApp } from '../utils/hono';
 import { extractJwksClaims } from './auth';
 
 vi.mock('hono/jwk', () => ({
@@ -12,7 +12,7 @@ interface TestClaims {
 
 describe('extractJwksClaims', () => {
   it('returns null when authorization header is missing', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
@@ -23,7 +23,7 @@ describe('extractJwksClaims', () => {
   });
 
   it('returns null when authorization header does not start with Bearer', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
@@ -34,7 +34,7 @@ describe('extractJwksClaims', () => {
   });
 
   it('returns null when JWKS verification fails', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
@@ -45,7 +45,7 @@ describe('extractJwksClaims', () => {
   });
 
   it('returns null when JWKS verification fails with audience parameter', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(
@@ -70,7 +70,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
@@ -91,7 +91,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(
@@ -116,7 +116,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(
@@ -139,7 +139,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
@@ -160,7 +160,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(
@@ -191,7 +191,7 @@ describe('extractJwksClaims', () => {
         },
     );
 
-    const app = new Hono();
+    const app = buildHonoApp();
 
     app.get('/test', async (c) => {
       await extractJwksClaims<TestClaims>(c, 'https://auth.example.com/jwks.json');
@@ -230,7 +230,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(c, 'https://auth-rs256.example.com/jwks.json');
@@ -256,7 +256,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(
@@ -287,7 +287,7 @@ describe('extractJwksClaims', () => {
       };
     });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = null;
     app.get('/test', async (c) => {
       result = await extractJwksClaims<TestClaims>(

@@ -1,3 +1,14 @@
+import type { Hono } from 'hono';
+import type { BlankSchema } from 'hono/types';
+
+export type HonoApp = Hono<
+  {
+    Variables: HalideVariables;
+  },
+  BlankSchema,
+  '/'
+>;
+
 /**
  * Normalized request context passed to route handlers and authorization functions.
  */

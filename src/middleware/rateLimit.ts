@@ -5,17 +5,8 @@ import {
   MILLIS_PER_SECOND,
   MIN_SWEEP_INTERVAL_MS,
 } from '../config/constants';
+import type { RedisClient } from '../types/redis-client';
 import { getClientIp } from '../utils/trustedProxies';
-
-/** Minimal Redis client interface for rate limiting. */
-export interface RedisClient {
-  del(key: string): Promise<number>;
-  expire(key: string, seconds: number): Promise<number>;
-  get(key: string): Promise<string | null>;
-  incr(key: string): Promise<number>;
-  pttl(key: string): Promise<number>;
-  set(key: string, value: string, opts?: { EX?: number }): Promise<'OK'>;
-}
 
 /**
  * Create a Redis-backed rate limit store implementation.
@@ -129,8 +120,8 @@ function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitS
     },
     async set(key: string, entry: WindowEntry): Promise<void> {
       if (maxEntries && store.size >= maxEntries) {
-        const firstKey = store.keys().next().value;
-        if (firstKey) store.delete(firstKey);
+        const oldestKey = store.keys().next().value;
+        if (oldestKey) store.delete(oldestKey);
       }
       store.set(key, entry);
     },
@@ -187,6 +178,8 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
       return;
     }
 
+    store.delete(clientIp);
+    store.set(clientIp, entry);
     entry.count += 1;
 
     if (entry.count > config.maxRequests) {

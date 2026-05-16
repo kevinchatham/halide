@@ -108,7 +108,7 @@ export function createTestApp<TClaims = unknown, TLogScope = unknown>(
   }
 
   registerRoutes({ agentCache, app, config, logger: noopLogger });
-  createOpenApiRoutes(config, app as unknown as Hono);
+  createOpenApiRoutes(config, app);
 
   return app;
 }

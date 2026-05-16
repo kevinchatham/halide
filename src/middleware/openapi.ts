@@ -1,13 +1,13 @@
 import { Scalar } from '@scalar/hono-api-reference';
 import type { Context } from 'hono';
-import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';
 import { asInternalLogger } from '../config/defaults';
 import { resolveOpenApiSpec } from '../routes/registry.openapi';
 import type { ProxyRoute } from '../types/api';
-import type { Logger } from '../types/app';
+import type { HonoApp, Logger } from '../types/app';
 import type { OpenApiOptions } from '../types/openapi';
 import type { ServerConfig } from '../types/server-config';
+import { buildHonoApp } from '../utils/hono';
 
 /** Allowed HTTP methods that can appear in OpenAPI operation definitions. */
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
@@ -98,12 +98,12 @@ function mergePathItem<TClaims = unknown, TLogScope = unknown>(
  * fetching the OpenAPI route handler output.
  */
 async function buildInlineSpec(
-  app: Hono,
+  app: HonoApp,
   options: OpenApiOptions | undefined,
 ): Promise<Record<string, unknown>> {
-  const tempApp = new Hono();
+  const tempApp = buildHonoApp();
   const inlineHandler = openAPIRouteHandler as (
-    app: Hono,
+    app: HonoApp,
     opts: {
       documentation: {
         info: { title: string; version: string };
@@ -125,7 +125,7 @@ async function buildInlineSpec(
   });
 
   const swaggerPath = '/__internal-spec';
-  (tempApp.get as (path: string, ...handlers: Array<unknown>) => Hono)(
+  (tempApp.get as (path: string, ...handlers: Array<unknown>) => HonoApp)(
     `${swaggerPath}/openapi.json`,
     handler,
   );
@@ -169,7 +169,7 @@ function buildFinalSpec(
  */
 export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,
-  app: Hono,
+  app: HonoApp,
   state: SpecCacheState = createSpecCacheState(),
   logger?: Logger<TLogScope>,
 ): void {

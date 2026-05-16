@@ -1,6 +1,6 @@
-import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
 import type { HalideContext, Logger } from '../types/app';
+import { buildHonoApp } from '../utils/hono';
 import { createAgentCache, createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
@@ -29,7 +29,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache);
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.get('/api/fail', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -61,7 +61,7 @@ describe('createProxyService — errors', () => {
     const appWithErrorLogger: HalideContext = { claims: undefined, logger: errorLogger };
     const handler = createProxyService(route, appWithErrorLogger, agentCache, { original: true });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.post('/api/data', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -92,7 +92,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.post('/api/data', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -122,7 +122,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.post('/api/data', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -152,7 +152,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.post('/api/data', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -177,7 +177,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache);
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.get('/api/*', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -197,7 +197,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache);
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.get('/api/*', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -216,7 +216,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache);
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.get('/api/users', handler);
     app.onError(() => new Response(null, { status: 502 }));
 
@@ -237,7 +237,7 @@ describe('createProxyService — errors', () => {
 
     const handler = createProxyService(route, createApp(), agentCache);
 
-    const app = new Hono();
+    const app = buildHonoApp();
     app.get('/api/users', handler);
     app.onError(() => new Response(null, { status: 502 }));
 

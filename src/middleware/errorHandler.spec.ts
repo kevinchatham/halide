@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
 import type { Logger, RequestContext } from '../types/app';
+import { buildHonoApp } from '../utils/hono';
 import { createErrorHandler } from './errorHandler';
 
 const logger = {
@@ -20,7 +20,7 @@ describe('createErrorHandler', () => {
   });
 
   it('logs error details and returns 500', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const handler = createErrorHandler(logger);
     app.onError(handler);
     app.post('/api/data', () => {
@@ -39,7 +39,7 @@ describe('createErrorHandler', () => {
   });
 
   it('returns 500 with error message', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const handler = createErrorHandler(logger);
     app.onError(handler);
     app.post('/api/data', () => {
@@ -54,7 +54,7 @@ describe('createErrorHandler', () => {
   });
 
   it('handles errors without a message', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const handler = createErrorHandler(logger);
     app.onError(handler);
     app.delete('/resource', () => {
@@ -83,7 +83,7 @@ describe('createErrorHandler', () => {
   });
 
   it('respects error status code', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const handler = createErrorHandler(logger);
     app.onError(handler);
     app.delete('/resource', () => {
@@ -100,7 +100,7 @@ describe('createErrorHandler', () => {
   });
 
   it('preserves valid 5xx status codes', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const handler = createErrorHandler(logger);
     app.onError(handler);
     app.delete('/resource', () => {

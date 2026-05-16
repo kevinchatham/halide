@@ -3,7 +3,7 @@ import type { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger, RequestContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { registerApiRoute as registerApiRouteFn } from './registry.api';
-import { createClaimExtractor } from './registry.claims';
+import { createClaimExtractor } from './registry.auth';
 import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy';
 
 export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registerProxyRoute };

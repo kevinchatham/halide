@@ -54,3 +54,6 @@ export const MAX_COLLECT_BYTES = 1024 * 1024;
 
 /** Milliseconds per second (unit conversion). */
 export const MILLIS_PER_SECOND = 1000;
+
+/** Maximum time (ms) to wait for active requests to drain during shutdown. */
+export const MAX_DRAIN_TIMEOUT_MS = 30_000;

@@ -14,32 +14,18 @@ type AsymmetricAlgorithm =
   | 'ES512'
   | 'EdDSA';
 
-/**
- * Per-URI JWKS cache entry with expiration timestamp.
- * When the entry expires, a new JWKS middleware is fetched on the next request.
- */
 type JwkCacheEntry = {
-  /** The cached JWKS middleware instance. */
   middleware: ReturnType<typeof import('hono/jwk').jwk>;
-  /** Timestamp (Date.now()) when this cache entry expires. */
   expiresAt: number;
-  /** JWT algorithms used when creating this middleware. */
   algorithms: string[];
 };
 
-/** Cache of JWKS middleware instances keyed by JWKS URI. */
 const jwkCache = new Map<string, JwkCacheEntry>();
 
-/** In-flight promise map for concurrent JWKS fetch coalescing. */
 const jwkFetchLocks = new Map<string, Promise<ReturnType<typeof import('hono/jwk').jwk>>>();
 
-/** In-flight promise map for concurrent JWKS refresh coalescing. */
 const jwkRefreshLocks = new Map<string, Promise<void>>();
 
-/**
- * Insert a JWKS cache entry, evicting the oldest entry (FIFO) when the cache
- * is full (exceeds MAX_JWK_CACHE).
- */
 function setJwkCacheEntry(
   jwksUri: string,
   expiresAt: number,
@@ -47,16 +33,12 @@ function setJwkCacheEntry(
   algorithms: string[],
 ): void {
   if (jwkCache.size >= MAX_JWK_CACHE) {
-    const firstKey = jwkCache.keys().next().value;
-    if (firstKey) jwkCache.delete(firstKey);
+    const oldestKey = jwkCache.keys().next().value;
+    if (oldestKey) jwkCache.delete(oldestKey);
   }
   jwkCache.set(jwksUri, { algorithms, expiresAt, middleware });
 }
 
-/**
- * Evict the oldest lock map entry (FIFO) when the map exceeds MAX_JWK_LOCKS.
- * Prevents unbounded memory growth during concurrent JWKS fetches or refreshes.
- */
 function evictLock(map: Map<string, Promise<unknown>>): void {
   if (map.size >= MAX_JWK_LOCKS) {
     const firstKey = map.keys().next().value;
@@ -64,12 +46,6 @@ function evictLock(map: Map<string, Promise<unknown>>): void {
   }
 }
 
-/**
- * Retrieve a cached JWKS middleware instance for the given URI, fetching and caching a new one if stale.
- * Caches middleware with TTL eviction; returns a fresh instance in tests.
- * @param jwksUri - The JWKS endpoint URL.
- * @returns The JWKS middleware function.
- */
 async function getCachedJwkMiddleware(
   jwksUri: string,
   algorithms?: string[],
@@ -115,7 +91,6 @@ async function getCachedJwkMiddleware(
   return fetchPromise;
 }
 
-/** Periodically evict stale JWKS cache entries every 10 minutes. */
 const jwkSweepTimer =
   typeof vi !== 'undefined'
     ? null
@@ -126,10 +101,9 @@ const jwkSweepTimer =
             jwkCache.delete(uri);
           }
         }
-      }, 600_000); // 10 minutes
+      }, 600_000);
 jwkSweepTimer?.unref();
 
-/** Background refresh: fetch fresh middleware for entries past half-life. */
 const jwkBackgroundRefreshTimer =
   typeof vi !== 'undefined'
     ? null
@@ -155,7 +129,7 @@ const jwkBackgroundRefreshTimer =
                 });
                 setJwkCacheEntry(uri, now + JWKS_CACHE_TTL_MS, middleware, alg);
               } catch {
-                // Fire-and-forget: don't block other refreshes
+                // Fire-and-forget: background refresh errors are intentionally suppressed
               } finally {
                 jwkRefreshLocks.delete(uri);
               }
@@ -163,13 +137,9 @@ const jwkBackgroundRefreshTimer =
             jwkRefreshLocks.set(uri, refreshPromise);
           }
         }
-      }, JWKS_CACHE_TTL_MS / 2); // 30 minutes
+      }, JWKS_CACHE_TTL_MS / 2);
 jwkBackgroundRefreshTimer?.unref();
 
-/**
- * Check whether the JWT audience claim matches the expected value.
- * Supports both string and array `aud` claim types per JWT spec.
- */
 function matchesAudience(payload: Record<string, unknown>, audience: string): boolean {
   const aud = payload.aud;
   if (aud === undefined) return false;
@@ -178,17 +148,30 @@ function matchesAudience(payload: Record<string, unknown>, audience: string): bo
   return false;
 }
 
-/**
- * Extract JWT claims from a Bearer token using configurable algorithm verification.
- * Tries each algorithm sequentially; the first algorithm that produces a valid payload
- * (and passes audience check) is accepted.
- * @typeParam TClaims - The type of the decoded JWT claims object.
- * @param c - The Hono context.
- * @param secret - The JWT signing secret.
- * @param audience - Optional expected audience claim.
- * @param algorithms - JWT algorithms accepted. Defaults to ['HS256'].
- * @returns The decoded claims or null if extraction fails.
- */
+function decodeJwtHeader(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64url = parts[0] as string;
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = 4 - (base64.length % 4);
+    const padded = padding === 4 ? base64 : base64 + '='.repeat(padding);
+    const decoded = atob(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAlgorithm(token: string, allowedAlgorithms: string[]): string | null {
+  const header = decodeJwtHeader(token);
+  if (!header) return null;
+  const alg = header.alg;
+  if (typeof alg !== 'string') return null;
+  if (!allowedAlgorithms.includes(alg)) return null;
+  return alg;
+}
+
 export async function extractBearerClaims<TClaims = unknown>(
   c: Context,
   secret: string,
@@ -200,47 +183,39 @@ export async function extractBearerClaims<TClaims = unknown>(
     return null;
   }
   const token = authHeader.slice(7);
-  const alg = algorithms && algorithms.length > 0 ? algorithms : ['HS256'];
-  for (const algorithm of alg) {
-    try {
-      const payload = await verify(
-        token,
-        secret,
-        algorithm as
-          | 'HS256'
-          | 'HS384'
-          | 'HS512'
-          | 'RS256'
-          | 'RS384'
-          | 'RS512'
-          | 'ES256'
-          | 'ES384'
-          | 'ES512'
-          | 'PS256'
-          | 'PS384'
-          | 'PS512'
-          | 'EdDSA',
-      );
-      if (audience && !matchesAudience(payload as Record<string, unknown>, audience)) {
-        return null;
-      }
-      return payload as TClaims;
-    } catch {
-      // Try next algorithm
+  const allowedAlgorithms = algorithms && algorithms.length > 0 ? algorithms : ['HS256'];
+
+  const algorithm = resolveAlgorithm(token, allowedAlgorithms);
+  if (!algorithm) return null;
+
+  try {
+    const payload = await verify(
+      token,
+      secret,
+      algorithm as
+        | 'HS256'
+        | 'HS384'
+        | 'HS512'
+        | 'RS256'
+        | 'RS384'
+        | 'RS512'
+        | 'ES256'
+        | 'ES384'
+        | 'ES512'
+        | 'PS256'
+        | 'PS384'
+        | 'PS512'
+        | 'EdDSA',
+    );
+    if (audience && !matchesAudience(payload as Record<string, unknown>, audience)) {
+      return null;
     }
+    return payload as TClaims;
+  } catch {
+    return null;
   }
-  return null;
 }
 
-/**
- * Extract JWT claims from a Bearer token using JWKS verification.
- * @typeParam TClaims - The type of the decoded JWT claims object.
- * @param c - The Hono context.
- * @param jwksUri - The JWKS endpoint URL.
- * @param audience - Optional expected audience claim.
- * @param algorithms - Optional JWT algorithms accepted. Defaults to ['RS256'].
- * @returns The decoded claims or null if extraction fails.
- */
 export async function extractJwksClaims<TClaims = unknown>(
   c: Context,
   jwksUri: string,
