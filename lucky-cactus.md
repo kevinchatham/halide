@@ -19,6 +19,10 @@ The `TApp` bundle pattern compresses two independent concerns into a single type
 apiRoutes: [route as unknown as ApiRoute<DemoApp>]
 ```
 
+**Variance root cause:** `ApiRoute.handler` is a function-valued property (`handler: ApiRouteHandler<...>`). With `strictFunctionTypes`, function-valued properties are contravariant, so handler types with different `TBody` are incompatible. The fix (Phase 2) uses a **method declaration** for `handler`, since TypeScript checks method parameters bivariantly, allowing mixed body types in the array without `any`.
+
+**Variance root cause:** `ApiRoute.handler` is a function-valued property (`handler: ApiRouteHandler<...>`). With `strictFunctionTypes`, function-valued properties are contravariant, so handler types with different `TBody` are incompatible. The fix (Phase 2) uses a **method declaration** for `handler`, since TypeScript checks method parameters bivariantly, allowing mixed body types in the array without `any`.
+
 ---
 
 ## Target Consumer API
@@ -28,11 +32,7 @@ apiRoutes: [route as unknown as ApiRoute<DemoApp>]
 interface UserClaims  { sub: string; role: 'admin' | 'user'; }
 interface LogScope    { requestId: string; userId?: string; }
 
-// 2a. Standalone — explicit params on each call
-const route = apiRoute<UserClaims, LogScope, { name: string }, { id: string }>({ ... });
-const server = createServer<UserClaims, LogScope>({ apiRoutes: [route] });
-
-// 2b. Builder — define TClaims/TLogScope once, only body types per route   [see open question]
+// 2. Builder — define TClaims/TLogScope once, only body types per route
 const { apiRoute, proxyRoute, createServer } = defineHalide<UserClaims, LogScope>();
 const route = apiRoute<{ name: string }, { id: string }>({ ... });
 const server = createServer({ apiRoutes: [route] });
@@ -73,7 +73,7 @@ logScopeFactory: (ctx, claims) => ({
 
 ### `src/types/app.ts`
 
-- Remove `AnyHalideContext` (or keep as unexported internal alias if still needed in registry).
+- Remove `AnyHalideContext` entirely (no longer needed — not even internally).
 - Remove `AppClaims<TApp>`, `AppLogger<TApp>`, `AppLogScope<TApp>`.
 - Update `ObservabilityConfig`:
 
@@ -136,7 +136,7 @@ type ServerConfig<TApp = HalideContext> = {
 
 // AFTER
 type ServerConfig<TClaims = unknown, TLogScope = unknown> = {
-  apiRoutes?: ApiRoute<TClaims, TLogScope, any, any>[];  // ← 'any' is the variance fix
+  apiRoutes?: ApiRoute<TClaims, TLogScope, unknown, unknown>[];  // method handler → bivariant
   proxyRoutes?: ProxyRoute<TClaims, TLogScope>[];
   observability?: ObservabilityConfig<TClaims, TLogScope>;
   ...
@@ -176,10 +176,16 @@ function proxyRoute<TClaims = unknown, TLogScope = unknown>(
 function createApp<TApp extends AnyHalideContext = HalideContext>(config: ServerConfig<TApp>): CreateAppResult
 function createServer<TApp extends AnyHalideContext = HalideContext>(config: ServerConfig<TApp>): Server
 
-// AFTER
+// AFTER — no constraint, no casts
 function createApp<TClaims = unknown, TLogScope = unknown>(config: ServerConfig<TClaims, TLogScope>): CreateAppResult
 function createServer<TClaims = unknown, TLogScope = unknown>(config: ServerConfig<TClaims, TLogScope>): Server
 ```
+
+Additionally, eliminate all casts in the implementation:
+- `{ errors: result.errors } as unknown as AppLogScope<TApp>` → plain `{ errors: result.errors }`
+- `logger as AppLogger<TApp>` → pass `logger` directly
+- `configInput as ServerConfig<HalideContext>` (for openapi pass-through) → just pass or use `HalideContext<TClaims, TLogScope>`
+- `createErrorHandler<unknown, TApp>(logger, logScopeFactory)` → `createErrorHandler<TClaims, TLogScope>(...)`
 
 The `extends AnyHalideContext` constraint is removed. No constraint is needed because `TClaims` and `TLogScope` are
 unconstrained type parameters.
@@ -196,21 +202,39 @@ const defaultAuthorize: AuthorizeFn<unknown, unknown> = async (_ctx, _app) => tr
 
 ---
 
-## Phase 2 — Fix `apiRoutes` Array Variance Bug
+## Phase 2 — Fix `apiRoutes` Array Variance Bug (Method Declaration)
 
-The root cause: `ApiRouteHandler<_, _, TBody, _>` is **contravariant** in `TBody` because `TBody` appears in the
-`ctx` parameter. TypeScript's `strictFunctionTypes` means `ApiRoute<App, CreateUserSchema>` is not assignable to
-`ApiRoute<App, unknown>`.
+The root cause: `ApiRoute.handler` is a **function-valued property** (`handler: ApiRouteHandler<...>`). With
+`strictFunctionTypes`, function-valued properties are contravariant in their parameter types. This means
+`ApiRoute<..., CreateUserSchema, ...>` is not assignable to `ApiRoute<..., unknown, ...>` because `CreateUserSchema`
+appears in a function parameter position.
 
-The fix is to use `any` on the `TBody`/`TResponse` slots in the `ServerConfig.apiRoutes` array. The type safety
-guarantee at the array level is exactly what Zod provides at runtime — the schema validates the body. TypeScript
-enforces the match between handler and schema **at route-definition time** (inside `apiRoute()`). There is nothing
-more to enforce at the server-config level.
+**Fix:** Change `handler` from a function-valued property to a **method declaration**. TypeScript checks method
+parameters bivariantly (even with `strictFunctionTypes`), so `ApiRoute<..., CreateUserSchema>` becomes assignable
+to `ApiRoute<..., unknown>` without `any`.
+
+**Why not make `ApiRouteInput.handler` a method too?** Consumer-facing type safety. At route-definition time,
+`ApiRouteInput` preserves the strict function-valued `ApiRouteHandler` — if a handler's body type doesn't match
+the route's declared schema, TypeScript catches it at the definition site. At array-assembly time, the method
+declaration on `ApiRoute` alone provides the bivariance needed for mixed-body arrays. Making both method
+declarations would lose definition-time schema validation entirely, forcing runtime tests to catch mismatches.
 
 ```typescript
-// In ServerConfig
-apiRoutes?: ApiRoute<TClaims, TLogScope, any, any>[];
+// BEFORE — function-valued property (contravariant)
+type ApiRoute<TClaims, TLogScope, TBody, TResponse> = {
+  handler: ApiRouteHandler<TClaims, TLogScope, TBody, TResponse>;
+};
+
+// AFTER — method declaration (bivariant)
+type ApiRoute<TClaims, TLogScope, TBody, TResponse> = {
+  handler(ctx: RequestContext & { body: TBody }, app: HalideContext<TClaims, TLogScope>): Promise<TResponse | Response>;
+};
 ```
+
+Type safety at route-definition time is preserved because `ApiRouteInput` overrides `handler` back to the strict
+function-valued `ApiRouteHandler` type — contravariance only applies at definition time, not at array-assembly time.
+
+The `ServerConfig.apiRoutes` array keeps `ApiRoute<TClaims, TLogScope, unknown, unknown>[]` — no `any` needed.
 
 With this change, the demo becomes:
 
@@ -227,7 +251,7 @@ apiRoutes: [profileRoute, userRoute, healthRoute]
 ## Phase 3 — Update Internal Registration Code
 
 All internal files that reference `TApp`, `AppClaims<TApp>`, `AppLogger<TApp>`, `AppLogScope<TApp>` need updating.
-These changes are mechanical — replace extraction helpers with direct parameters.
+These changes are mechanical — replace extraction helpers with direct `TClaims, TLogScope` parameters.
 
 ### `src/routes/registry.ts`
 
@@ -268,6 +292,53 @@ instead of extracting from `TApp`.
 Replace all `TApp extends AnyHalideContext` constraints with `TClaims, TLogScope` and remove all `AppClaims<TApp>`,
 `AppLogger<TApp>`, `AppLogScope<TApp>` usages.
 
+### `src/routes/registry.openapi.ts`
+
+Functions `buildDescribeRouteOptions`, `buildRequestBody`, `buildResponses` use `<TApp>` generics (for passing to
+`ApiRoute<TApp>` / `ProxyRoute<TApp>`). Update to `<TClaims, TLogScope>`.
+
+### `src/routes/registry.body.ts`
+
+`createApiBodyParser` and `createProxyBodyParser` use `<TApp = HalideContext>`. Update to
+`<TClaims = unknown, TLogScope = unknown>`.
+
+### `src/routes/registry.auth.ts`
+
+Key simplifications:
+
+1. **logScopeFactory signature change** eliminates the "preliminary app context" hack:
+
+```typescript
+// BEFORE — builds a fake TApp just to pass to logScopeFactory
+const preliminaryAppCtx = { claims, logger } as TApp;
+const scope = logScopeFactory(reqCtx, preliminaryAppCtx);
+
+// AFTER — passes claims directly
+const scope = logScopeFactory(reqCtx, claims);
+```
+
+2. **`createScopedLogger` cast eliminated:**
+```typescript
+// BEFORE
+scopedLogger = createScopedLogger(logger, scope) as AppLogger<TApp>;
+
+// AFTER
+scopedLogger = createScopedLogger(logger, scope);
+```
+
+3. **`EmitConfig<TApp>` and `ResponseEmitConfig<TApp>`** — split to `TClaims, TLogScope`.
+
+### `src/middleware/openapi.ts`
+
+`createOpenApiRoutes` uses `<TApp extends HalideContext = HalideContext>`. Switch to
+`<TClaims = unknown, TLogScope = unknown>` — use `HalideContext<TClaims, TLogScope>` as the struct type, not as
+a constraint.
+
+### `src/services/proxy.ts`
+
+`applyIdentityHeaders`, `applyTransform`, `createProxyService` use `<TApp extends AnyHalideContext>`. Update
+all to `<TClaims, TLogScope>` with `HalideContext<TClaims, TLogScope>`.
+
 ### `src/middleware/errorHandler.ts`
 
 ```typescript
@@ -286,22 +357,10 @@ function createErrorHandler<TClaims = unknown, TLogScope = unknown>(
 
 ---
 
-## Phase 4 — Clean Up `Route` Union Type
+## Phase 4 — Remove `Route` Union Type
 
-The `Route<TApp, TBody, TResponse>` union is asymmetric: `ProxyRoute` has no `TBody`/`TResponse`, so those params
-are misleading on the union. Simplify:
-
-```typescript
-// BEFORE
-type Route<TApp = HalideContext, TBody = unknown, TResponse = unknown> =
-  | ApiRoute<TApp, TBody, TResponse>
-  | ProxyRoute<TApp>;
-
-// AFTER
-type Route<TClaims = unknown, TLogScope = unknown> =
-  | ApiRoute<TClaims, TLogScope, any, any>
-  | ProxyRoute<TClaims, TLogScope>;
-```
+The `Route<TApp, TBody, TResponse>` union is asymmetric (ProxyRoute has no body/response params) and is dead code —
+zero internal imports. Remove it entirely from `src/types/api.ts` and `src/index.ts`.
 
 ---
 
@@ -313,10 +372,18 @@ type Route<TClaims = unknown, TLogScope = unknown> =
 - `AppLogger`
 - `AppLogScope`
 - `RegisterRoutesOptions` (internal)
+- `Route` (dead code — removed entirely)
 
 **Keep or add:**
 - `HalideContext<TClaims, TLogScope>` — still useful as the named handler context type
+- `defineHalide` — new builder factory (from Phase 6); this is the **primary consumer-facing API**
 - All other existing exports, updated signatures only
+
+**Not exported (internal only):**
+- `apiRoute` — only accessible via `defineHalide().apiRoute`
+- `proxyRoute` — only accessible via `defineHalide().proxyRoute`
+- `createApp` — only accessible via `defineHalide().createApp`
+- `createServer` — only accessible via `defineHalide().createServer`
 
 ---
 
@@ -347,7 +414,7 @@ export function defineHalide<TClaims = unknown, TLogScope = unknown>() {
 }
 ```
 
-Export from `src/index.ts`. Usage:
+Export from `src/index.ts`. This is the **primary consumer-facing API** — standalone `apiRoute`, `proxyRoute`, `createApp`, and `createServer` exist as internal implementation only (not exported). Usage:
 
 ```typescript
 const { apiRoute, proxyRoute, createServer } = defineHalide<UserClaims, LogScope>();
@@ -365,7 +432,7 @@ const server = createServer({
 
 ## Phase 7 — Update Tests, Demo, and Spec Files
 
-- `src/demo.ts` — Rewrite to use the new API. Remove `as unknown as ApiRoute<DemoApp>` cast.
+- `src/demo.ts` — Rewrite to use the builder API. Remove `as unknown as ApiRoute<DemoApp>` cast.
 - `src/routes/apiRoute.spec.ts` — Update test with `apiRoute<UserClaims, LogScope, Body, Response>`.
 - `src/routes/registry.spec.ts` — Update `RegisterRoutesOptions` type usage.
 - `src/routes/registry.auth.spec.ts` — Update claim extractor tests.
@@ -379,20 +446,24 @@ const server = createServer({
 | File | Change Type |
 |------|-------------|
 | `src/types/app.ts` | Remove `AnyHalideContext`, `AppClaims`, `AppLogger`, `AppLogScope`; update `ObservabilityConfig` |
-| `src/types/api.ts` | Split all generics to `TClaims, TLogScope`; update all 6 types |
-| `src/types/server-config.ts` | Split to `TClaims, TLogScope`; use `any` for body in `apiRoutes[]` |
-| `src/config/runtime.ts` | Remove `AnyHalideContext` constraint; split params |
+| `src/types/api.ts` | Split all generics to `TClaims, TLogScope`; update `ApiRoute`, `ApiRouteHandler`, `ApiRouteInput`, `AuthorizeFn`, `ProxyRoute`, `ProxyRouteInput`; convert `handler` to method declaration; remove `Route` union |
+| `src/types/server-config.ts` | Split to `TClaims, TLogScope`; `apiRoutes[]` stays `unknown` (method fixes variance) |
+| `src/config/runtime.ts` | Remove `AnyHalideContext` constraint; split params; eliminate all casts |
 | `src/config/defaults.ts` | Update `defaultAuthorize` type |
-| `src/config/builder.ts` | **New file** — `defineHalide` builder (Phase 6 only) |
-| `src/routes/apiRoute.ts` | Split to 4 params |
+| `src/config/builder.ts` | **New file** — `defineHalide` builder (Phase 6) |
+| `src/routes/apiRoute.ts` | Split to 4 params; no runtime changes |
 | `src/routes/proxyRoute.ts` | Split to 2 params; align default with `apiRoute` |
 | `src/routes/registry.ts` | Split `RegisterRoutesOptions` |
-| `src/routes/registry.api.ts` | Replace `AppClaims/AppLogger/AppLogScope` usages |
-| `src/routes/registry.auth.ts` | Simplify `createClaimExtractor`, `createAuthMiddleware`; fix logScopeFactory call |
+| `src/routes/registry.api.ts` | Replace `AppClaims/AppLogger/AppLogScope` usages; split generics |
+| `src/routes/registry.auth.ts` | Split `EmitConfig`/`ResponseEmitConfig`; fix logScopeFactory call; remove preliminary app context hack; remove cast on `createScopedLogger` |
 | `src/routes/registry.proxy.ts` | Remove `AnyHalideContext` constraint; split params |
+| `src/routes/registry.openapi.ts` | Update `buildDescribeRouteOptions`, `buildRequestBody`, `buildResponses` generics |
+| `src/routes/registry.body.ts` | Update `createApiBodyParser`, `createProxyBodyParser` generics |
+| `src/middleware/openapi.ts` | Update `createOpenApiRoutes` generics |
 | `src/middleware/errorHandler.ts` | Update `logScopeFactory` signature |
-| `src/index.ts` | Remove old exports; optionally add `defineHalide` |
-| `src/demo.ts` | Rewrite with new API; remove cast |
+| `src/services/proxy.ts` | Update `applyIdentityHeaders`, `applyTransform`, `createProxyService` generics |
+| `src/index.ts` | Remove old exports (`AnyHalideContext`, `AppClaims`, `AppLogger`, `AppLogScope`, `Route`, `RegisterRoutesOptions`); keep `apiRoute`/`proxyRoute`/`createApp`/`createServer` as internal-only (not exported); add `defineHalide` as primary export |
+| `src/demo.ts` | Rewrite with builder API; remove cast |
 | `src/*.spec.ts` (all) | Update type params throughout |
 
 ---
@@ -402,7 +473,8 @@ const server = createServer({
 | Area | Before | After |
 |------|--------|-------|
 | `ServerConfig` | `ServerConfig<TApp>` | `ServerConfig<TClaims, TLogScope>` |
-| `ApiRoute` | `ApiRoute<TApp, TBody, TRes>` | `ApiRoute<TClaims, TLogScope, TBody, TRes>` |
+| `ApiRoute` | `ApiRoute<TApp, TBody, TRes>` (handler: function prop) | `ApiRoute<TClaims, TLogScope, TBody, TRes>` (handler: method — bivariant) |
+| `Route` | exported union type | removed entirely |
 | `ProxyRoute` | `ProxyRoute<TApp>` | `ProxyRoute<TClaims, TLogScope>` |
 | `AuthorizeFn` | `AuthorizeFn<TApp>` | `AuthorizeFn<TClaims, TLogScope>` |
 | `ObservabilityConfig` | `ObservabilityConfig<TApp>` | `ObservabilityConfig<TClaims, TLogScope>` |
@@ -415,4 +487,9 @@ const server = createServer({
 
 ## Decision Log
 
-**defineHalide builder:** Included (Phase 6). The `defineHalide<TClaims, TLogScope>()` builder is part of the implementation scope. Standalone functions remain for consumers who prefer explicit params.
+- **defineHalide builder:** Builder-only (Phase 6). `defineHalide<TClaims, TLogScope>()` is the primary consumer-facing API. Standalone `apiRoute`/`proxyRoute`/`createApp`/`createServer` exist as internal implementation only (not publicly exported).
+- **logScopeFactory:** Changed from `(ctx, app)` to `(ctx, claims)` — removes the preliminary-app-context hack.
+- **Variance fix:** Method declaration on `ApiRoute.handler` (not `any`). TypeScript checks method parameters bivariantly, so `ApiRoute<..., CreateUserSchema>` is assignable to `ApiRoute<..., unknown>`. `ApiRouteInput.handler` remains a strict function-valued `ApiRouteHandler` for type safety at route-definition time.
+- **Route union:** Removed entirely (dead code — zero internal imports).
+- **HalideContext:** Not used as an internal constraint. All internal code uses `TClaims, TLogScope` directly. `HalideContext` remains exported as a convenience type.
+- **Casts:** Eliminate all casts in implementation (`runtime.ts`, `registry.auth.ts`, etc.) — no `as unknown as AppLogScope<TApp>`, no `as AppLogger<TApp>`, no preliminary-app-context hack.
