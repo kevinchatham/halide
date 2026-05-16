@@ -7,7 +7,6 @@ import { createTestApp, noopLogger } from '../test-utils/index.js';
 import type { HalideVariables } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { registerRoutes } from './registry';
-import { NOOP_EXTRACTOR_CACHE } from './registry.claims';
 
 const secret = 'test-secret';
 
@@ -16,9 +15,6 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
 }
 
 describe('registerRoutes — auth', () => {
-  beforeEach(() => {
-    NOOP_EXTRACTOR_CACHE.reset();
-  });
   describe('Authentication', () => {
     it('returns 401 for private routes without token', async () => {
       const app = await createTestApp({

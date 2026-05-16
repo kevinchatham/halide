@@ -438,7 +438,7 @@ export function createProxyService<TClaims = unknown, TLogScope = unknown>(
       const params = c.req.param();
       rewrittenPath = rewritePath;
       for (const [key, value] of Object.entries(params)) {
-        rewrittenPath = rewrittenPath.replace(`:${key}`, value);
+        rewrittenPath = rewrittenPath.replace(new RegExp(`:\\${key}\\b`, 'g'), value);
       }
     }
     const targetUrl = new URL(rewrittenPath, parsedTarget).toString();

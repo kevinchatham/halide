@@ -96,7 +96,7 @@
 
 <!-- **`createAuthMiddleware` has 30 lines of scope creation logic.** `src/routes/registry.auth.ts:311-333` creates scoped loggers, builds `HalideContext`, and stores variables on the Hono context. This is framework machinery that every route handler must understand implicitly. -->
 
-**Proxy path rewriting uses string replacement.** `src/services/proxy.ts:434-436` replaces `:key` patterns in `proxyPath` using `String.replace()`. This is fragile — if a route parameter name appears as a substring of another word in the path, it gets replaced incorrectly. Hono's path parser handles this, but the manual replacement doesn't.
+<!-- **Proxy path rewriting uses string replacement.** `src/services/proxy.ts:434-436` replaces `:key` patterns in `proxyPath` using `String.replace()`. This is fragile — if a route parameter name appears as a substring of another word in the path, it gets replaced incorrectly. Hono's path parser handles this, but the manual replacement doesn't. -->
 
 ## 6. Recommendations
 
@@ -106,16 +106,16 @@
 
 **3. Add circuit breaker to proxy routes.** Implement a circuit breaker pattern (`src/services/proxy.ts`) that tracks upstream failure rates and stops forwarding to unhealthy targets. This prevents cascading failures when upstream servers are degraded. Priority: High.
 
-**4. Centralize all constants.** Move all magic numbers from `src/middleware/rateLimit.ts`, `src/config/constants.ts`, and inline values into a single `src/config/constants.ts` file. Remove the duplicate `DEFAULT_MAX_ENTRIES`. Priority: Medium.
+<!-- **4. Centralize all constants.** Move all magic numbers from `src/middleware/rateLimit.ts`, `src/config/constants.ts`, and inline values into a single `src/config/constants.ts` file. Remove the duplicate `DEFAULT_MAX_ENTRIES`. Priority: Medium. -->
 
-**5. Add TTL to claim extractor cache.** The `ClaimExtractorCache` should evict entries after a configurable time, not just on size. This ensures auth config changes propagate promptly. Priority: Medium.
+<!-- **5. Add TTL to claim extractor cache.** The `ClaimExtractorCache` should evict entries after a configurable time, not just on size. This ensures auth config changes propagate promptly. Priority: Medium. -->
 
-**6. Split `registry.auth.ts` into auth and observability modules.** Move `emitOnRequest`, `emitOnResponse`, and `EmitConfig` interfaces to a separate `registry.observability.ts` file. This separates auth logic from hook emission logic. Priority: Medium.
+<!-- **6. Split `registry.auth.ts` into auth and observability modules.** Move `emitOnRequest`, `emitOnResponse`, and `EmitConfig` interfaces to a separate `registry.observability.ts` file. This separates auth logic from hook emission logic. Priority: Medium. -->
 
-**7. Replace `void` promise validation with awaited validation.** `src/config/runtime.ts:72-81` fire-and-forgets async validation. Either await it before returning `CreateAppResult` or expose a `validationPromise` property so consumers can handle failures. Priority: Medium.
+<!-- **7. Replace `void` promise validation with awaited validation.** `src/config/runtime.ts:72-81` fire-and-forgets async validation. Either await it before returning `CreateAppResult` or expose a `validationPromise` property so consumers can handle failures. Priority: Medium. -->
 
-**8. Add structured error codes to `BodyParseError`.** Extend `BodyParseError` with a `code` property ('MALFORMED_JSON', 'OVERSIZED_BODY', 'ENCODING_ERROR') to provide diagnostic value. Priority: Low.
+<!-- **8. Add structured error codes to `BodyParseError`.** Extend `BodyParseError` with a `code` property ('MALFORMED_JSON', 'OVERSIZED_BODY', 'ENCODING_ERROR') to provide diagnostic value. Priority: Low. -->
 
-**9. Add `maxCollect` config validation.** The `maxCollect` option in `ObservabilityConfig` has no upper bound. Add a validation constraint (e.g., maximum 10KB) to prevent excessive memory usage from response body collection. Priority: Low.
+<!-- **9. Add `maxCollect` config validation.** The `maxCollect` option in `ObservabilityConfig` has no upper bound. Add a validation constraint (e.g., maximum 10KB) to prevent excessive memory usage from response body collection. Priority: Low. -->
 
-**10. Document middleware ordering explicitly.** Add a comment block at the top of `createApp` documenting the exact middleware ordering and the reason for each position. This reduces the cognitive load when modifying the pipeline. Priority: Low.
+<!-- **10. Document middleware ordering explicitly.** Add a comment block at the top of `createApp` documenting the exact middleware ordering and the reason for each position. This reduces the cognitive load when modifying the pipeline. Priority: Low. -->

@@ -10,9 +10,6 @@ export const MAX_JWK_LOCKS = 100;
 /** Maximum number of HTTP agent pool entries. */
 export const MAX_AGENT_CACHE = 500;
 
-/** Maximum number of entries in the claim extractor cache. */
-export const MAX_EXTRACTOR_CACHE = 200;
-
 /** Default maximum number of entries for the rate limit in-memory store. */
 export const DEFAULT_MAX_ENTRIES = 10000;
 
@@ -51,6 +48,9 @@ export const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
 
 /** Default maximum bytes to collect for observability. */
 export const DEFAULT_MAX_COLLECT_BYTES = 1024;
+
+/** Maximum bytes to collect for observability (1024 KB). */
+export const MAX_COLLECT_BYTES = 1024 * 1024;
 
 /** Milliseconds per second (unit conversion). */
 export const MILLIS_PER_SECOND = 1000;

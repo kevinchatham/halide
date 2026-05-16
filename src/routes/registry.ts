@@ -3,11 +3,7 @@ import type { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger, RequestContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { registerApiRoute as registerApiRouteFn } from './registry.api';
-import {
-  type ClaimExtractorCache,
-  createClaimExtractor,
-  NOOP_EXTRACTOR_CACHE,
-} from './registry.claims';
+import { createClaimExtractor } from './registry.claims';
 import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy';
 
 export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registerProxyRoute };
@@ -57,8 +53,6 @@ export type RegisterRoutesOptions<TClaims = unknown, TLogScope = unknown> = {
   logger: Logger<TLogScope>;
   /** The HTTP agent cache for proxy connections. */
   agentCache: ReturnType<typeof createAgentCache>;
-  /** The claim extractor cache instance. Optional — defaults to a no-op cache. */
-  claimExtractorCache?: ClaimExtractorCache;
 };
 
 /**
@@ -77,16 +71,12 @@ export type RegisterRoutesOptions<TClaims = unknown, TLogScope = unknown> = {
 export function registerRoutes<TClaims = unknown, TLogScope = unknown>(
   options: RegisterRoutesOptions<TClaims, TLogScope>,
 ): void {
-  const { app, config, logger, agentCache, claimExtractorCache = NOOP_EXTRACTOR_CACHE } = options;
+  const { app, config, logger, agentCache } = options;
   const logScopeFactory = config.observability?.logScopeFactory as
     | ((ctx: RequestContext, claims: unknown) => TLogScope)
     | undefined;
 
-  const claimExtractor = createClaimExtractor<TClaims, TLogScope>(
-    config,
-    logger,
-    claimExtractorCache,
-  );
+  const claimExtractor = createClaimExtractor<TClaims, TLogScope>(config, logger);
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {

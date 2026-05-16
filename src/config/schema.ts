@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { MAX_COLLECT_BYTES } from './constants';
+
 /**
  * Zod schema for app config structural validation.
  *
@@ -194,6 +196,24 @@ export const openApiSchema = z
   .strict();
 
 /**
+ * Zod schema for observability config structural validation.
+ *
+ * Validates the `maxCollect` field: must be a positive integer bounded by
+ * `MAX_COLLECT_BYTES` (1024 KB) to prevent excessive memory allocation when
+ * collecting proxy response bodies for observability logging.
+ */
+export const observabilitySchema = z
+  .object({
+    logger: z.any().optional(),
+    logScopeFactory: z.function().optional(),
+    maxCollect: z.number().int().positive().max(MAX_COLLECT_BYTES).optional(),
+    onRequest: z.function().optional(),
+    onResponse: z.function().optional(),
+    requestId: z.boolean().optional(),
+  })
+  .strict();
+
+/**
  * Zod schema for full server config — structural and cross-field validation.
  *
  * Validates all top-level fields (`app`, `security`, `apiRoutes`, `proxyRoutes`,
@@ -206,12 +226,13 @@ export const openApiSchema = z
  * - `auth.secretTtl` must be a non-negative integer.
  * - `auth.algorithms` must be a non-empty array.
  * - `rateLimit.maxEntries` must be a positive integer.
+ * - `observability.maxCollect` must be a positive integer not exceeding 1024 KB.
  */
 export const serverConfigSchema = z
   .object({
     apiRoutes: z.array(routeSchema).optional(),
     app: appSchema.optional(),
-    observability: z.any().optional(),
+    observability: observabilitySchema.optional(),
     openapi: openApiSchema.optional(),
     proxyRoutes: z.array(routeSchema).optional(),
     security: securitySchema.optional(),

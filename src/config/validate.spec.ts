@@ -55,4 +55,45 @@ describe('validateServerConfig', () => {
     const result = await validateServerConfig({});
     expect(result.valid).toBe(true);
   });
+
+  it('accepts observability with default maxCollect', async () => {
+    const result = await validateServerConfig({
+      observability: { maxCollect: 1024 },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('accepts observability with maxCollect at exact MAX_COLLECT_BYTES boundary', async () => {
+    const result = await validateServerConfig({
+      observability: { maxCollect: 1048576 },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects observability with maxCollect exceeding 1024 KB', async () => {
+    const result = await validateServerConfig({
+      observability: { maxCollect: 1048577 },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors.at(0)?.field).toBe('observability.maxCollect');
+  });
+
+  it('rejects observability with non-integer maxCollect', async () => {
+    const result = await validateServerConfig({
+      observability: { maxCollect: 1024.5 } as never,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors.at(0)?.field).toBe('observability.maxCollect');
+  });
+
+  it('rejects observability with negative maxCollect', async () => {
+    const result = await validateServerConfig({
+      observability: { maxCollect: -100 },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors.at(0)?.field).toBe('observability.maxCollect');
+  });
 });
