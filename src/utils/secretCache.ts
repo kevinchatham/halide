@@ -1,3 +1,4 @@
+import { asInternalLogger } from '../config/defaults';
 import type { Logger } from '../types/app';
 
 /**
@@ -28,6 +29,7 @@ export function createSecretCache<TLogScope = unknown>(
   ttlSeconds: number,
   logger: Logger<TLogScope>,
 ): (fetcher: () => string | Promise<string>) => Promise<string> {
+  const il = asInternalLogger(logger);
   let cache: CachedSecret | null = null;
   let pendingPromise: Promise<string> | null = null;
 
@@ -49,8 +51,8 @@ export function createSecretCache<TLogScope = unknown>(
         cache = { expiresAt: freshNow + ttlSeconds * 1000, value };
         return value;
       } catch (err) {
-        logger.error(
-          { error: 'secret_refresh_failed' } as TLogScope,
+        il.error(
+          { error: 'secret_refresh_failed' },
           'Failed to refresh JWT secret from secret provider:',
           err instanceof Error ? err.message : String(err),
         );

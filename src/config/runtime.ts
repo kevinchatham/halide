@@ -14,9 +14,8 @@ import { createAppHandler } from '../routes/app';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
 import type { AppConfig, HalideVariables, Logger } from '../types/app';
-import type { CspDirectives } from '../types/csp';
 import type { ServerConfig } from '../types/server-config';
-import { createDefaultLogger, DEFAULTS } from './defaults';
+import { asInternalLogger, createDefaultLogger, DEFAULTS } from './defaults';
 import { validateServerConfig, validateServerConfigSync } from './validate';
 
 /**
@@ -58,36 +57,37 @@ export interface CreateAppResult {
  *
  * @typeParam TClaims - The type of the decoded JWT claims.
  * @typeParam TLogScope - The type of the structured log scope object.
- * @param configInput - The server configuration.
+ * @param config - The server configuration.
  * @returns An object containing the Hono app and cleanup functions.
  */
 export function createApp<TClaims = unknown, TLogScope = unknown>(
-  configInput: ServerConfig<TClaims, TLogScope>,
+  config: ServerConfig<TClaims, TLogScope>,
 ): CreateAppResult {
-  const logger = configInput.observability?.logger ?? createDefaultLogger();
-  const logScopeFactory = configInput.observability?.logScopeFactory;
-  const auth = configInput.security?.auth;
+  const logger = config.observability?.logger ?? createDefaultLogger();
+  const internalLogger = asInternalLogger(logger);
+  const logScopeFactory = config.observability?.logScopeFactory;
+  const auth = config.security?.auth;
   const hasFunctionSecret = auth?.secret && typeof auth.secret === 'function';
 
   if (hasFunctionSecret) {
-    void validateServerConfig(configInput).then((result) => {
+    void validateServerConfig(config).then((result) => {
       if (!result.valid) {
-        logger.error(
-          { errors: result.errors } as TLogScope,
+        internalLogger.error(
+          { errors: result.errors },
           'Async auth secret validation failed at startup:',
           result.errors.map((e) => e.message).join(', '),
         );
       }
     });
   } else {
-    validateServerConfigSync(configInput, logger as Logger<unknown>);
+    validateServerConfigSync(config, logger as Logger<unknown>);
   }
 
   const app = new Hono<{ Variables: HalideVariables }>();
   const agentCache = createAgentCache();
 
-  const appName = configInput.app?.name ?? DEFAULTS.app.name;
-  const security = configInput.security;
+  const appName = config.app?.name ?? DEFAULTS.app.name;
+  const security = config.security;
   const corsConfig = security?.cors;
   const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
   const corsOrigin = corsConfig?.origin ?? DEFAULTS.cors.origin;
@@ -143,41 +143,41 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
     rateLimitDispose = dispose;
   }
 
-  const openapiEnabled = configInput.openapi?.enabled ?? false;
+  const openapiEnabled = config.openapi?.enabled ?? false;
 
   if (openapiEnabled) {
-    logger.warn(
-      { appName } as TLogScope,
+    internalLogger.warn(
+      { appName },
       `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
     );
-    const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<CspDirectives>;
-    const swaggerPath = configInput.openapi?.path ?? DEFAULTS.openapi.path;
+    const cspOverrides = DEFAULTS.csp.openapiOverrides;
+    const swaggerPath = config.openapi?.path ?? DEFAULTS.openapi.path;
     app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
     app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
   }
 
   app.use('*', createSecurityMiddleware(security?.csp ?? {}));
 
-  if (configInput.observability?.requestId) {
+  if (config.observability?.requestId) {
     app.use('*', createRequestIdMiddleware());
   }
 
-  registerRoutes({ agentCache, app, config: configInput, logger: logger as Logger<TLogScope> });
+  registerRoutes({ agentCache, app, config, logger });
 
   const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
 
-  createOpenApiRoutes(configInput, app as unknown as Hono, specCacheState);
+  createOpenApiRoutes(config, app as unknown as Hono, specCacheState);
 
-  if (configInput.app?.root) {
+  if (config.app?.root) {
     const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
-      configInput.app as AppConfig & { root: string },
+      config.app as AppConfig & { root: string },
       security?.csp,
     );
     app.get('/*', cspMiddleware, staticMiddleware);
     app.all('/*', cspMiddleware, appFallback);
   }
 
-  app.onError(createErrorHandler<TClaims, TLogScope>(logger as Logger<TLogScope>, logScopeFactory));
+  app.onError(createErrorHandler<TClaims, TLogScope>(logger, logScopeFactory));
 
   return {
     app,

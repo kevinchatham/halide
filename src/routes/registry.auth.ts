@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { MAX_EXTRACTOR_CACHE } from '../config/constants';
-import { createScopedLogger, DEFAULTS } from '../config/defaults';
+import { asInternalLogger, createScopedLogger, DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
 import type { AuthorizeFn, HalideContext } from '../types/api';
@@ -184,22 +184,17 @@ export function emitOnRequest<TClaims = unknown, TLogScope = unknown>(
   config: EmitConfig<TClaims, TLogScope>,
   ctx: RequestContext,
 ): void {
+  const il = config.logger ? asInternalLogger(config.logger) : undefined;
   if (config.observability?.onRequest && config.observe !== false) {
     try {
       const result = config.observability.onRequest(ctx, config.app);
       if (result instanceof Promise) {
         result.catch((err) =>
-          config.logger?.error(
-            {} as TLogScope,
-            `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
-          ),
+          il?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`),
         );
       }
     } catch (err) {
-      config.logger?.error(
-        {} as TLogScope,
-        `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      il?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }
@@ -267,6 +262,7 @@ export function emitOnResponse<TClaims = unknown, TLogScope = unknown>(
   config: ResponseEmitConfig<TClaims, TLogScope>,
   ctx: RequestContext,
 ): void {
+  const il = config.logger ? asInternalLogger(config.logger) : undefined;
   if (config.observability?.onResponse && config.observe !== false) {
     try {
       const result = config.observability.onResponse(ctx, config.app, {
@@ -278,17 +274,11 @@ export function emitOnResponse<TClaims = unknown, TLogScope = unknown>(
       });
       if (result instanceof Promise) {
         result.catch((err) =>
-          config.logger?.error(
-            {} as TLogScope,
-            `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
-          ),
+          il?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`),
         );
       }
     } catch (err) {
-      config.logger?.error(
-        {} as TLogScope,
-        `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      il?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

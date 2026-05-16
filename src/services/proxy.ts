@@ -4,7 +4,7 @@ import tls from 'node:tls';
 import type { Context } from 'hono';
 import { proxy } from 'hono/proxy';
 import { MAX_AGENT_CACHE } from '../config/constants';
-import { DEFAULTS } from '../config/defaults';
+import { asInternalLogger, DEFAULTS } from '../config/defaults';
 import type { HalideContext, ProxyRoute } from '../types/api';
 import type { Logger, RequestContext } from '../types/app';
 import { isTrustedProxy } from '../utils/trustedProxies';
@@ -342,6 +342,7 @@ function applyTransform<TClaims = unknown, TLogScope = unknown>(
   headers: Record<string, string | undefined>,
   logger?: Logger<TLogScope>,
 ): BodyInit | null {
+  const il = logger ? asInternalLogger(logger) : undefined;
   if (!route.transform) return c.req.raw.body;
   try {
     const jsonBody = parsedBody ?? {};
@@ -366,7 +367,7 @@ function applyTransform<TClaims = unknown, TLogScope = unknown>(
     }
     return body;
   } catch (err) {
-    logger?.error({} as TLogScope, err instanceof Error ? err.message : String(err));
+    il?.error({}, err instanceof Error ? err.message : String(err));
     throw err;
   }
 }

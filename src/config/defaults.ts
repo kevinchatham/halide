@@ -1,6 +1,7 @@
 import { styleText } from 'node:util';
 import type { AuthorizeFn } from '../types/api';
 import type { HalideContext, Logger, RequestContext } from '../types/app';
+import type { CspDirectives } from '../types/csp';
 
 /**
  * Default configuration values used when options are omitted.
@@ -49,7 +50,7 @@ export const DEFAULTS = {
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
       styleSrcAttr: ["'unsafe-inline'"],
-    },
+    } as Partial<CspDirectives>,
   },
   openapi: {
     path: '/swagger',
@@ -158,4 +159,16 @@ export function createScopedLogger<TLogScope>(
     info: (_scope: TLogScope, ...args: unknown[]) => logger.info(scope, ...args),
     warn: (_scope: TLogScope, ...args: unknown[]) => logger.warn(scope, ...args),
   };
+}
+
+/**
+ * Cast a typed logger to a generic internal logger for use in framework internals
+ * where ad-hoc scope objects are logged (e.g., validation errors, startup warnings).
+ *
+ * @typeParam T - The current type parameter of the logger.
+ * @param logger - The logger to cast.
+ * @returns The logger cast to {@link Logger}<Record<string, unknown>>.
+ */
+export function asInternalLogger<T>(logger: Logger<T>): Logger<Record<string, unknown>> {
+  return logger as Logger<Record<string, unknown>>;
 }

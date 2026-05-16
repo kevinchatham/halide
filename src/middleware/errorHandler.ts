@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { asInternalLogger } from '../config/defaults';
 import type { HalideContext, Logger, RequestContext } from '../types/app';
 
 /**
@@ -19,6 +20,7 @@ export function createErrorHandler<TClaims = unknown, TLogScope = unknown>(
   logger: Logger<TLogScope>,
   logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope,
 ): (err: unknown, c: Context) => Response {
+  const internalLogger = asInternalLogger(logger);
   return (err: unknown, c: Context) => {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error && err.stack ? err.stack : undefined;
@@ -30,23 +32,22 @@ export function createErrorHandler<TClaims = unknown, TLogScope = unknown>(
       typeof c.json
     >[1];
 
-    let logScope: TLogScope;
+    let logScope: Record<string, unknown>;
     if (logScopeFactory) {
       const reqCtx = c.get('reqCtx') as RequestContext | undefined;
       const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope> | undefined;
-      const factoryScope =
-        reqCtx && appCtx ? logScopeFactory(reqCtx, appCtx.claims) : ({} as TLogScope);
+      const factoryScope = reqCtx && appCtx ? logScopeFactory(reqCtx, appCtx.claims) : undefined;
       logScope = {
         ...(typeof factoryScope === 'object' && factoryScope !== null ? factoryScope : {}),
         ...(stack ? { errorStack: stack } : {}),
-      } as TLogScope;
+      };
     } else {
       logScope = {
         ...(stack ? { errorStack: stack } : {}),
-      } as TLogScope;
+      };
     }
 
-    logger.error(logScope, `Internal server error: ${message}`);
+    internalLogger.error(logScope, `Internal server error: ${message}`);
     return c.json({ error: 'Internal Server Error' }, status);
   };
 }
