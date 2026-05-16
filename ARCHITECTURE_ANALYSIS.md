@@ -86,7 +86,7 @@
 
 <!-- **`asInternalLogger` type cast is a code smell.** `src/config/defaults.ts:172-174` casts `Logger<T>` to `Logger<Record<string, unknown>>`. This bypasses type safety and means internal logger calls can log arbitrary shapes that the consumer's `TLogScope` type doesn't expect. The cast is necessary because internal logging doesn't fit the consumer's scope type, but it indicates the Logger interface is not flexible enough. -->
 
-**Test utilities don't mock middleware.** `src/test-utils/index.ts:21-29` creates a test app by calling `registerRoutes` and `createOpenApiRoutes` directly, bypassing `createApp`. This means tests don't exercise CORS, CSP, rate limiting, or CSRF middleware — they test routes in isolation but not the full middleware pipeline.
+<!-- **Test utilities don't mock middleware.** `src/test-utils/index.ts:21-29` creates a test app by calling `registerRoutes` and `createOpenApiRoutes` directly, bypassing `createApp`. This means tests don't exercise CORS, CSP, rate limiting, or CSRF middleware — they test routes in isolation but not the full middleware pipeline. -->
 
 **CLI couples to project structure assumptions.** `src/cli/commands/init.ts` assumes the project has `tsconfig.json` and `tsconfig.app.json` files. The `excludeServerFromApp` function (`src/cli/commands/init.template.ts:83-102`) creates `tsconfig.app.json` with `exclude: ['server.ts']` if it doesn't exist, which may conflict with frameworks that use different exclude patterns.
 

@@ -49,7 +49,11 @@ export interface CreateAppResult {
   rateLimitDispose: (() => void) | undefined;
 }
 
-function setupCorsAndCsrf<TClaims, TLogScope>(
+/**
+ * Apply CORS and optional CSRF middleware to the Hono app.
+ * @internal
+ */
+export function setupCorsAndCsrf<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
@@ -77,7 +81,11 @@ function setupCorsAndCsrf<TClaims, TLogScope>(
   }
 }
 
-function setupRateLimit<TClaims, TLogScope>(
+/**
+ * Apply rate limiting middleware to the Hono app.
+ * @internal
+ */
+export function setupRateLimit<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   security: ServerConfig<TClaims, TLogScope>['security'],
 ): (() => void) | undefined {
@@ -113,7 +121,11 @@ function setupRateLimit<TClaims, TLogScope>(
   return dispose;
 }
 
-function setupOpenapi<TClaims, TLogScope>(
+/**
+ * Apply CSP overrides for OpenAPI/Swagger routes when OpenAPI is enabled.
+ * @internal
+ */
+export function setupOpenapi<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims, TLogScope>,
   logger: Logger<Record<string, unknown>>,
@@ -135,14 +147,22 @@ function setupOpenapi<TClaims, TLogScope>(
   app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
 }
 
-function setupSecurity<TClaims, TLogScope>(
+/**
+ * Apply CSP security headers middleware to the Hono app.
+ * @internal
+ */
+export function setupSecurity<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
   app.use('*', createSecurityMiddleware(config.security?.csp ?? {}));
 }
 
-function setupRequestId<TClaims, TLogScope>(
+/**
+ * Apply request ID middleware when `observability.requestId` is enabled.
+ * @internal
+ */
+export function setupRequestId<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
@@ -169,7 +189,11 @@ function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
   createOpenApiRoutes(config, app, specCacheState, logger);
 }
 
-function setupAppHandler<TClaims, TLogScope>(
+/**
+ * Apply SPA fallback and static file handler when `config.app.root` is set.
+ * @internal
+ */
+export function setupAppHandler<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   config: ServerConfig<TClaims, TLogScope>,
 ): void {
@@ -183,7 +207,11 @@ function setupAppHandler<TClaims, TLogScope>(
   app.all('/*', cspMiddleware, appFallback);
 }
 
-function setupErrorHandling<TClaims, TLogScope>(
+/**
+ * Apply the global error handler middleware to the Hono app.
+ * @internal
+ */
+export function setupErrorHandling<TClaims, TLogScope>(
   app: Hono<{ Variables: HalideVariables }>,
   logger: Logger<TLogScope>,
   logScopeFactory: ((ctx: RequestContext, claims: TClaims | undefined) => TLogScope) | undefined,
