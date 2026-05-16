@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { applyEdits, modify, parse } from 'jsonc-parser';
 import stripJsonComments from 'strip-json-comments';
 
 /**
@@ -49,10 +50,14 @@ export const TSCONFIG_SERVER = `{
 `;
 
 /** Write tsconfig.server.json if it doesn't already exist in the project root. */
-export function writeTsconfigServer(cwd: string): void {
+export function writeTsconfigServer(cwd: string, dryRun = false, force = false): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
-  if (fs.existsSync(tsconfigServerPath)) {
+  if (!force && fs.existsSync(tsconfigServerPath)) {
     log('✓ tsconfig.server.json already exists — skipping');
+    return;
+  }
+  if (dryRun) {
+    log('\u2139 [dry-run] Would create tsconfig.server.json');
     return;
   }
   fs.writeFileSync(tsconfigServerPath, TSCONFIG_SERVER, 'utf8');
@@ -60,45 +65,121 @@ export function writeTsconfigServer(cwd: string): void {
 }
 
 /** Add tsconfig.server.json reference to tsconfig.json, skipping if already referenced. */
-export function addServerReference(cwd: string): void {
+export function addServerReference(cwd: string, dryRun = false, force = false): void {
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
   if (!fs.existsSync(tsconfigPath)) return;
 
   const raw = fs.readFileSync(tsconfigPath, 'utf8');
-  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
+  const parsed = parse(raw) as Record<string, unknown>;
 
   if (!Array.isArray(parsed.references)) return;
 
+  const normalizedPath = path.normalize('./tsconfig.server.json');
   const alreadyReferenced = (parsed.references as Array<Record<string, string>>).some(
-    (ref) => ref.path === './tsconfig.server.json',
+    (ref) => path.normalize(ref.path ?? '') === normalizedPath,
   );
-  if (alreadyReferenced) return;
+  if (alreadyReferenced && !force) return;
 
-  parsed.references.push({ path: './tsconfig.server.json' });
-  fs.writeFileSync(tsconfigPath, JSON.stringify(parsed, null, 2), 'utf8');
-  log('✓ Added tsconfig.server.json reference to tsconfig.json');
-}
-
-/** Add server.ts to tsconfig.app.json exclude list, skipping if already excluded. */
-export function excludeServerFromApp(cwd: string): void {
-  const appPath = path.join(cwd, 'tsconfig.app.json');
-  if (!fs.existsSync(appPath)) return;
-
-  const raw = fs.readFileSync(appPath, 'utf8');
-  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
-
-  if (!Array.isArray(parsed.exclude)) {
-    parsed.exclude = ['server.ts'];
-    fs.writeFileSync(appPath, JSON.stringify(parsed, null, 2), 'utf8');
-    log('✓ Added server.ts to tsconfig.app.json exclude list');
+  if (dryRun) {
+    log('\u2139 [dry-run] Would add tsconfig.server.json reference to tsconfig.json');
     return;
   }
 
-  if ((parsed.exclude as string[]).includes('server.ts')) return;
+  const formattedOptions = { insertSpaces: true, tabSize: 2 };
+  let edits: ReturnType<typeof modify>;
+  if (force) {
+    const filteredRefs = (parsed.references as Array<Record<string, string>>).filter(
+      (ref) => path.normalize(ref.path ?? '') !== normalizedPath,
+    );
+    edits = modify(raw, ['references'], [...filteredRefs, { path: './tsconfig.server.json' }], {
+      formattingOptions: formattedOptions,
+    });
+  } else {
+    edits = modify(
+      raw,
+      ['references', -1],
+      { path: './tsconfig.server.json' },
+      { formattingOptions: formattedOptions },
+    );
+  }
+  fs.writeFileSync(tsconfigPath, applyEdits(raw, edits), 'utf8');
+  log('✓ Added tsconfig.server.json reference to tsconfig.json');
+}
 
-  (parsed.exclude as string[]).push('server.ts');
-  fs.writeFileSync(appPath, JSON.stringify(parsed, null, 2), 'utf8');
-  log('✓ Added server.ts to tsconfig.app.json exclude list');
+/** Resolved app tsconfig info with raw content to avoid double reads. */
+export interface ResolvedTsconfig {
+  content: string;
+  name: string;
+}
+
+/** Resolve the app tsconfig file, returning filename, raw content, and parsed references info. */
+export function resolveAppTsconfig(cwd: string): ResolvedTsconfig | null {
+  const candidates = ['tsconfig.app.json', 'tsconfig.web.json', 'tsconfig.json'];
+
+  for (const candidate of candidates) {
+    const fullPath = path.join(cwd, candidate);
+    if (!fs.existsSync(fullPath)) continue;
+
+    if (candidate === 'tsconfig.json') {
+      const raw = fs.readFileSync(fullPath, 'utf8');
+      const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
+      if (Array.isArray(parsed.references)) continue;
+      return { content: raw, name: candidate };
+    }
+
+    const raw = fs.readFileSync(fullPath, 'utf8');
+    return { content: raw, name: candidate };
+  }
+
+  return null;
+}
+
+/** Add server.ts to the app tsconfig exclude list, skipping if already excluded. */
+export function excludeServerFromApp(
+  cwd: string,
+  dryRun = false,
+  force = false,
+  cachedContent?: string,
+): void {
+  const resolved = resolveAppTsconfig(cwd);
+  if (resolved === null) {
+    log('\u26a0 No app tsconfig found — skipping server.ts exclusion');
+    return;
+  }
+
+  const tsconfigName = resolved.name;
+  const appPath = path.join(cwd, tsconfigName);
+  if (!fs.existsSync(appPath)) return;
+
+  const raw = cachedContent ?? resolved.content;
+  const parsed = parse(raw) as Record<string, unknown>;
+  const exclude = Array.isArray(parsed.exclude) ? (parsed.exclude as string[]) : [];
+
+  if (exclude.includes('server.ts') && !force) {
+    log('✓ server.ts already excluded — skipping');
+    return;
+  }
+
+  if (dryRun) {
+    log(`\u2139 [dry-run] Would add server.ts to ${tsconfigName} exclude list`);
+    return;
+  }
+
+  const formattedOptions = { insertSpaces: true, tabSize: 2 };
+  let edits: ReturnType<typeof modify>;
+  if (Array.isArray(parsed.exclude)) {
+    const filteredExclude = force ? exclude.filter((s) => s !== 'server.ts') : exclude;
+    edits = modify(raw, ['exclude'], [...filteredExclude, 'server.ts'], {
+      formattingOptions: formattedOptions,
+    });
+  } else {
+    const existing = parsed.exclude != null ? [String(parsed.exclude)] : [];
+    edits = modify(raw, ['exclude'], [...existing, 'server.ts'], {
+      formattingOptions: formattedOptions,
+    });
+  }
+  fs.writeFileSync(appPath, applyEdits(raw, edits), 'utf8');
+  log(`✓ Added server.ts to ${tsconfigName} exclude list`);
 }
 
 /** Output a message to stdout with a trailing newline for CLI progress reporting. */

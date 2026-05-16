@@ -88,7 +88,7 @@
 
 <!-- **Test utilities don't mock middleware.** `src/test-utils/index.ts:21-29` creates a test app by calling `registerRoutes` and `createOpenApiRoutes` directly, bypassing `createApp`. This means tests don't exercise CORS, CSP, rate limiting, or CSRF middleware — they test routes in isolation but not the full middleware pipeline. -->
 
-**CLI couples to project structure assumptions.** `src/cli/commands/init.ts` assumes the project has `tsconfig.json` and `tsconfig.app.json` files. The `excludeServerFromApp` function (`src/cli/commands/init.template.ts:83-102`) creates `tsconfig.app.json` with `exclude: ['server.ts']` if it doesn't exist, which may conflict with frameworks that use different exclude patterns.
+<!-- **CLI couples to project structure assumptions.** `src/cli/commands/init.ts` assumes the project has `tsconfig.json` and `tsconfig.app.json` files. The `excludeServerFromApp` function (`src/cli/commands/init.template.ts:83-102`) creates `tsconfig.app.json` with `exclude: ['server.ts']` if it doesn't exist, which may conflict with frameworks that use different exclude patterns. -->
 
 **`registry.auth.ts` mixes auth and observability.** The file contains `emitOnRequest` and `emitOnResponse` functions (observability concerns) alongside `extractClaims` and `checkAuthorization` (auth concerns). This coupling means auth changes require understanding observability hooks and vice versa.
 

@@ -228,4 +228,31 @@ describe('init', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
   });
+
+  it('skips interactive prompts when dryRun is true', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      if (p.endsWith('tsconfig.server.json')) return false;
+      return false;
+    });
+
+    await init({ dryRun: true });
+
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+  });
+
+  it('does not install halide when dryRun is true', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      if (p.endsWith('tsconfig.server.json')) return false;
+      return false;
+    });
+
+    await init({ dryRun: true });
+
+    expect(mockExecSync).not.toHaveBeenCalled();
+  });
 });

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { confirm, input } from '@inquirer/prompts';
+import { applyEdits, parse as jsoncParse, modify } from 'jsonc-parser';
 import {
   addServerReference,
   excludeServerFromApp,
@@ -23,33 +24,61 @@ export function runQuietly(cmd: string, cwd: string): void {
 }
 
 /** Add halide:start and halide:build npm scripts to package.json if they don't already exist. */
-export function addScriptsToPackageJson(cwd: string): void {
+export function addScriptsToPackageJson(cwd: string, dryRun = false, force = false): void {
   const pkgPath = path.join(cwd, 'package.json');
   const raw = fs.readFileSync(pkgPath, 'utf8');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-  if (!parsed.scripts || typeof parsed.scripts !== 'object') {
-    parsed.scripts = {};
+  const newStart = 'npm run halide:build && node dist/server.js';
+  const newBuild = 'tsc --project tsconfig.server.json';
+  const formattedOptions = { insertSpaces: true, tabSize: 2 };
+
+  if (!force) {
+    const parsed = jsoncParse(raw) as Record<string, unknown>;
+    const scripts =
+      parsed.scripts && typeof parsed.scripts === 'object'
+        ? (parsed.scripts as Record<string, string>)
+        : {};
+    if (scripts['halide:start'] && scripts['halide:build']) return;
   }
 
-  const scripts = parsed.scripts as Record<string, string>;
-  let added = false;
-
-  if (!scripts['halide:start']) {
-    scripts['halide:start'] = 'npm run halide:build && node dist/server.js';
-    added = true;
-  }
-  if (!scripts['halide:build']) {
-    scripts['halide:build'] = 'tsc --project tsconfig.server.json';
-    added = true;
+  if (dryRun) {
+    log('\u2139 [dry-run] Would add halide:start and halide:build scripts to package.json');
+    return;
   }
 
-  if (added) {
-    fs.writeFileSync(pkgPath, JSON.stringify(parsed, null, 2), 'utf8');
-    log('✓ Added halide:start and halide:build scripts to package.json');
+  let result = raw;
+
+  if (force) {
+    const modified1 = modify(result, ['scripts', 'halide:start'], newStart, {
+      formattingOptions: formattedOptions,
+    });
+    result = applyEdits(result, modified1);
+    const modified2 = modify(result, ['scripts', 'halide:build'], newBuild, {
+      formattingOptions: formattedOptions,
+    });
+    result = applyEdits(result, modified2);
   } else {
-    log('✓ halide scripts already exist in package.json — skipping');
+    const parsed = jsoncParse(raw) as Record<string, unknown>;
+    const scripts =
+      parsed.scripts && typeof parsed.scripts === 'object'
+        ? (parsed.scripts as Record<string, string>)
+        : {};
+    if (!scripts['halide:start']) {
+      const modified1 = modify(result, ['scripts', 'halide:start'], newStart, {
+        formattingOptions: formattedOptions,
+      });
+      result = applyEdits(result, modified1);
+    }
+    if (!scripts['halide:build']) {
+      const modified2 = modify(result, ['scripts', 'halide:build'], newBuild, {
+        formattingOptions: formattedOptions,
+      });
+      result = applyEdits(result, modified2);
+    }
   }
+
+  fs.writeFileSync(pkgPath, result, 'utf8');
+  log('✓ Added halide:start and halide:build scripts to package.json');
 }
 
 /** Supported package managers for dependency installation. */
@@ -109,8 +138,10 @@ function log(message: string): void {
 }
 
 export {
+  addServerReference,
   excludeServerFromApp,
   generateServerTs,
+  resolveAppTsconfig,
   TSCONFIG_SERVER,
   writeTsconfigServer,
 } from './init.template';
@@ -122,9 +153,15 @@ export {
  * to package.json, and optionally installs AI coding skills.
  *
  * @param options - Optional configuration. Set `skillsOnly` to skip project setup.
+ *   Set `dryRun` to preview changes without writing files.
+ *   Set `force` to overwrite existing files.
  */
-export async function init(options?: { skillsOnly?: boolean }): Promise<undefined> {
-  const { skillsOnly = false } = options ?? {};
+export async function init(options?: {
+  skillsOnly?: boolean;
+  dryRun?: boolean;
+  force?: boolean;
+}): Promise<undefined> {
+  const { skillsOnly = false, dryRun = false, force = false } = options ?? {};
   const cwd = process.cwd();
 
   if (!fs.existsSync(path.join(cwd, 'package.json'))) {
@@ -136,6 +173,18 @@ export async function init(options?: { skillsOnly?: boolean }): Promise<undefine
 
   if (skillsOnly) {
     installSkillsFromHalide(cwd);
+    return;
+  }
+
+  if (dryRun) {
+    log('\u2139 [dry-run] Skipping interactive prompts');
+    log('\u2139 [dry-run] Would install halide');
+    log('\u2139 [dry-run] Would create server.ts');
+    writeTsconfigServer(cwd, true, force);
+    addServerReference(cwd, true, force);
+    excludeServerFromApp(cwd, true, force);
+    addScriptsToPackageJson(cwd, true, force);
+    log('\nDone! (dry-run)');
     return;
   }
 
@@ -182,10 +231,10 @@ export async function init(options?: { skillsOnly?: boolean }): Promise<undefine
     log('✓ Created server.ts');
   }
 
-  writeTsconfigServer(cwd);
-  addServerReference(cwd);
-  excludeServerFromApp(cwd);
-  addScriptsToPackageJson(cwd);
+  writeTsconfigServer(cwd, dryRun, force);
+  addServerReference(cwd, dryRun, force);
+  excludeServerFromApp(cwd, dryRun, force);
+  addScriptsToPackageJson(cwd, dryRun, force);
 
   if (installSkills) {
     installSkillsFromHalide(cwd);
