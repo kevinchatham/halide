@@ -8,6 +8,7 @@ import type { ClaimExtractor } from '../types/security';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
 import { createAuthMiddleware } from './registry.auth';
 import { createProxyBodyParser } from './registry.body';
+import { createContextMiddleware } from './registry.context';
 import { emitOnRequest, emitOnResponse } from './registry.observability';
 import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
@@ -27,7 +28,8 @@ export function registerProxyRoute<TClaims = unknown, TLogScope = unknown>(
 
     middlewares.push(
       createProxyBodyParser(route),
-      createAuthMiddleware(route, claimExtractor, logger, logScopeFactory),
+      createAuthMiddleware(route, claimExtractor, logger),
+      createContextMiddleware(logger, logScopeFactory),
       createProxyHandler(route, agentCache, observability, logger),
     );
 

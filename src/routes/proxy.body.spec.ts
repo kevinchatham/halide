@@ -1,4 +1,4 @@
-import { collectProxyBody } from './proxy-body';
+import { collectProxyBody } from './proxy.body';
 
 describe('collectProxyBody', () => {
   it('returns original response when body is null', async () => {

@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { buildRequestContextFromHono } from '../services/proxy';
 import type { AuthorizeFn } from '../types/api';
 import type { HalideContext, RequestContext } from '../types/app';
 import { createAuthErrorResponse } from './registry.claims';
@@ -14,19 +15,18 @@ import { createAuthErrorResponse } from './registry.claims';
  * @param c - The Hono context.
  * @param route - The route with an optional authorize function.
  * @param app - The bundled app context.
- * @param _body - The parsed request body for authorization checks.
- * @param ctx - Pre-built request context to avoid recreation.
+ * @param body - The parsed request body for authorization checks.
  * @returns A 403 response if authorization is denied, or null to continue processing.
  */
 export async function checkAuthorization<TClaims = unknown, TLogScope = unknown>(
   c: Context,
   route: { authorize?: AuthorizeFn<TClaims, TLogScope> },
   app: HalideContext<TClaims, TLogScope>,
-  _body: unknown,
-  ctx: RequestContext,
+  body: unknown,
 ): Promise<Response | null> {
   if (!route.authorize) return null;
   try {
+    const ctx = buildRequestContextFromHono(c, body) as RequestContext;
     const allowed = await route.authorize(ctx, app);
     if (!allowed) {
       return createAuthErrorResponse(c, 403, 'Forbidden');

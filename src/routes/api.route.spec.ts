@@ -1,5 +1,5 @@
 import { defaultAuthorize } from '../config/defaults';
-import { apiRoute } from './apiRoute';
+import { apiRoute } from './api.route';
 
 const handler = async (): Promise<{ ok: boolean }> => ({ ok: true });
 

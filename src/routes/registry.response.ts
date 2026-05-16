@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { ObservabilityConfig } from '../types/app';
-import { collectProxyBody } from './proxy-body';
+import { collectProxyBody } from './proxy.body';
 
 /**
  * Result of response body collection with streaming.

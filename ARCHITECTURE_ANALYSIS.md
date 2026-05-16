@@ -90,7 +90,7 @@
 
 <!-- **CLI couples to project structure assumptions.** `src/cli/commands/init.ts` assumes the project has `tsconfig.json` and `tsconfig.app.json` files. The `excludeServerFromApp` function (`src/cli/commands/init.template.ts:83-102`) creates `tsconfig.app.json` with `exclude: ['server.ts']` if it doesn't exist, which may conflict with frameworks that use different exclude patterns. -->
 
-**`registry.auth.ts` mixes auth and observability.** The file contains `emitOnRequest` and `emitOnResponse` functions (observability concerns) alongside `extractClaims` and `checkAuthorization` (auth concerns). This coupling means auth changes require understanding observability hooks and vice versa.
+<!-- **`registry.auth.ts` mixes auth and observability.** The file contains `emitOnRequest` and `emitOnResponse` functions (observability concerns) alongside `extractClaims` and `checkAuthorization` (auth concerns). This coupling means auth changes require understanding observability hooks and vice versa. -->
 
 **Constants are scattered across multiple files.** `src/config/constants.ts` defines `JWKS_CACHE_TTL_MS`, `MAX_JWK_CACHE`, `MAX_AGENT_CACHE`, etc. But `src/middleware/rateLimit.ts:5` redefines `DEFAULT_MAX_ENTRIES = 10_000` which duplicates `src/config/constants.ts:17`. Constants should be centralized.
 

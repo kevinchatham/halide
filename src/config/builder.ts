@@ -1,5 +1,5 @@
-import { apiRoute } from '../routes/apiRoute';
-import { proxyRoute } from '../routes/proxyRoute';
+import { apiRoute } from '../routes/api.route';
+import { proxyRoute } from '../routes/proxy.route';
 import type { ApiRoute, ApiRouteInput, ProxyRoute, ProxyRouteInput } from '../types/api';
 import type { ServerConfig } from '../types/server-config';
 import type { CreateAppResult, Server } from './runtime';

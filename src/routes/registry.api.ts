@@ -13,6 +13,7 @@ import type { ClaimExtractor } from '../types/security';
 import { registerRouteOnApp as registerRouteOnAppFn } from './registry';
 import { createAuthMiddleware } from './registry.auth';
 import { createApiBodyParser } from './registry.body';
+import { createContextMiddleware } from './registry.context';
 import { emitOnRequest, emitOnResponse } from './registry.observability';
 import { buildDescribeRouteOptions } from './registry.openapi';
 import { observeAndPipeResponse } from './registry.response';
@@ -36,7 +37,8 @@ export function registerApiRoute<TClaims = unknown, TLogScope = unknown>(
   middlewares.push(
     describeRoute(buildDescribeRouteOptions(route)),
     createApiBodyParser(route),
-    createAuthMiddleware(route, claimExtractor, logger, logScopeFactory),
+    createAuthMiddleware(route, claimExtractor, logger),
+    createContextMiddleware(logger, logScopeFactory),
     createApiHandler(route, observability, logger),
   );
 
