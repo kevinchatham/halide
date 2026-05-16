@@ -2,9 +2,7 @@ import { MILLIS_PER_SECOND } from '../config/constants';
 import { asInternalLogger } from '../config/defaults';
 import type { Logger } from '../types/app';
 
-/**
- * Internal cache entry for a resolved JWT secret with expiration timestamp.
- */
+/** Internal cache entry for a resolved JWT secret with expiration timestamp. */
 interface CachedSecret {
   /** Timestamp (`Date.now()`) when this cache entry expires. After this time the cache is invalidated. */
   expiresAt: number;

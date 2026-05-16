@@ -22,7 +22,7 @@ type JwkCacheEntry = {
   algorithms: string[];
 };
 
-/** Map of JWKS URI to cached middleware instance. */
+/** Map of JWKS URI to cached middleware instances, evicted on capacity. */
 const jwkCache = new Map<string, JwkCacheEntry>();
 
 /** Map of JWKS URI to in-flight fetch promises, preventing concurrent JWKS fetches. */

@@ -10,7 +10,7 @@ Verify JWTs using a shared secret or a remote key set. Auth is configured under 
 security: {
   auth: {
     strategy: 'bearer',
-    secret: () => process.env.JWT_SECRET,
+    secret: process.env.JWT_SECRET ?? 'dev-secret',
     audience: 'my-app',           // optional: validates the aud claim
     secretTtl: 60,                // optional: cache secret for N seconds (default: 60)
   },

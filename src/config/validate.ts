@@ -38,7 +38,6 @@ export type ValidationResult = {
 };
 
 /** Collect non-blocking warnings from config that are not handled by Zod. */
-/** Collect non-blocking warnings from config that are not handled by Zod. */
 function collectValidationWarnings(config: Record<string, unknown>): ValidationError[] {
   const warnings: ValidationError[] = [];
   const rateLimit = (config.security as Record<string, unknown> | undefined)?.rateLimit as

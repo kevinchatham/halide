@@ -50,6 +50,10 @@ const server = createServer<UserClaims, LogScope>({
 
   observability: {
     requestId: true,
+    logScopeFactory: (ctx, claims) => ({
+      requestId: (ctx.headers as Record<string, string | undefined>)?.['x-request-id'] ?? 'no-id',
+      service: 'bff',
+    }),
     onRequest: (ctx, app) => {
       app.logger.info(
         { requestId: 'request-id', service: 'bff' },

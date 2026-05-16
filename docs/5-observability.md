@@ -7,25 +7,28 @@ A styled default logger is used when none is provided (colored in TTY, plain tex
 ```ts
 type MyLogScope = { requestId: string; service: string };
 
-observability: {
-  requestId: true, // generates/forwards x-request-id headers
-  logger: {
-    debug: (scope) => myLogger.debug(scope),
-    error: (scope) => myLogger.error(scope),
-    info: (scope) => myLogger.info(scope),
-    warn: (scope) => myLogger.warn(scope),
+const server = createServer<MyClaims, MyLogScope>({
+  observability: {
+    requestId: true, // generates/forwards x-request-id headers
+    logger: createDefaultLogger(),
+    logScopeFactory: (ctx, claims) => ({
+      requestId: ctx.headers?.['x-request-id'] ?? 'no-request-id',
+      service: 'bff',
+    }),
+    onRequest: (ctx, app) => {
+      app.logger.info(
+        { requestId: ctx.headers?.['x-request-id'] ?? 'no-request-id', service: 'bff' },
+        `${ctx.method} ${ctx.path}`,
+      );
+    },
+    onResponse: (ctx, app, response) => {
+      app.logger.info(
+        { requestId: 'request-id', service: 'bff' },
+        `${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`,
+      );
+    },
   },
-  logScopeFactory: (ctx, claims) => ({
-    requestId: ctx.path,
-    userId: claims?.sub ?? undefined,
-  }),
-  onRequest: (ctx, app) => {
-    app.logger.info(ctx, `${ctx.method} ${ctx.path}`);
-  },
-  onResponse: (ctx, app, response) => {
-    app.logger.info(ctx, `${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`);
-  },
-}
+});
 ```
 
 Per-route observability is controlled with the `observe` flag. Set `observe: false` on a route to skip hooks for that route.

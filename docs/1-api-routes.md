@@ -58,7 +58,7 @@ Handler return values are JSON-serialized. Returning a native `Response` bypasse
 
 ## Supported methods
 
-`'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`.
+`'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'`.
 
 ## Body handling
 
