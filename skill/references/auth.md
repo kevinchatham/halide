@@ -27,7 +27,7 @@ Algorithms are tried sequentially; the first algorithm that produces a valid pay
 
 ### JWKS (remote key set, RS256)
 
-Uses `hono/jwk` internally with cached middleware instances. Cache is evicted on TTL expiration (10-minute sweep interval). Background refresh happens at half-TTL.
+Uses `hono/jwk` internally. Fetches and caches public keys from the JWKS endpoint.
 
 ```typescript
 security: {

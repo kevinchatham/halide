@@ -55,7 +55,7 @@ type SecurityConfig = {
     maxRequests?: number; // default: 100
     windowMs?: number; // default: 900000 (15 minutes)
     trustedProxies?: string[]; // optional — trust x-forwarded-for from these IPs/CIDRs
-    maxEntries?: number; // optional — max store entries; oldest evicted
+    maxEntries?: number; // default: 10000 — max store entries; oldest evicted
     redisClient?: RedisClient; // optional — distributed rate limiting
   };
 };
@@ -73,15 +73,17 @@ type SecurityAuthConfig = {
 ## Key Types
 
 | Type                                | Description                                                                   |
-| ----------------------------------- | ----------------------------------------------------------------------------- | ----------------- |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
 | `ServerConfig<TApp>`                | Top-level configuration object                                                |
 | `HalideContext<TClaims, TLogScope>` | Bundled app context: `{ claims, logger }`                                     |
 | `Server`                            | Server instance with `ready`, `start(onReady)`, `stop()`                      |
 | `CreateAppResult`                   | Return of `createApp()` — `{ app, logger, proxyDispose, rateLimitDispose }`   |
 | `ApiRoute<TApp, TBody>`             | API route definition                                                          |
-| `ApiRouteHandler<TApp, TBody>`      | Handler signature: `(ctx, app) => Promise<TResponse                           | Response>`        |
+| `ApiRouteHandler<TApp, TBody>`      | Handler signature: `(ctx, app) => Promise<TResponse \| Response>`             |
+| `ApiRouteInput<TApp, TBody>`        | Input for `apiRoute()` factory — omits `type`, requires `handler`             |
 | `ProxyRoute<TApp>`                  | Proxy route definition                                                        |
-| `AuthorizeFn<TApp>`                 | `(ctx, app) => boolean                                                        | Promise<boolean>` |
+| `ProxyRouteInput<TApp>`             | Input for `proxyRoute()` factory — omits `type`                               |
+| `AuthorizeFn<TApp>`                 | `(ctx, app) => boolean \| Promise<boolean>`                                   |
 | `TransformFn`                       | `({ method, body, headers }) => { body, headers }`                            |
 | `RequestContext`                    | Normalized request context: `{ method, path, headers, params, query, body? }` |
 | `ResponseContext`                   | `{ statusCode, durationMs, error?, body?, bodyType? }`                        |
@@ -89,10 +91,13 @@ type SecurityAuthConfig = {
 | `SecurityAuthConfig`                | Auth strategy, secret/JWKS, audience, algorithms                              |
 | `CorsConfig`                        | Origin, methods, credentials, headers                                         |
 | `CspDirectives`                     | CSP directive map (camelCase keys)                                            |
+| `CspDirectiveValue`                 | `string \| ContentSecurityPolicyOptionHandler`                                |
 | `AppConfig`                         | Static file serving configuration                                             |
 | `ObservabilityConfig<TApp>`         | Logger, requestId, lifecycle hooks, logScopeFactory, maxCollect               |
 | `OpenApiConfig`                     | OpenAPI toggle, path, options                                                 |
 | `OpenApiRouteMeta`                  | Per-route OpenAPI metadata                                                    |
+| `OpenApiSource`                     | External OpenAPI spec source: `{ path: string }`                              |
+| `ResolvedOpenApiSpec`               | Resolved spec with associated proxy route                                     |
 | `Logger<TLogScope>`                 | `{ debug, error, info, warn }` interface                                      |
 | `ClaimExtractor<TClaims>`           | Function to extract claims from a Hono Context                                |
 

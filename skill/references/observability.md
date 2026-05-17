@@ -13,8 +13,8 @@ observability: {
     info: (scope, ...args) => myLogger.info(scope, ...args),
     warn: (scope, ...args) => myLogger.warn(scope, ...args),
   },
-  logScopeFactory: (ctx, app) => ({ requestId: ctx.path }),  // optional — per-request scope
-  maxCollect: 1024,             // optional — max bytes to collect from proxy responses
+  logScopeFactory: (ctx, claims) => ({ requestId: ctx.path }),  // optional — per-request scope
+  maxCollect: 1024,             // optional — max bytes to collect from proxy responses (cap: 1MB)
   onRequest: (ctx, app) => { app.logger.info(ctx, `${ctx.method} ${ctx.path}`); },
   onResponse: (ctx, app, response) => { app.logger.info(ctx, `${ctx.method} ${ctx.path} ${response.statusCode}`); },
 }
@@ -43,12 +43,12 @@ interface Logger<TLogScope = unknown> {
 
 ## Log Scope Factory
 
-The `logScopeFactory` produces a typed scope object for each request. The scope is automatically baked into every logger call via `createScopedLogger`, eliminating the need to manually pass scope in every `logger.info(scope, ...)` call.
+The `logScopeFactory` produces a typed scope object for each request. It receives the normalized request context and JWT claims (if authenticated). The scope is automatically baked into every logger call via `createScopedLogger`, eliminating the need to manually pass scope in every `logger.info(scope, ...)` call.
 
 ```typescript
-logScopeFactory: (ctx, app) => ({
+logScopeFactory: (ctx, claims) => ({
   requestId: ctx.path,
-  userId: app.claims?.sub ?? undefined,
+  userId: claims?.sub ?? undefined,
 }),
 ```
 
@@ -83,6 +83,8 @@ When `observability.requestId` is `true`, every request gets an `x-request-id` h
 
 For proxy routes, response bodies are collected up to `maxCollect` bytes (default: 1024) for observability logging. The full response is always piped through unmodified. Binary body content is decoded as text and may be garbled for non-text responses.
 
+**Maximum cap:** `maxCollect` cannot exceed 1MB (1048576 bytes). Values above this limit are clamped.
+
 ## Types
 
 ```typescript
@@ -103,12 +105,16 @@ type ResponseContext = {
   bodyType?: 'text' | 'binary';
 };
 
-type ObservabilityConfig<TApp = HalideContext> = {
+type ObservabilityConfig<TClaims = unknown, TLogScope = unknown> = {
   requestId?: boolean;
-  logger?: AppLogger<TApp>;
-  logScopeFactory?: (ctx: RequestContext, app: TApp) => AppLogScope<TApp>;
-  maxCollect?: number; // default: 1024
-  onRequest?: (ctx: RequestContext, app: TApp) => void | Promise<void>;
-  onResponse?: (ctx: RequestContext, app: TApp, response: ResponseContext) => void | Promise<void>;
+  logger?: Logger<TLogScope>;
+  logScopeFactory?: (ctx: RequestContext, claims: TClaims | undefined) => TLogScope;
+  maxCollect?: number; // default: 1024, max: 1048576 (1MB)
+  onRequest?: (ctx: RequestContext, app: HalideContext<TClaims, TLogScope>) => void | Promise<void>;
+  onResponse?: (
+    ctx: RequestContext,
+    app: HalideContext<TClaims, TLogScope>,
+    response: ResponseContext,
+  ) => void | Promise<void>;
 };
 ```

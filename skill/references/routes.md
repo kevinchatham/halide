@@ -13,6 +13,7 @@ apiRoute({
   method: 'get',                   // default: 'get'
   handler: async (ctx, app) => ({ status: 'ok' }),  // REQUIRED
   requestSchema: MyZodSchema,   // optional — Zod schema for body validation
+  responseSchema: MyResponseSchema, // optional — Zod schema for documenting response in OpenAPI
   authorize: (ctx, app) => true,  // auto-filled by factory
   observe: true,                   // optional — set false to skip observability hooks
   openapi: { ... },                // optional — OpenAPI metadata
@@ -88,6 +89,10 @@ proxyRoute({
 })
 ```
 
+### Supported Methods
+
+`'get'`, `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'` — all 7 HTTP methods are supported.
+
 ### Path Rewriting
 
 The `path` is the incoming route prefix. The `proxyPath` (defaults to `path` if omitted) is the prefix on the target. The incoming path prefix is replaced with `proxyPath`:
@@ -121,7 +126,7 @@ Result:   http://products.internal/backend/users/123
 
 ### Identity Headers
 
-The `identity` function receives `(ctx, app)` and returns a `Record<string, string>` of headers to inject into the proxied request. Only called when `app.claims` is defined (i.e., private routes with successful auth). Read-only headers (`host`, `connection`, `content-length`, `transfer-encoding`) and multi-value headers (`set-cookie`) cannot be overridden.
+The `identity` function receives `(ctx, app)` and returns a `Record<string, string> | undefined` of headers to inject into the proxied request. Returning `undefined` skips header injection. Only called when `app.claims` is defined (i.e., private routes with successful auth). Read-only headers (`host`, `connection`, `content-length`, `transfer-encoding`) and multi-value headers (`set-cookie`) cannot be overridden.
 
 ```typescript
 identity: (ctx, app) => ({
@@ -132,7 +137,7 @@ identity: (ctx, app) => ({
 
 ### Transform
 
-The `transform` function receives `{ method, body, headers }` and returns `{ body, headers }` to modify the request before proxying. `method` is the lowercase HTTP method. The body is JSON-stringified. Headers are normalized to lowercase keys. Read-only headers cannot be modified by transform.
+The `transform` function receives `{ method, body, headers }` and returns `{ body, headers }` to modify the request before proxying. `method` is the lowercase HTTP method (all 7 methods: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`). The body is JSON-stringified. Headers are normalized to lowercase keys. Read-only headers cannot be modified by transform.
 
 ```typescript
 transform: ({ method, body, headers }) => ({

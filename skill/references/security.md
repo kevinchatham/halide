@@ -30,7 +30,9 @@ security: {
 
 **Gotcha:** Wildcard origin (`'*'`) cannot be combined with `credentials: true` — the validator will throw.
 
-When `credentials` is true, CSRF protection is also enabled with the CORS origins.
+## CSRF Protection
+
+When `credentials: true` is set in CORS config, CSRF protection is **automatically enabled** using `hono/csrf`. The CSRF middleware uses the configured CORS origins as allowed origins. No additional configuration is needed — it is applied transparently alongside CORS.
 
 ## CSP
 
@@ -122,7 +124,7 @@ security: {
     maxRequests: 100,       // default: 100
     windowMs: 900000,       // default: 900000 (15 minutes)
     trustedProxies: ['10.0.0.0/8'],  // optional — trust x-forwarded-for from these IPs/CIDRs
-    maxEntries: 1000,       // optional — max store entries; oldest evicted when exceeded
+    maxEntries: 10000,      // default: 10000 — max store entries; oldest evicted when exceeded
     redisClient?: RedisClient,  // optional — distributed rate limiting
   },
 }
@@ -135,5 +137,5 @@ Client IP is extracted from `x-forwarded-for` (first value) when socket IP match
 | `maxRequests`    | `100`       | Maximum requests per window                            |
 | `windowMs`       | `900000`    | Window duration in ms (15 minutes)                     |
 | `trustedProxies` | `[]`        | Trusted proxy IPs/CIDRs for x-forwarded-for validation |
-| `maxEntries`     | `undefined` | Max store entries; oldest evicted when exceeded        |
+| `maxEntries`     | `10000`     | Max store entries; oldest evicted when exceeded        |
 | `redisClient`    | `undefined` | Redis client for distributed rate limiting             |

@@ -18,36 +18,37 @@ A lightweight backend framework for Node.js built on Hono. Provides API routes, 
 | Security (CORS/CSP) | `docs/4-security.md`      | `skill/references/security.md`      |
 | Observability       | `docs/5-observability.md` | `skill/references/observability.md` |
 | OpenAPI/Scalar UI   | `docs/6-openapi.md`       | `skill/references/openapi.md`       |
+| Testing Utilities   | —                         | `skill/references/testing.md`       |
+| Runtime Lifecycle   | —                         | `skill/references/runtime.md`       |
 | CLI                 | `docs/9-cli.md`           | —                                   |
 
 ## Complete Type Reference
 
 ```ts
-import {
-  createApp,
-  createServer,
-  createDefaultLogger,
-  createNoopLogger,
-  createScopedLogger,
-  defineHalide,
-} from 'halide';
+import { defineHalide, createDefaultLogger, createNoopLogger, createScopedLogger } from 'halide';
 import type {
   ServerConfig,
   HalideContext,
   AppConfig,
   SecurityConfig,
+  SecurityAuthConfig,
   CorsConfig,
   CspDirectives,
+  CspDirectiveValue,
   OpenApiConfig,
   OpenApiOptions,
   OpenApiRouteMeta,
+  OpenApiSource,
+  ResolvedOpenApiSpec,
   ObservabilityConfig,
   Logger,
   RequestContext,
   ResponseContext,
   ApiRoute,
   ApiRouteHandler,
+  ApiRouteInput,
   ProxyRoute,
+  ProxyRouteInput,
   AuthorizeFn,
   TransformFn,
   ClaimExtractor,
@@ -56,16 +57,22 @@ import type {
 } from 'halide';
 ```
 
+Note: `createApp` and `createServer` are NOT direct exports — they come from the `defineHalide()` builder pattern.
+
 ## Minimal Example
 
 ```ts
-import { createServer, defineHalide } from 'halide';
+import { defineHalide } from 'halide';
 
-const { apiRoute } = defineHalide();
+const { apiRoute, createServer } = defineHalide();
 
 const server = createServer({
   apiRoutes: [
-    apiRoute({ access: 'public', path: '/health', handler: async () => ({ status: 'ok' }) }),
+    apiRoute({
+      access: 'public',
+      path: '/health',
+      handler: async () => ({ status: 'ok' }),
+    }),
   ],
 });
 server.start();
@@ -75,10 +82,13 @@ server.start();
 
 - **CSP uses camelCase** — `defaultSrc`, not `default-src`. Validator throws on kebab-case.
 - **Wildcard CORS origin + `credentials: true`** is forbidden — validator throws.
+- **CSRF auto-enabled** — when `credentials: true`, CSRF protection is automatically added using `hono/csrf` with CORS origins.
 - **Private routes require `security.auth`** — validator throws at startup if missing.
 - **`ServerConfig` uses separate arrays** — `apiRoutes` and `proxyRoutes`, not a single `routes`.
 - **`apiPrefix` defaults to `/api`** — paths under that prefix get 404 instead of app fallback. Set `apiPrefix: ''` to disable.
 - **Proxy `timeout` defaults to 10000ms** (10s). Rate limit defaults: 100 requests per 900000ms (15 min).
+- **Rate limit `maxEntries` defaults to 10000** — max store entries; oldest evicted when exceeded.
+- **`defineHalide()` is the entry point** — `createApp` and `createServer` are returned by the builder, not direct imports.
 
 ## Fallback References
 
