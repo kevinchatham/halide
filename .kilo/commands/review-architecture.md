@@ -1,7 +1,6 @@
 ---
 description: Analyze the Halide architecture and produce a critical implementation review
-agent: plan
-output: markdown
+agent: ask
 ---
 
 # Purpose

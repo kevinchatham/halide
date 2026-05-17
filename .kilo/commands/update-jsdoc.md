@@ -2,7 +2,7 @@
 
 description: Scan source files and add/update JSDoc comments on public APIs and internal symbols
 agent: plan
------------
+---
 
 # Purpose
 

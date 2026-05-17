@@ -1,6 +1,6 @@
 ---
 description: Audit and update docs/ to match the current source code
-agent: plan
+agent: code
 ---
 
 # Overview
