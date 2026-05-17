@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { applyEdits, modify, parse } from 'jsonc-parser';
 import stripJsonComments from 'strip-json-comments';
+import { cliInfo, cliSuccess, cliWarn } from '../utils/logger.js';
 
 /**
  * Generate the server.ts starter file content for a new Halide project.
@@ -155,16 +156,16 @@ export function writeTsconfigServer(
 ): void {
   const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
   if (!force && fs.existsSync(tsconfigServerPath)) {
-    log('✓ tsconfig.server.json already exists — skipping');
+    cliSuccess('tsconfig.server.json already exists — skipping');
     return;
   }
   if (dryRun) {
-    log('\u2139 [dry-run] Would create tsconfig.server.json');
+    cliInfo('[dry-run] Would create tsconfig.server.json');
     return;
   }
   const config = fullProject ? TSCONFIG_SERVER_FULL : TSCONFIG_SERVER;
   fs.writeFileSync(tsconfigServerPath, config, 'utf8');
-  log('✓ Created tsconfig.server.json');
+  cliSuccess('Created tsconfig.server.json');
 }
 
 /**
@@ -193,7 +194,7 @@ export function addServerReference(cwd: string, dryRun = false, force = false): 
   if (alreadyReferenced && !force) return;
 
   if (dryRun) {
-    log('\u2139 [dry-run] Would add tsconfig.server.json reference to tsconfig.json');
+    cliInfo('[dry-run] Would add tsconfig.server.json reference to tsconfig.json');
     return;
   }
 
@@ -215,7 +216,7 @@ export function addServerReference(cwd: string, dryRun = false, force = false): 
     );
   }
   fs.writeFileSync(tsconfigPath, applyEdits(raw, edits), 'utf8');
-  log('✓ Added tsconfig.server.json reference to tsconfig.json');
+  cliSuccess('Added tsconfig.server.json reference to tsconfig.json');
 }
 
 /** Resolved app tsconfig info with raw content to avoid double reads. */
@@ -277,7 +278,7 @@ export function addToTsconfigExclude(
 ): void {
   const resolved = resolveAppTsconfig(cwd);
   if (resolved === null) {
-    log(`\u26a0 No app tsconfig found in ${cwd} — skipping exclusion`);
+    cliWarn(`No app tsconfig found in ${cwd} — skipping exclusion`);
     return;
   }
 
@@ -290,12 +291,12 @@ export function addToTsconfigExclude(
   const exclude = Array.isArray(parsed.exclude) ? (parsed.exclude as string[]) : [];
 
   if (exclude.includes(filePath) && !force) {
-    log(`✓ ${filePath} already excluded — skipping`);
+    cliSuccess(`${filePath} already excluded — skipping`);
     return;
   }
 
   if (dryRun) {
-    log(`\u2139 [dry-run] Would add ${filePath} to ${tsconfigName} exclude list`);
+    cliInfo(`[dry-run] Would add ${filePath} to ${tsconfigName} exclude list`);
     return;
   }
 
@@ -314,7 +315,7 @@ export function addToTsconfigExclude(
     });
   }
   fs.writeFileSync(appPath, applyEdits(raw, edits), 'utf8');
-  log(`✓ Added ${filePath} to ${tsconfigName} exclude list`);
+  cliSuccess(`Added ${filePath} to ${tsconfigName} exclude list`);
 }
 
 /**
@@ -327,9 +328,4 @@ export function excludeServerFromApp(
   cachedContent?: string,
 ): void {
   addToTsconfigExclude(cwd, dryRun, force, 'server.ts', cachedContent);
-}
-
-/** Output a message to stdout with a trailing newline for CLI progress reporting. */
-function log(message: string): void {
-  process.stdout.write(`${message}\n`);
 }

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "compaction": {
+    "auto": true,
+    "preserve_recent_tokens": 8192,
+    "prune": true,
+    "reserved": 16384,
+    "tail_turns": 2
+  },
+  "provider": {
+    "local": {
+      "models": {
+        "unsloth-qwen-3.6-27b-q3": {
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          }
+        },
+        "unsloth-qwen-3.6-35b-a3b-q3": {
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,60 +1,49 @@
-import process from 'node:process';
-import { parseArgs } from 'node:util';
-import { init } from './commands/init';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Command } from 'commander';
+import { init } from './commands/init.js';
 
-type Args = {
-  positionals: string[];
-  values: {
-    'skills-only'?: boolean;
-    'dry-run'?: boolean;
-    force?: boolean;
-    'project-dir'?: string;
-    'project-type'?: string;
-  };
-};
+const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
+const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 
-const { positionals, values }: Args = parseArgs({
-  allowPositionals: true,
-  options: {
-    'dry-run': {
-      default: false,
-      type: 'boolean',
-    },
-    force: {
-      default: false,
-      type: 'boolean',
-    },
-    'project-dir': {
-      type: 'string',
-    },
-    'project-type': {
-      type: 'string',
-    },
-    'skills-only': {
-      default: false,
-      type: 'boolean',
-    },
-  },
-});
+const program = new Command();
 
-const command: string | undefined = positionals[0];
+program
+  .name('halide')
+  .description('Initialize and manage Halide BFF projects')
+  .version(pkg.version);
 
-if (command === 'init') {
-  const projectTypeRaw = values['project-type'];
-  if (projectTypeRaw !== undefined && !['full', 'single'].includes(projectTypeRaw)) {
-    process.stderr.write(
-      `Error: Invalid project type "${projectTypeRaw}". Must be "full" or "single".\n`,
-    );
-    process.exit(1);
-  }
-  await init({
-    dryRun: values['dry-run'],
-    force: values.force,
-    projectDir: values['project-dir'],
-    projectType: projectTypeRaw as 'full' | 'single' | undefined,
-    skillsOnly: values['skills-only'],
+program
+  .command('init')
+  .description('Scaffold a new Halide project')
+  .option('--dry-run', 'Preview changes without writing files')
+  .option('--force', 'Overwrite existing files')
+  .option('--project-dir <path>', 'Target directory (skip prompt)')
+  .option('--project-type <type>', 'Project type: full (multi-file) or single', (val) => {
+    if (!['full', 'single'].includes(val)) {
+      throw new Error('Must be "full" or "single"');
+    }
+    return val;
+  })
+  .option('--skills-only', 'Only install AI skills')
+  .option('-y, --yes', 'Accept all defaults (non-interactive)')
+  .action(async (options) => {
+    try {
+      const exitCode = await init({
+        dryRun: options.dryRun,
+        force: options.force,
+        projectDir: options.projectDir,
+        projectType: options.projectType,
+        skillsOnly: options.skillsOnly,
+        yes: options.yes,
+      });
+      process.exit(exitCode);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`\nFatal error: ${message}\n`);
+      process.exit(1);
+    }
   });
-} else {
-  process.stderr.write(`Usage: halide init\n`);
-  process.exit(1);
-}
+
+await program.parseAsync(process.argv);

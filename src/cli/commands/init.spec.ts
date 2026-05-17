@@ -93,14 +93,12 @@ describe('init', () => {
     vi.clearAllMocks();
   });
 
-  it('exits if no package.json found', async () => {
+  it('returns 1 if no package.json found', async () => {
     mockExistsSync.mockReturnValue(false);
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
-    await init();
+    const result = await init();
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    exitSpy.mockRestore();
+    expect(result).toBe(1);
   });
 
   it('installs halide with detected package manager', async () => {
@@ -227,14 +225,12 @@ describe('init', () => {
     expect(mockCpSync).toHaveBeenCalled();
   });
 
-  it('exits early in skillsOnly mode if no package.json', async () => {
+  it('returns 1 in skillsOnly mode if no package.json', async () => {
     mockExistsSync.mockReturnValue(false);
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
-    await init({ skillsOnly: true });
+    const result = await init({ skillsOnly: true });
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    exitSpy.mockRestore();
+    expect(result).toBe(1);
   });
 
   it('skips interactive prompts when dryRun is true', async () => {
@@ -312,5 +308,65 @@ describe('init', () => {
     expect(serverWriteCall).toBeDefined();
     expect(String(serverWriteCall![1])).toContain("name: 'my-full-app'");
     expect(String(serverWriteCall![1])).toContain('port: 8080');
+  });
+
+  it('skips all prompts when yes is true', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+
+    await init({ yes: true });
+
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+  });
+
+  it('uses default values when yes is true', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+    mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([{ isDirectory: () => false, name: 'SKILL.md' }]);
+
+    await init({ yes: true });
+
+    const serverWriteCall = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('server.ts'),
+    );
+    expect(serverWriteCall).toBeDefined();
+    expect(String(serverWriteCall![1])).toContain("name: 'halide-app'");
+    expect(String(serverWriteCall![1])).toContain('port: 3553');
+  });
+
+  it('returns 0 on success', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+    mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([{ isDirectory: () => false, name: 'SKILL.md' }]);
+
+    const result = await init({ yes: true });
+
+    expect(result).toBe(0);
+  });
+
+  it('skips prompts when yes is true in dryRun mode', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+
+    await init({ dryRun: true, yes: true });
+
+    expect(mockInput).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
   });
 });

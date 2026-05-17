@@ -5,6 +5,7 @@ import path from 'node:path';
 import { confirm, input, select } from '@inquirer/prompts';
 import { applyEdits, parse as jsoncParse, modify } from 'jsonc-parser';
 import ora from 'ora';
+import { cliInfo, cliLog, cliSuccess, cliWarn } from '../utils/logger.js';
 import {
   addServerReference,
   addToTsconfigExclude,
@@ -61,7 +62,7 @@ export function addScriptsToPackageJson(
   const formattedOptions = { insertSpaces: true, tabSize: 2 };
 
   if (dryRun) {
-    log('\u2139 [dry-run] Would add halide:start and halide:build scripts to package.json');
+    cliInfo('[dry-run] Would add halide:start and halide:build scripts to package.json');
     return;
   }
 
@@ -89,7 +90,7 @@ export function addScriptsToPackageJson(
   writeScript('halide:build', newBuild);
 
   fs.writeFileSync(pkgPath, result, 'utf8');
-  log('✓ Added halide:start and halide:build scripts to package.json');
+  cliSuccess('Added halide:start and halide:build scripts to package.json');
 }
 
 /** Supported package managers for dependency installation. */
@@ -155,17 +156,12 @@ export function installSkillsFromHalide(cwd: string): boolean {
         recursive: entry.isDirectory(),
       });
     }
-    log('✓ Installed halide skills to .agents/skills/halide/');
+    cliSuccess('Installed halide skills to .agents/skills/halide/');
     return true;
   } catch {
-    log(`⚠ Warning: Could not install skills`);
+    cliWarn('Could not install skills');
     return false;
   }
-}
-
-/** Output a message to stdout with a trailing newline for CLI progress reporting. */
-function log(message: string): void {
-  process.stdout.write(`${message}\n`);
 }
 
 /**
@@ -182,6 +178,7 @@ function log(message: string): void {
  *   Set `dryRun` to preview changes without writing files.
  *   Set `force` to overwrite existing files.
  *   Set `projectDir` to specify the target directory (non-interactive use).
+ *   Set `yes` to accept all defaults without prompts.
  */
 export async function init(options?: {
   skillsOnly?: boolean;
@@ -189,13 +186,15 @@ export async function init(options?: {
   force?: boolean;
   projectDir?: string;
   projectType?: 'full' | 'single';
-}): Promise<undefined> {
+  yes?: boolean;
+}): Promise<0 | 1> {
   const {
     skillsOnly = false,
     dryRun = false,
     force = false,
     projectDir,
     projectType,
+    yes = false,
   } = options ?? {};
   const cwd = projectDir ?? process.cwd();
 
@@ -203,7 +202,7 @@ export async function init(options?: {
 
   if (projectDir) {
     resolvedDir = path.resolve(projectDir);
-  } else if (dryRun) {
+  } else if (dryRun || yes) {
     resolvedDir = cwd;
   } else {
     const projectPath = await input({
@@ -215,33 +214,31 @@ export async function init(options?: {
 
   const pkgPath = path.join(resolvedDir, 'package.json');
   if (!fs.existsSync(pkgPath)) {
-    process.stderr.write(
-      'Error: No package.json found in project directory. Run this in a Node.js project.\n',
-    );
-    process.exit(1);
+    cliWarn('No package.json found in project directory. Run this in a Node.js project.');
+    return 1;
   }
 
   if (skillsOnly) {
     installSkillsFromHalide(resolvedDir);
-    return;
+    return 0;
   }
 
   const effectiveProjectType = projectType ?? 'full';
 
   if (dryRun) {
-    log('\u2139 [dry-run] Skipping interactive prompts');
-    log(`\u2139 [dry-run] Project directory: ${resolvedDir}`);
-    log(`\u2139 [dry-run] Project type: ${effectiveProjectType}`);
-    log('\u2139 [dry-run] Would install halide');
+    cliInfo('[dry-run] Skipping interactive prompts');
+    cliInfo(`Project directory: ${resolvedDir}`);
+    cliInfo(`Project type: ${effectiveProjectType}`);
+    cliInfo('Would install halide');
 
     if (effectiveProjectType === 'full') {
       const files = generateFullProject('my-app', 3553);
-      log('\u2139 [dry-run] Would create:');
+      cliInfo('Would create:');
       for (const filePath of Object.keys(files)) {
-        log(`  - ${filePath}`);
+        cliInfo(`  - ${filePath}`);
       }
     } else {
-      log('\u2139 [dry-run] Would create: server.ts');
+      cliInfo('Would create: server.ts');
     }
 
     writeTsconfigServer(resolvedDir, true, force, effectiveProjectType === 'full');
@@ -253,51 +250,59 @@ export async function init(options?: {
       effectiveProjectType === 'full' ? 'src/server.ts' : 'server.ts',
     );
     addScriptsToPackageJson(resolvedDir, true, force, effectiveProjectType === 'full');
-    log('\nDone! (dry-run)');
-    return;
+    cliLog('\nDone! (dry-run)');
+    return 0;
   }
 
   if (!fs.existsSync(resolvedDir)) {
     fs.mkdirSync(resolvedDir, { recursive: true });
   }
 
-  const appName = await input({
-    default: 'halide-app',
-    message: 'App name?',
-    validate: (value: string) => {
-      if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
-      return 'App name must contain only letters, numbers, dashes, and underscores';
-    },
-  });
+  const appName = yes
+    ? 'halide-app'
+    : await input({
+        default: 'halide-app',
+        message: 'App name?',
+        validate: (value: string) => {
+          if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
+          return 'App name must contain only letters, numbers, dashes, and underscores';
+        },
+      });
 
-  const port = Number(
-    await input({
-      default: '3553',
-      message: 'Port?',
-      validate: (value: string) => {
-        const portNum = Number.parseInt(value, 10);
-        if (Number.isNaN(portNum) || portNum < 1 || portNum > 65535) {
-          return 'Please enter a valid port number (1-65535)';
-        }
-        return true;
-      },
-    }),
-  );
+  const port = yes
+    ? 3553
+    : Number(
+        await input({
+          default: '3553',
+          message: 'Port?',
+          validate: (value: string) => {
+            const portNum = Number.parseInt(value, 10);
+            if (Number.isNaN(portNum) || portNum < 1 || portNum > 65535) {
+              return 'Please enter a valid port number (1-65535)';
+            }
+            return true;
+          },
+        }),
+      );
 
   const selectedProjectType =
     projectType ??
-    (await select({
-      choices: [
-        { name: 'Full project', value: 'full' },
-        { name: 'Single file', value: 'single' },
-      ],
-      message: 'Project type?',
-    }));
+    (yes
+      ? 'full'
+      : await select({
+          choices: [
+            { name: 'Full project', value: 'full' },
+            { name: 'Single file', value: 'single' },
+          ],
+          message: 'Project type?',
+        }));
 
-  const installSkills = await confirm({
-    default: true,
-    message: 'Install AI coding skills for halide?',
-  });
+  const installSkills = yes
+    ? true
+    : await confirm({
+        default: true,
+        message: 'Install AI coding skills for halide?',
+      });
 
   const pkgManager = detectPackageManager(resolvedDir);
   const installCmd = getInstallCmd(pkgManager);
@@ -336,11 +341,11 @@ export async function init(options?: {
       }
     }
 
-    writeTsconfigServer(resolvedDir, dryRun, force, selectedProjectType === 'full');
-    addServerReference(resolvedDir, dryRun, force);
+    writeTsconfigServer(resolvedDir, false, force, selectedProjectType === 'full');
+    addServerReference(resolvedDir, false, force);
     const finalServerPath = selectedProjectType === 'full' ? 'src/server.ts' : 'server.ts';
-    addToTsconfigExclude(resolvedDir, dryRun, force, finalServerPath);
-    addScriptsToPackageJson(resolvedDir, dryRun, force, selectedProjectType === 'full');
+    addToTsconfigExclude(resolvedDir, false, force, finalServerPath);
+    addScriptsToPackageJson(resolvedDir, false, force, selectedProjectType === 'full');
 
     fileSpinner.succeed();
   } catch (err: unknown) {
@@ -351,13 +356,14 @@ export async function init(options?: {
   if (installSkills) {
     const skillsInstalled = installSkillsFromHalide(resolvedDir);
     if (!skillsInstalled) {
-      log('\u2139 To install skills manually, copy halide/skill/ to .agents/skills/halide/');
+      cliWarn('To install skills manually, copy halide/skill/ to .agents/skills/halide/');
     }
   } else {
-    log('✓ Skipping skills installation');
+    cliSuccess('Skipping skills installation');
   }
 
-  log('\nDone! Next steps:');
-  log('  1. Edit your routes in src/routes/ or server.ts');
-  log('  2. Run your server with: npm run halide:start');
+  cliLog('\nDone! Next steps:');
+  cliLog('  1. Edit your routes in src/routes/ or server.ts');
+  cliLog('  2. Run your server with: npm run halide:start');
+  return 0;
 }
