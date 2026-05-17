@@ -69,13 +69,13 @@ describe('parseJsonBody', () => {
         json: () => Promise.reject(new TypeError('network error')),
       },
     };
-    let error: BodyParseError;
+    let error: BodyParseError | undefined;
     try {
       await parseJsonBody(mockCtx as unknown as Parameters<typeof parseJsonBody>[0]);
     } catch (e) {
       error = e as BodyParseError;
     }
-    expect(error).toBeInstanceOf(BodyParseError);
+    expect(error!).toBeInstanceOf(BodyParseError);
     expect(error!.code).toBe('PARSE_ERROR');
   });
 });
