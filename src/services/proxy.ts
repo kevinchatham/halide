@@ -36,6 +36,7 @@ export class AgentCache {
   private readonly cache = new Map<string, http.Agent>();
   private readonly probeResults = new Map<string, boolean>();
 
+  /** Retrieve or create a cached HTTP agent for the given target URL. */
   getAgent(target: string): http.Agent {
     const key = `${target}`;
     let agent = this.cache.get(key);
@@ -141,6 +142,7 @@ export class AgentCache {
     return this.probeResults.get(AgentCache.probeKeyFor(target));
   }
 
+  /** Destroy all cached agents and clear probe results. */
   dispose(): void {
     for (const [, agent] of this.cache) {
       agent.destroy();

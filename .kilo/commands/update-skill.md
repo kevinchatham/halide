@@ -1,6 +1,6 @@
 ---
 description: Audit and update the Halide skill index and reference files from the current source code
-agent: code
+agent: plan
 ---
 
 # Purpose

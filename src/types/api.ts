@@ -92,7 +92,7 @@ export type ProxyRoute<TClaims = unknown, TLogScope = unknown> = {
   proxyPath?: string;
   /** Upstream target URL to forward requests to. Required. */
   target: string;
-  /** Timeout in milliseconds for upstream requests. Defaults to 60000. */
+  /** Timeout in milliseconds for upstream requests. Defaults to 10000 (10 seconds). */
   timeout?: number;
   /** Route type discriminator. Set automatically by {@link proxyRoute}. */
   type: 'proxy';
