@@ -5,7 +5,11 @@ Attach logging, request IDs, and lifecycle hooks for visibility into every reque
 A styled default logger is used when none is provided (colored in TTY, plain text otherwise). Use `createNoopLogger()` for silent output.
 
 ```ts
+import { createDefaultLogger, defineHalide } from 'halide';
+
 type MyLogScope = { requestId: string; service: string };
+
+const { createServer } = defineHalide<MyClaims, MyLogScope>();
 
 const server = createServer<MyClaims, MyLogScope>({
   observability: {

@@ -432,7 +432,7 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
           if (activeRequests.size === 0) {
             resolve();
           } else {
-            setTimeout(checkDrain, 100);
+            setTimeout(checkDrain, 1000);
           }
         };
         checkDrain();

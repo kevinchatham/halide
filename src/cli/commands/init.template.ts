@@ -12,11 +12,13 @@ import stripJsonComments from 'strip-json-comments';
  * @returns The server.ts file content as a string.
  */
 export function generateServerTs(appName: string, port: number): string {
-  return `import { createServer, apiRoute } from 'halide';
+  return `import { defineHalide } from 'halide';
+
+const { apiRoute, createServer } = defineHalide();
 
 const healthRoute = apiRoute({
   access: 'public',
-  handler: async () => ({ status: 'ok' }),
+  handler: async (_ctx, _app) => ({ status: 'ok' }),
   method: 'get',
   path: '/health',
 });

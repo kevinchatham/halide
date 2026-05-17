@@ -358,7 +358,7 @@ export const serverConfigSchema = z
  * Validate that private routes have auth configured.
  * @internal
  */
-function validatePrivateAuth(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodRawContext): void {
+function validatePrivateAuth(data: z.infer<typeof serverConfigSchema>, ctx: z.RefinementCtx): void {
   const allRoutes = [...(data.apiRoutes ?? []), ...(data.proxyRoutes ?? [])];
   const hasPrivateRoute = allRoutes.some((r) => r.access === 'private');
   if (hasPrivateRoute && !data.security?.auth) {
@@ -374,7 +374,7 @@ function validatePrivateAuth(data: z.infer<typeof serverConfigSchema>, ctx: z.Zo
  * Validate API routes have handlers.
  * @internal
  */
-function validateApiRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodRawContext): void {
+function validateApiRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.RefinementCtx): void {
   for (const [routeIdx, route] of (data.apiRoutes ?? []).entries()) {
     if (!route.handler) {
       ctx.addIssue({
@@ -390,7 +390,7 @@ function validateApiRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodR
  * Validate proxy routes have valid targets and methods.
  * @internal
  */
-function validateProxyRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodRawContext): void {
+function validateProxyRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.RefinementCtx): void {
   for (const [routeIdx, route] of (data.proxyRoutes ?? []).entries()) {
     if (route.type !== 'proxy') continue;
     validateProxyTarget(route, routeIdx, ctx);
@@ -403,9 +403,9 @@ function validateProxyRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.Zo
  * @internal
  */
 function validateProxyTarget(
-  route: z.infer<typeof routeSchema>,
+  route: z.infer<typeof proxyRouteSchema>,
   routeIdx: number,
-  ctx: z.ZodRawContext,
+  ctx: z.RefinementCtx,
 ): void {
   if (route.target == null || route.target === '') {
     ctx.addIssue({
@@ -438,9 +438,9 @@ function validateProxyTarget(
  * @internal
  */
 function validateProxyMethods(
-  route: z.infer<typeof routeSchema>,
+  route: z.infer<typeof proxyRouteSchema>,
   routeIdx: number,
-  ctx: z.ZodRawContext,
+  ctx: z.RefinementCtx,
 ): void {
   if (!route.methods || route.methods.length === 0) {
     ctx.addIssue({

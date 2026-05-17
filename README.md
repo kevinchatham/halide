@@ -78,7 +78,9 @@ export const userProxyRoute = proxyRoute({
 ```ts
 // server.ts
 import { healthRoute, userProxyRoute } from './routes';
-import { createServer } from 'halide';
+import { defineHalide } from 'halide';
+
+const { createServer } = defineHalide();
 
 const server = createServer({
   app: {

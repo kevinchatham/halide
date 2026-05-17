@@ -4,19 +4,11 @@
 
 ### `defineHalide<TClaims, TLogScope>(): HalideBuilder`
 
-Builder factory that pre-bakes `TClaims` and `TLogScope` so callers only specify body types per route. Returns an object with `apiRoute`, `proxyRoute`, `createApp`, and `createServer`.
+Builder factory that pre-bakes `TClaims` and `TLogScope` so callers only specify body types per route. Returns an object with `apiRoute`, `proxyRoute`, `createApp`, and `createServer`. Access `createApp` and `createServer` via the returned builder, not via direct import.
 
 ```ts
 const { apiRoute, createServer } = defineHalide<UserClaims, LogScope>();
 ```
-
-### `createServer<TClaims, TLogScope>(config): Server`
-
-Creates a fully-configured Halide server with lifecycle management. The server is synchronous to create. Call `server.start()` to listen. Graceful shutdown is handled automatically on SIGINT/SIGTERM.
-
-### `createApp<TClaims, TLogScope>(config): CreateAppResult`
-
-Creates a configured Hono application with all middleware, routes, and handlers. Does not start an HTTP server. Returns `{ app, logger, proxyDispose, rateLimitDispose }`. Useful for testing or custom server setups.
 
 ### `apiRoute<TClaims, TLogScope, TBody, TResponse>(input): ApiRoute`
 

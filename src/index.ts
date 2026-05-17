@@ -1,6 +1,6 @@
 export { defineHalide } from './config/builder';
 export { createDefaultLogger, createNoopLogger, createScopedLogger } from './config/defaults';
-export { type CreateAppResult, createApp, createServer, type Server } from './config/runtime';
+export type { CreateAppResult, Server } from './config/runtime';
 export type {
   ApiRoute,
   ApiRouteHandler,
