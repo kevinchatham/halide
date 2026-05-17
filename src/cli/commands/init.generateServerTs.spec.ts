@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateServerTs } from './init';
+import { generateServerTs } from './init.template';
 
 const mockExecSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());

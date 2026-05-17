@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateServerTs, init } from './init';
+import { init } from './init';
+import { generateServerTs } from './init.template';
 
 const mockExecSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
@@ -9,6 +10,7 @@ const mockReadFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockAppendFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockInput: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockConfirm: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
+const mockSelect: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockCpSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockMkdirSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockResolve: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
@@ -57,6 +59,7 @@ vi.mock('node:module', async (importOriginal) => {
 vi.mock('@inquirer/prompts', () => ({
   confirm: mockConfirm,
   input: mockInput,
+  select: mockSelect,
 }));
 
 const originalCwd: () => string = process.cwd;
@@ -76,9 +79,12 @@ describe('init', () => {
         return '{"compilerOptions":{"types":[]},"exclude":["src/**/*.spec.ts"]}';
       return '{"version":"0.0.0"}';
     });
-    mockInput.mockImplementation((opts) =>
-      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app'),
-    );
+    mockInput.mockImplementation((opts) => {
+      if (opts.message.includes('Project directory')) return projectDir;
+      if (opts.message.includes('port')) return '3553';
+      return 'my-app';
+    });
+    mockSelect.mockResolvedValue('single');
     mockConfirm.mockResolvedValue(true);
   });
 
@@ -118,9 +124,11 @@ describe('init', () => {
       if (p.endsWith('server.ts')) return false;
       return false;
     });
-    mockInput.mockImplementation((opts) =>
-      Promise.resolve(opts.message.includes('port') ? '3553' : 'my-custom-app'),
-    );
+    mockInput.mockImplementation((opts) => {
+      if (opts.message.includes('Project directory')) return projectDir;
+      if (/port/i.test(opts.message)) return '3553';
+      return 'my-custom-app';
+    });
 
     await init();
 
@@ -138,8 +146,8 @@ describe('init', () => {
     });
     let nameValidate: (value: string) => string | boolean = () => true;
     mockInput.mockImplementation((opts) => {
-      if (!opts.message.includes('port') && opts.validate) nameValidate = opts.validate;
-      return Promise.resolve(opts.message.includes('port') ? '3553' : 'my-app');
+      if (!/port/i.test(opts.message) && opts.validate) nameValidate = opts.validate;
+      return Promise.resolve(/port/i.test(opts.message) ? '3553' : 'my-app');
     });
 
     await init();
@@ -254,5 +262,55 @@ describe('init', () => {
     await init({ dryRun: true });
 
     expect(mockExecSync).not.toHaveBeenCalled();
+  });
+
+  it('creates full project structure when projectType is full', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+    mockSelect.mockResolvedValue('full');
+    mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([{ isDirectory: () => false, name: 'SKILL.md' }]);
+
+    await init();
+
+    const writtenFiles = mockWriteFileSync.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(writtenFiles).toContain(path.join(projectDir, 'src/halide/builder.ts'));
+    expect(writtenFiles).toContain(path.join(projectDir, 'src/halide/types.ts'));
+    expect(writtenFiles).toContain(path.join(projectDir, 'src/routes/health.ts'));
+    expect(writtenFiles).toContain(path.join(projectDir, 'src/routes/index.ts'));
+    expect(writtenFiles).toContain(path.join(projectDir, 'src/server.ts'));
+    expect(writtenFiles).toContain(path.join(projectDir, 'tsconfig.server.json'));
+    expect(mockExecSync).toHaveBeenCalledWith(
+      'npm install halide && npm install -D @types/node',
+      expect.anything(),
+    );
+  });
+
+  it('creates full project structure with user-provided app name and port', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json')) return true;
+      if (p.endsWith('server.ts')) return false;
+      return false;
+    });
+    mockSelect.mockResolvedValue('full');
+    mockResolve.mockReturnValue('/fake/project/node_modules/halide/index.js');
+    mockReaddirSync.mockReturnValue([{ isDirectory: () => false, name: 'SKILL.md' }]);
+    mockInput.mockImplementation((opts) => {
+      if (opts.message.includes('Project directory')) return projectDir;
+      if (/port/i.test(opts.message)) return '8080';
+      return 'my-full-app';
+    });
+
+    await init();
+
+    const serverWriteCall = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('src/server.ts'),
+    );
+    expect(serverWriteCall).toBeDefined();
+    expect(String(serverWriteCall![1])).toContain("name: 'my-full-app'");
+    expect(String(serverWriteCall![1])).toContain('port: 8080');
   });
 });
