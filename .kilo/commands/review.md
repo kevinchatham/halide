@@ -1,5 +1,5 @@
 ---
-description: Perform a comprehensive implementation focused code review.
+description: Perform a comprehensive code review of uncommitted and untracked changes in the working tree.
 agent: ask
 ---
 
