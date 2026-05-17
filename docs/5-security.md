@@ -40,6 +40,12 @@ Applied to all routes via `hono/cors`.
 
 Wildcard origin (`'*'`) cannot be combined with `credentials: true` — the validator will throw.
 
+CORS methods are upper-cased internally before being passed to `hono/cors`.
+
+## CSRF
+
+When `security.cors.credentials` is `true`, the `hono/csrf` middleware is automatically applied with the configured CORS origins. This prevents cross-site request forgery by validating the `Origin` and `Referer` headers against the allowed origins list. No explicit CSRF configuration is needed — it is enabled implicitly by enabling CORS credentials.
+
 ## CSP
 
 Applied via `hono/secure-headers`. Always active — defaults to a restrictive policy if not specified.
@@ -75,12 +81,12 @@ When OpenAPI is enabled, the Swagger UI routes use relaxed CSP directives to all
 
 Opt-in — not enabled unless `security.rateLimit` is configured. Uses a sliding window algorithm with in-memory storage and periodic cleanup.
 
-| Field            | Default  | Description                                                                     |
-| ---------------- | -------- | ------------------------------------------------------------------------------- |
-| `maxRequests`    | `100`    | Maximum requests per window (default: 100)                                      |
-| `windowMs`       | `900000` | Window duration in ms — 15 minutes (default: 900000)                            |
-| `trustedProxies` | (none)   | Trusted proxy IPs/CIDRs. When set, `x-forwarded-for` is only trusted from these |
-| `maxEntries`     | `10000`  | Maximum entries in the rate limit store. Oldest entries evicted when exceeded   |
-| `redisClient`    | (none)   | Redis client for distributed rate limiting across multiple server instances     |
+| Field            | Default  | Description                                                                                                                                                                                                                 |
+| ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maxRequests`    | `100`    | Maximum requests per window (default: 100)                                                                                                                                                                                  |
+| `windowMs`       | `900000` | Window duration in ms — 15 minutes (default: 900000)                                                                                                                                                                        |
+| `trustedProxies` | (none)   | Trusted proxy IPs/CIDRs. Same concept as proxy route `trustedProxies` — used for `x-forwarded-for` IP extraction. When set, the client IP is extracted from `x-forwarded-for` only if the socket IP matches a trusted proxy |
+| `maxEntries`     | `10000`  | Maximum entries in the rate limit store. Oldest entries evicted when exceeded                                                                                                                                               |
+| `redisClient`    | (none)   | Redis client for distributed rate limiting across multiple server instances                                                                                                                                                 |
 
 Client IP is extracted from `x-forwarded-for` (first value) when the socket IP matches a trusted proxy, or falls back to socket IP (or `'unknown'` if socket IP is unavailable). When exceeded, returns `429 Too Many Requests` with a `Retry-After` header (seconds until window reset).

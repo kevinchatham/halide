@@ -18,12 +18,14 @@ Interactively scaffolds a Halide server in the current project. It prompts for:
 
 ### CLI flags
 
-| Flag            | Description                                           |
-| --------------- | ----------------------------------------------------- |
-| `--dry-run`     | Preview changes without modifying any files           |
-| `--force`       | Overwrite existing files without prompting            |
-| `--skills-only` | Only install AI coding skills, skip other scaffolding |
-| `--project-dir` | Target directory for non-interactive setup            |
+| Flag             | Description                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| `--dry-run`      | Preview changes without modifying any files                 |
+| `--force`        | Overwrite existing files without prompting                  |
+| `--skills-only`  | Only install AI coding skills, skip other scaffolding       |
+| `--project-dir`  | Target directory for non-interactive setup                  |
+| `--yes` / `-y`   | Accept all defaults without prompts (non-interactive mode)  |
+| `--project-type` | Project type: `full` (multi-file) or `single` (single file) |
 
 ### Full project structure
 

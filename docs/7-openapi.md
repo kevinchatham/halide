@@ -82,6 +82,31 @@ When `responses` is present, `responseSchema` is ignored. When neither is presen
 
 Set `observe: false` on a route to skip `onRequest` and `onResponse` hooks for that route. The route will still appear in the OpenAPI documentation.
 
+## External specs via `openapiSpec`
+
+Proxy routes can reference an external OpenAPI specification using the `openapiSpec` field. This is useful when you're proxying to a backend service that already has its own API documentation.
+
+```ts
+const { proxyRoute } = defineHalide();
+
+const ordersProxy = proxyRoute({
+  access: 'public',
+  path: '/api/orders',
+  methods: ['get', 'post'],
+  target: 'http://orders.internal:8080',
+  proxyPath: '/orders',
+  openapiSpec: {
+    path: './openapi/orders-api.json', // local file path
+  },
+});
+```
+
+The `path` can be a local file path (relative to the current working directory) or a URL. When a URL is provided, the spec is fetched at startup and cached. Fetch requests use a 10-second timeout.
+
+The external spec is merged into the inline OpenAPI documentation. Only paths and operations matching the proxy route's `methods` are included. If the external spec defines operations for methods not in the route's `methods` array, those operations are filtered out.
+
+Spec fetching uses a concurrency guard — concurrent requests for the same spec URL are deduplicated. The resolved spec is cached and reused across OpenAPI UI requests.
+
 ## Scalar UI
 
 The documentation UI uses [Scalar](https://github.com/scalar/scalar) (`@scalar/hono-api-reference`), not Swagger UI. The Scalar agent, MCP server, client button, and developer tools are all disabled.

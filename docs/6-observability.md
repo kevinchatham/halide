@@ -20,16 +20,12 @@ const server = createServer<MyClaims, MyLogScope>({
       service: 'bff',
     }),
     onRequest: (ctx, app) => {
-      app.logger.info(
-        { requestId: ctx.headers?.['x-request-id'] ?? 'no-request-id', service: 'bff' },
-        `${ctx.method} ${ctx.path}`,
-      );
+      // The logger is already scoped via logScopeFactory — no scope arg needed
+      app.logger.info(`${ctx.method} ${ctx.path}`);
     },
     onResponse: (ctx, app, response) => {
-      app.logger.info(
-        { requestId: 'request-id', service: 'bff' },
-        `${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`,
-      );
+      // The logger is already scoped — just pass the message
+      app.logger.info(`${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`);
     },
   },
 });
@@ -65,7 +61,9 @@ Built-in logger factories:
 
 - **`createDefaultLogger()`** — styled logger with colored, level-prefixed messages. Uses `node:util.styleText` for colors in TTY, plain text otherwise.
 - **`createNoopLogger()`** — discards all log messages.
-- **`createScopedLogger(logger, scope)`** — wraps a logger so every method automatically applies a fixed scope.
+- **`createScopedLogger(logger, scope)`** — wraps a logger so every method automatically applies a fixed scope. The returned logger ignores the scope argument passed to each method, using the pre-baked scope instead. This means handlers and hooks can call `logger.info(...args)` without manually passing a scope object.
+
+When `logScopeFactory` is configured, the framework creates a scoped logger per request. The factory produces a typed scope value that is automatically applied to every logger call within that request. Handlers and hooks receive the scoped logger via `app.logger` and simply call `logger.info(...args)` — the scope is injected automatically.
 
 ## Lifecycle hooks
 

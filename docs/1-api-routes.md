@@ -58,10 +58,10 @@ Handler return values are JSON-serialized. Returning a native `Response` bypasse
 
 ## Supported methods
 
-`'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'`.
+`'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`. The methods `'head'` and `'options'` are proxy-only and not available for API routes.
 
 ## Body handling
 
 For routes **with** `requestSchema`, the body is parsed and validated before the handler runs. If validation fails, the server responds with `400 Bad Request` and the validation errors.
 
-For routes **without** `requestSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For `GET` and `DELETE`, body is `undefined`.
+For routes **without** `requestSchema`, the body is parsed from JSON automatically for `POST`, `PUT`, and `PATCH` requests. For all other methods, body is `undefined`.

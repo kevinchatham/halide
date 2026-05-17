@@ -85,7 +85,7 @@ export const userRoutes = [
     method: 'post',
     path: '/users',
     requestSchema: CreateUserSchema,
-    handler: async (ctx) => ({
+    handler: async (ctx, _app) => ({
       id: crypto.randomUUID(),
       email: ctx.body.email,
       name: ctx.body.name,
