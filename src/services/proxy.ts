@@ -34,7 +34,7 @@ import { isTrustedProxy } from '../utils/trustedProxies';
  */
 export class AgentCache {
   private readonly cache = new Map<string, http.Agent>();
-  private probeResults = new Map<string, boolean>();
+  private readonly probeResults = new Map<string, boolean>();
 
   getAgent(target: string): http.Agent {
     const key = `${target}`;
@@ -80,7 +80,13 @@ export class AgentCache {
     const probeKey = `${url.hostname}:${url.port}`;
     const timeout = timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
 
-    const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80;
+    let port = 80;
+    if (url.protocol === 'https:') {
+      port = 443;
+    }
+    if (url.port) {
+      port = Number(url.port);
+    }
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -489,7 +495,7 @@ export function createProxyService<TClaims = unknown, TLogScope = unknown>(
       const params = c.req.param();
       rewrittenPath = rewritePath;
       for (const [key, value] of Object.entries(params)) {
-        rewrittenPath = rewrittenPath.replace(new RegExp(`:\\${key}\\b`, 'g'), value);
+        rewrittenPath = rewrittenPath.replaceAll(new RegExp(`:\\${key}\\b`, 'g'), value);
       }
     }
     const targetUrl = new URL(rewrittenPath, parsedTarget).toString();

@@ -349,60 +349,104 @@ export const serverConfigSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    const allRoutes = [...(data.apiRoutes ?? []), ...(data.proxyRoutes ?? [])];
-    const hasPrivateRoute = allRoutes.some((r) => r.access === 'private');
-    if (hasPrivateRoute && !data.security?.auth) {
+    validatePrivateAuth(data, ctx);
+    validateApiRoutes(data, ctx);
+    validateProxyRoutes(data, ctx);
+  });
+
+/**
+ * Validate that private routes have auth configured.
+ * @internal
+ */
+function validatePrivateAuth(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodRawContext): void {
+  const allRoutes = [...(data.apiRoutes ?? []), ...(data.proxyRoutes ?? [])];
+  const hasPrivateRoute = allRoutes.some((r) => r.access === 'private');
+  if (hasPrivateRoute && !data.security?.auth) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "security.auth is required when routes have access: 'private'",
+      path: ['security', 'auth'],
+    });
+  }
+}
+
+/**
+ * Validate API routes have handlers.
+ * @internal
+ */
+function validateApiRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodRawContext): void {
+  for (const [routeIdx, route] of (data.apiRoutes ?? []).entries()) {
+    if (!route.handler) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "security.auth is required when routes have access: 'private'",
-        path: ['security', 'auth'],
+        message: 'API route requires handler',
+        path: ['apiRoutes', routeIdx, 'handler'],
       });
     }
+  }
+}
 
-    for (const [routeIdx, route] of (data.apiRoutes ?? []).entries()) {
-      if (!route.handler) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'API route requires handler',
-          path: ['apiRoutes', routeIdx, 'handler'],
-        });
-      }
+/**
+ * Validate proxy routes have valid targets and methods.
+ * @internal
+ */
+function validateProxyRoutes(data: z.infer<typeof serverConfigSchema>, ctx: z.ZodRawContext): void {
+  for (const [routeIdx, route] of (data.proxyRoutes ?? []).entries()) {
+    if (route.type !== 'proxy') continue;
+    validateProxyTarget(route, routeIdx, ctx);
+    validateProxyMethods(route, routeIdx, ctx);
+  }
+}
+
+/**
+ * Validate a single proxy route target field.
+ * @internal
+ */
+function validateProxyTarget(
+  route: z.infer<typeof routeSchema>,
+  routeIdx: number,
+  ctx: z.ZodRawContext,
+): void {
+  if (route.target == null || route.target === '') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Proxy route requires target',
+      path: ['proxyRoutes', routeIdx, 'target'],
+    });
+    return;
+  }
+  try {
+    const u = new URL(route.target);
+    if (!['http:', 'https:'].includes(u.protocol)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Proxy route target is not a valid URL: ${route.target}`,
+        path: ['proxyRoutes', routeIdx, 'target'],
+      });
     }
+  } catch {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Proxy route target is not a valid URL: ${route.target}`,
+      path: ['proxyRoutes', routeIdx, 'target'],
+    });
+  }
+}
 
-    for (const [routeIdx, route] of (data.proxyRoutes ?? []).entries()) {
-      if (route.type !== 'proxy') continue;
-
-      if (route.target == null || route.target === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Proxy route requires target',
-          path: ['proxyRoutes', routeIdx, 'target'],
-        });
-      } else {
-        try {
-          const u = new URL(route.target);
-          if (!['http:', 'https:'].includes(u.protocol)) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: `Proxy route target is not a valid URL: ${route.target}`,
-              path: ['proxyRoutes', routeIdx, 'target'],
-            });
-          }
-        } catch {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `Proxy route target is not a valid URL: ${route.target}`,
-            path: ['proxyRoutes', routeIdx, 'target'],
-          });
-        }
-      }
-
-      if (!route.methods || route.methods.length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Proxy route requires at least one method',
-          path: ['proxyRoutes', routeIdx, 'methods'],
-        });
-      }
-    }
-  });
+/**
+ * Validate a single proxy route has at least one method.
+ * @internal
+ */
+function validateProxyMethods(
+  route: z.infer<typeof routeSchema>,
+  routeIdx: number,
+  ctx: z.ZodRawContext,
+): void {
+  if (!route.methods || route.methods.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Proxy route requires at least one method',
+      path: ['proxyRoutes', routeIdx, 'methods'],
+    });
+  }
+}

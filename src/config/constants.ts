@@ -1,5 +1,5 @@
 /** Per-URI JWKS cache TTL in milliseconds (1 hour). Used to cache fetched JWKS keys. */
-export const JWKS_CACHE_TTL_MS = 3600_000;
+export const JWKS_CACHE_TTL_MS = 3_600_000;
 
 /** Maximum number of cached JWKS middleware instances. Old entries are evicted when exceeded. */
 export const MAX_JWK_CACHE = 100;

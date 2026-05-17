@@ -2,9 +2,6 @@ import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import { BodyParseError, parseJsonBody } from '../utils/parseJsonBody';
 
-/** HTTP methods that carry a request body and are parsed by the body middleware. */
-type BodyMethod = 'post' | 'put' | 'patch';
-
 /**
  * Create a body parsing middleware for API routes without a requestSchema.
  *
@@ -23,7 +20,7 @@ type BodyMethod = 'post' | 'put' | 'patch';
 export function createApiBodyParser<TClaims = unknown, TLogScope = unknown>(
   route: ApiRoute<TClaims, TLogScope>,
 ): MiddlewareHandler {
-  const methodsWithBody = new Set<BodyMethod | string>(['POST', 'PUT', 'PATCH']);
+  const methodsWithBody = new Set<string>(['POST', 'PUT', 'PATCH']);
 
   return async (c: Context, next: Next) => {
     if (route.requestSchema) {

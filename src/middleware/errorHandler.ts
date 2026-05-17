@@ -3,6 +3,33 @@ import { asInternalLogger } from '../config/defaults';
 import type { HalideContext, Logger, RequestContext } from '../types/app';
 
 /**
+ * Build the log scope object for error logging.
+ *
+ * Merges the factory-provided scope (when available) with the error stack.
+ *
+ * @param stack - The error stack trace, if present.
+ * @param logScopeFactory - Optional per-request factory.
+ * @param c - The Hono context (used to extract request/app context).
+ * @returns The merged log scope object.
+ */
+function buildErrorLogScope<TClaims = unknown, TLogScope = unknown>(
+  stack: string | undefined,
+  logScopeFactory: ((ctx: RequestContext, claims: TClaims | undefined) => TLogScope) | undefined,
+  c: Context,
+): Record<string, unknown> {
+  if (!logScopeFactory) {
+    return stack ? { errorStack: stack } : {};
+  }
+  const reqCtx = c.get('reqCtx') as RequestContext | undefined;
+  const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope> | undefined;
+  const factoryScope = reqCtx && appCtx ? logScopeFactory(reqCtx, appCtx.claims) : undefined;
+  return {
+    ...(typeof factoryScope === 'object' && factoryScope !== null ? factoryScope : {}),
+    ...(stack ? { errorStack: stack } : {}),
+  };
+}
+
+/**
  * Create an error handler middleware that logs error details and returns a response.
  * Respects the error's `.status` property when present (e.g., HTTPError).
  *
@@ -32,20 +59,7 @@ export function createErrorHandler<TClaims = unknown, TLogScope = unknown>(
       typeof c.json
     >[1];
 
-    let logScope: Record<string, unknown>;
-    if (logScopeFactory) {
-      const reqCtx = c.get('reqCtx') as RequestContext | undefined;
-      const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope> | undefined;
-      const factoryScope = reqCtx && appCtx ? logScopeFactory(reqCtx, appCtx.claims) : undefined;
-      logScope = {
-        ...(typeof factoryScope === 'object' && factoryScope !== null ? factoryScope : {}),
-        ...(stack ? { errorStack: stack } : {}),
-      };
-    } else {
-      logScope = {
-        ...(stack ? { errorStack: stack } : {}),
-      };
-    }
+    const logScope = buildErrorLogScope(stack, logScopeFactory, c);
 
     internalLogger.error(logScope, `Internal server error: ${message}`);
     return c.json({ error: 'Internal Server Error' }, status);

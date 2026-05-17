@@ -1,7 +1,7 @@
 import type { ZodSchema } from 'zod';
 import type { HalideContext, RequestContext } from './app';
 
-export type { HalideContext };
+export type { HalideContext } from './app';
 
 /**
  * Metadata for OpenAPI/Scalar documentation generation on a route.

@@ -124,7 +124,7 @@ function createProxyHandler<TClaims = unknown, TLogScope = unknown>(
         {
           app: appCtx,
           body,
-          bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
+          bodyType: proxyResponseBody ? 'text' : undefined,
           c,
           emitCtx: { handlerError, start, statusCode },
           logger,

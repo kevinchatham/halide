@@ -16,10 +16,10 @@ export function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]
   return trustedProxies.some((tp) => {
     if (tp.includes('/')) {
       const [net, prefix] = tp.split('/');
-      const parsedNet = ipaddr.parse(net!);
-      return addr!.match(parsedNet, Number(prefix));
+      const parsedNet = ipaddr.parse(net);
+      return addr.match(parsedNet, Number(prefix));
     }
-    return addr!.toString() === tp;
+    return addr.toString() === tp;
   });
 }
 

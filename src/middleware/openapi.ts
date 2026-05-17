@@ -238,23 +238,21 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
         return c.json(state.cachedSpec);
       }
 
-      if (!state.specResolution) {
-        state.specResolution = (async (): Promise<void> => {
-          try {
-            const inlineSpec = await buildInlineSpec(app, options);
-            const resolvedSpecs = await resolveOpenApiSpec(proxyRoutes ?? []);
-            const mergedSpec = mergeExternalSpecs(inlineSpec, resolvedSpecs);
-            state.cachedSpec = buildFinalSpec(mergedSpec, options);
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            il?.error(
-              { error: 'openapi_spec_resolution_failed' },
-              `Failed to resolve OpenAPI spec: ${message}`,
-            );
-            state.specResolution = null;
-          }
-        })();
-      }
+      state.specResolution ??= (async (): Promise<void> => {
+        try {
+          const inlineSpec = await buildInlineSpec(app, options);
+          const resolvedSpecs = await resolveOpenApiSpec(proxyRoutes ?? []);
+          const mergedSpec = mergeExternalSpecs(inlineSpec, resolvedSpecs);
+          state.cachedSpec = buildFinalSpec(mergedSpec, options);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          il?.error(
+            { error: 'openapi_spec_resolution_failed' },
+            `Failed to resolve OpenAPI spec: ${message}`,
+          );
+          state.specResolution = null;
+        }
+      })();
 
       await state.specResolution;
       return c.json(state.cachedSpec ?? {});

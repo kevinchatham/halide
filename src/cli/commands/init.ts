@@ -50,50 +50,33 @@ export function addScriptsToPackageJson(cwd: string, dryRun = false, force = fal
   const newBuild = 'tsc --project tsconfig.server.json';
   const formattedOptions = { insertSpaces: true, tabSize: 2 };
 
-  if (!force) {
-    const parsed = jsoncParse(raw) as Record<string, unknown>;
-    const scripts =
-      parsed.scripts && typeof parsed.scripts === 'object'
-        ? (parsed.scripts as Record<string, string>)
-        : {};
-    if (scripts['halide:start'] && scripts['halide:build']) return;
-  }
-
   if (dryRun) {
     log('\u2139 [dry-run] Would add halide:start and halide:build scripts to package.json');
     return;
   }
 
+  const parsed = jsoncParse(raw) as Record<string, unknown>;
+  const scripts =
+    parsed.scripts && typeof parsed.scripts === 'object'
+      ? (parsed.scripts as Record<string, string>)
+      : {};
+
+  if (!force && scripts['halide:start'] && scripts['halide:build']) {
+    return;
+  }
+
   let result = raw;
 
-  if (force) {
-    const modified1 = modify(result, ['scripts', 'halide:start'], newStart, {
+  const writeScript = (key: 'halide:start' | 'halide:build', value: string): void => {
+    if (!force && scripts[key]) return;
+    const modified = modify(result, ['scripts', key], value, {
       formattingOptions: formattedOptions,
     });
-    result = applyEdits(result, modified1);
-    const modified2 = modify(result, ['scripts', 'halide:build'], newBuild, {
-      formattingOptions: formattedOptions,
-    });
-    result = applyEdits(result, modified2);
-  } else {
-    const parsed = jsoncParse(raw) as Record<string, unknown>;
-    const scripts =
-      parsed.scripts && typeof parsed.scripts === 'object'
-        ? (parsed.scripts as Record<string, string>)
-        : {};
-    if (!scripts['halide:start']) {
-      const modified1 = modify(result, ['scripts', 'halide:start'], newStart, {
-        formattingOptions: formattedOptions,
-      });
-      result = applyEdits(result, modified1);
-    }
-    if (!scripts['halide:build']) {
-      const modified2 = modify(result, ['scripts', 'halide:build'], newBuild, {
-        formattingOptions: formattedOptions,
-      });
-      result = applyEdits(result, modified2);
-    }
-  }
+    result = applyEdits(result, modified);
+  };
+
+  writeScript('halide:start', newStart);
+  writeScript('halide:build', newBuild);
 
   fs.writeFileSync(pkgPath, result, 'utf8');
   log('✓ Added halide:start and halide:build scripts to package.json');

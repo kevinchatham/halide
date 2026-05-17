@@ -217,7 +217,8 @@ export function excludeServerFromApp(
       formattingOptions: formattedOptions,
     });
   } else {
-    const existing = parsed.exclude != null ? [String(parsed.exclude)] : [];
+    const existing =
+      parsed.exclude == null || typeof parsed.exclude !== 'string' ? [] : [parsed.exclude];
     edits = modify(raw, ['exclude'], [...existing, 'server.ts'], {
       formattingOptions: formattedOptions,
     });

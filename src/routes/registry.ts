@@ -2,11 +2,9 @@ import type { Hono, MiddlewareHandler } from 'hono';
 import type { createAgentCache } from '../services/proxy';
 import type { HalideVariables, Logger, RequestContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
-import { registerApiRoute as registerApiRouteFn } from './registry.api';
+import { registerApiRoute } from './registry.api';
 import { createClaimExtractor } from './registry.auth';
-import { registerProxyRoute as registerProxyRouteFn } from './registry.proxy';
-
-export { registerApiRouteFn as registerApiRoute, registerProxyRouteFn as registerProxyRoute };
+import { registerProxyRoute } from './registry.proxy';
 
 /**
  * Hono method types that have direct `app.*` methods on the Hono app instance.
@@ -84,13 +82,13 @@ export function registerRoutes<TClaims = unknown, TLogScope = unknown>(
 
   if (config.apiRoutes) {
     for (const route of config.apiRoutes) {
-      registerApiRouteFn(app, route, claimExtractor, config.observability, logger, logScopeFactory);
+      registerApiRoute(app, route, claimExtractor, config.observability, logger, logScopeFactory);
     }
   }
 
   if (config.proxyRoutes) {
     for (const route of config.proxyRoutes) {
-      registerProxyRouteFn(
+      registerProxyRoute(
         app,
         route,
         claimExtractor,

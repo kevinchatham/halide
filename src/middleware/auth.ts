@@ -110,16 +110,16 @@ async function getCachedJwkMiddleware(
  * Runs every 10 minutes. Skipped in test environments.
  */
 const jwkSweepTimer =
-  typeof vi !== 'undefined'
-    ? null
-    : setInterval(() => {
+  typeof vi === 'undefined'
+    ? setInterval(() => {
         const now = Date.now();
         for (const [uri, entry] of jwkCache.entries()) {
           if (entry.expiresAt <= now) {
             jwkCache.delete(uri);
           }
         }
-      }, 600_000);
+      }, 600_000)
+    : null;
 jwkSweepTimer?.unref();
 
 /**
@@ -128,9 +128,8 @@ jwkSweepTimer?.unref();
  * are proactively refreshed. Skipped in test environments.
  */
 const jwkBackgroundRefreshTimer =
-  typeof vi !== 'undefined'
-    ? null
-    : setInterval(async () => {
+  typeof vi === 'undefined'
+    ? setInterval(async () => {
         const now = Date.now();
         const halfLife = JWKS_CACHE_TTL_MS / 2;
         for (const [uri, entry] of jwkCache.entries()) {
@@ -160,7 +159,8 @@ const jwkBackgroundRefreshTimer =
             jwkRefreshLocks.set(uri, refreshPromise);
           }
         }
-      }, JWKS_CACHE_TTL_MS / 2);
+      }, JWKS_CACHE_TTL_MS / 2)
+    : null;
 jwkBackgroundRefreshTimer?.unref();
 
 /** Check whether the JWT audience claim matches the expected value. Supports both string and array claims. */
@@ -178,7 +178,7 @@ function decodeJwtHeader(token: string): Record<string, unknown> | null {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const base64url = parts[0] as string;
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const base64 = base64url.replaceAll('-', '+').replaceAll('_', '/');
     const padding = 4 - (base64.length % 4);
     const padded = padding === 4 ? base64 : base64 + '='.repeat(padding);
     const decoded = atob(padded);

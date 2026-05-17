@@ -27,7 +27,7 @@ export function createContextMiddleware<TClaims = unknown, TLogScope = unknown>(
     const claims = c.get('claims') as TClaims | undefined;
 
     const body = c.get('parsedBody');
-    const reqCtx = buildRequestContextFromHono(c, body) as RequestContext;
+    const reqCtx = buildRequestContextFromHono(c, body);
 
     let scopedLogger = logger;
     if (logScopeFactory) {

@@ -87,6 +87,7 @@ function createApiHandler<TClaims = unknown, TLogScope = unknown>(
     let proxyResponseBody: string | undefined;
     let pipeError: Error | undefined;
     let responseToReturn: Response | undefined;
+    let result: unknown;
 
     const appCtx = c.get('appCtx') as HalideContext<TClaims, TLogScope>;
     const reqCtx = c.get('reqCtx') as RequestContext;
@@ -94,52 +95,61 @@ function createApiHandler<TClaims = unknown, TLogScope = unknown>(
 
     emitOnRequest({ app: appCtx, body, c, logger, observability, observe: route.observe }, reqCtx);
 
-    let result: unknown;
     try {
-      const handlerCtx = reqCtx as RequestContext & { body: unknown };
-      handlerCtx.body = body;
-      result = await route.handler(handlerCtx, appCtx);
+      const {
+        handlerValue: handlerResult,
+        abort,
+        response,
+      } = await processResponse(
+        route.handler,
+        reqCtx,
+        body,
+        appCtx,
+        c,
+        observability,
+        route.observe,
+      );
 
-      if (result instanceof Response) {
-        statusCode = result.status;
-        const pipeResult = await observeAndPipeResponse(c, result, observability, route.observe);
-
-        if (pipeResult.aborted) {
-          handlerError = new Error('Client disconnected');
-          statusCode = 499;
-        } else {
-          proxyResponseBody = pipeResult.body;
-          if (pipeResult.pipeError) {
-            pipeError = pipeResult.pipeError;
-          }
-          responseToReturn = pipeResult.response;
+      if (abort) {
+        handlerError = abort;
+        statusCode = 499;
+      } else if (handlerResult instanceof Response) {
+        responseToReturn = response?.response ?? handlerResult;
+        statusCode = handlerResult.status;
+        result = handlerResult;
+        if (response?.body !== undefined) {
+          proxyResponseBody = response.body;
         }
+      } else {
+        result = handlerResult;
       }
     } catch (err) {
       handlerError = err instanceof Error ? err : new Error(String(err));
       statusCode = 500;
       throw err;
     } finally {
-      if (pipeError && !handlerError) {
-        handlerError = pipeError;
-        statusCode = 502;
-      }
-      if (route.observe !== false) {
-        emitOnResponse(
-          {
-            app: appCtx,
-            body,
-            bodyType: proxyResponseBody !== undefined ? 'text' : undefined,
-            c,
-            emitCtx: { handlerError, start, statusCode },
-            logger,
-            observability,
-            observe: route.observe,
-            responseBody: proxyResponseBody !== undefined ? proxyResponseBody : result,
-          },
-          reqCtx,
-        );
-      }
+      const { finalizedError, finalizedStatus } = finalizeStatus(
+        handlerError,
+        pipeError,
+        statusCode,
+      );
+      handlerError = finalizedError;
+      statusCode = finalizedStatus;
+      emitApiOnResponse(
+        {
+          app: appCtx,
+          body,
+          bodyType: proxyResponseBody ? 'text' : undefined,
+          c,
+          emitCtx: { handlerError, start, statusCode },
+          logger,
+          observability,
+          observe: route.observe,
+          responseBody: proxyResponseBody ?? result,
+          route,
+        },
+        reqCtx,
+      );
     }
 
     if (responseToReturn) {
@@ -148,4 +158,121 @@ function createApiHandler<TClaims = unknown, TLogScope = unknown>(
 
     return c.json(result);
   };
+}
+
+/**
+ * Process the handler result — handle Response piping and client aborts.
+ *
+ * @internal
+ */
+async function processResponse<TClaims, TLogScope>(
+  handler: (
+    ctx: RequestContext & { body: unknown },
+    app: HalideContext<TClaims, TLogScope>,
+  ) => unknown,
+  reqCtx: RequestContext,
+  body: unknown,
+  appCtx: HalideContext<TClaims, TLogScope>,
+  c: Context,
+  observability: ObservabilityConfig<TClaims, TLogScope> | undefined,
+  observe: boolean | undefined,
+): Promise<{
+  handlerValue: unknown;
+  response?: { response: Response; statusCode: number; body?: string; pipeError?: Error };
+  abort?: Error;
+}> {
+  const handlerCtx = reqCtx as RequestContext & { body: unknown };
+  handlerCtx.body = body;
+  const result = handler(handlerCtx, appCtx);
+
+  if (!(result instanceof Promise)) {
+    return { handlerValue: result };
+  }
+
+  const awaited = await result;
+
+  if (!(awaited instanceof Response)) {
+    return { handlerValue: awaited };
+  }
+
+  try {
+    const pipeResult = await observeAndPipeResponse(c, awaited, observability, observe);
+    if (pipeResult.aborted) {
+      return { abort: new Error('Client disconnected'), handlerValue: awaited };
+    }
+    return {
+      handlerValue: awaited,
+      response: {
+        body: pipeResult.body,
+        pipeError: pipeResult.pipeError,
+        response: pipeResult.response,
+        statusCode: awaited.status,
+      },
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    throw error;
+  }
+}
+
+/**
+ * Determine final error and status code after handler execution.
+ *
+ * @internal
+ */
+function finalizeStatus(
+  handlerError: Error | undefined,
+  pipeError: Error | undefined,
+  statusCode: number,
+): { finalizedError: Error | undefined; finalizedStatus: number } {
+  if (pipeError && !handlerError) {
+    return { finalizedError: pipeError, finalizedStatus: 502 };
+  }
+  return { finalizedError: handlerError, finalizedStatus: statusCode };
+}
+
+/** Config for {@link emitApiOnResponse}. */
+/** @internal */
+interface ApiOnResponseConfig<TClaims = unknown, TLogScope = unknown> {
+  readonly app: HalideContext<TClaims, TLogScope>;
+  readonly body: unknown;
+  readonly bodyType: 'text' | 'binary' | undefined;
+  readonly c: Context;
+  readonly emitCtx: {
+    readonly handlerError: Error | undefined;
+    readonly start: number;
+    readonly statusCode: number;
+  };
+  readonly logger: Logger<TLogScope>;
+  readonly observability: ObservabilityConfig<TClaims, TLogScope> | undefined;
+  readonly observe: boolean | undefined;
+  readonly responseBody: unknown;
+  readonly route: ApiRoute<TClaims, TLogScope>;
+}
+
+/**
+ * Emit the onResponse hook for API routes.
+ *
+ * @internal
+ */
+function emitApiOnResponse<TClaims, TLogScope>(
+  config: ApiOnResponseConfig<TClaims, TLogScope>,
+  reqCtx: RequestContext,
+): void {
+  if (config.route.observe !== false) {
+    emitOnResponse(
+      {
+        app: config.app,
+        body: config.body,
+        bodyType: config.bodyType,
+        c: config.c,
+        emitCtx: config.emitCtx,
+        logger: config.logger,
+        observability: config.observability,
+        observe: config.observe,
+        responseBody: config.responseBody,
+      },
+      reqCtx,
+    );
+  }
 }

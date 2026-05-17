@@ -3,7 +3,7 @@ import { asInternalLogger, DEFAULTS } from '../config/defaults';
 import { extractBearerClaims, extractJwksClaims } from '../middleware/auth';
 import { buildRequestContextFromHono } from '../services/proxy';
 import type { AuthorizeFn, HalideContext } from '../types/api';
-import type { Logger, RequestContext } from '../types/app';
+import type { Logger } from '../types/app';
 import type { ClaimExtractor } from '../types/security';
 import type { ServerConfig } from '../types/server-config';
 import { createSecretCache } from '../utils/secretCache';
@@ -125,7 +125,7 @@ export async function checkAuthorization<TClaims = unknown, TLogScope = unknown>
 ): Promise<Response | null> {
   if (!route.authorize) return null;
   try {
-    const ctx = buildRequestContextFromHono(c, body) as RequestContext;
+    const ctx = buildRequestContextFromHono(c, body);
     const allowed = await route.authorize(ctx, app);
     if (!allowed) {
       return createAuthErrorResponse(c, 403, 'Forbidden');

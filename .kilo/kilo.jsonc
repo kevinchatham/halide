@@ -2,10 +2,9 @@
   "$schema": "https://app.kilo.ai/config.json",
   "compaction": {
     "auto": true,
-    "preserve_recent_tokens": 8000,
+    "preserve_recent_tokens": 7500,
     "prune": true,
-    "reserved": 20000,
-    "tail_turns": 2,
-    "threshold_percent": 100
+    "reserved": 15000,
+    "tail_turns": 2
   }
 }
