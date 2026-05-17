@@ -5,6 +5,7 @@ import {
   createOpenApiRoutes,
   createSpecCacheState,
   resetOpenApiCache,
+  resolveOpenApiInfo,
   type SpecCacheState,
 } from './openapi';
 
@@ -307,5 +308,47 @@ describe('createOpenApiRoutes', () => {
     expect(body.paths['/items'].delete).toBeDefined();
     expect(body.paths['/items'].post).toBeUndefined();
     expect(body.paths['/items'].put).toBeUndefined();
+  });
+});
+
+describe('resolveOpenApiInfo', () => {
+  it('returns inlineInfo when no options provided', () => {
+    const inlineInfo = { description: 'Inline desc', title: 'Inline API', version: '2.0.0' };
+    const result = resolveOpenApiInfo(undefined, inlineInfo);
+    expect(result).toBe(inlineInfo);
+  });
+
+  it('returns inlineInfo when options has no title/version/description', () => {
+    const inlineInfo = { title: 'Inline API', version: '2.0.0' };
+    const result = resolveOpenApiInfo({ servers: [{ url: 'http://localhost' }] }, inlineInfo);
+    expect(result).toBe(inlineInfo);
+  });
+
+  it('uses options title and version, falls back to inline description', () => {
+    const inlineInfo = { description: 'Inline desc', title: 'Inline', version: '1.0.0' };
+    const result = resolveOpenApiInfo({ title: 'Opts' }, inlineInfo);
+    expect(result).toEqual({ description: 'Inline desc', title: 'Opts', version: '1.0.0' });
+  });
+
+  it('uses options description when provided', () => {
+    const inlineInfo = { description: 'Inline desc', title: 'Inline', version: '1.0.0' };
+    const result = resolveOpenApiInfo({ description: 'Opts desc' }, inlineInfo);
+    expect(result).toEqual({
+      description: 'Opts desc',
+      title: 'Inline',
+      version: '1.0.0',
+    });
+  });
+
+  it('uses defaults when no inlineInfo and no options', () => {
+    const result = resolveOpenApiInfo({ title: 'Custom' }, undefined);
+    expect(result).toEqual({ title: 'Custom', version: '1.0.0' });
+  });
+
+  it('omits description when neither options nor inlineInfo have it', () => {
+    const inlineInfo = { title: 'Inline', version: '1.0.0' };
+    const result = resolveOpenApiInfo({ version: '2.0.0' }, inlineInfo);
+    expect(result).toEqual({ title: 'Inline', version: '2.0.0' });
+    expect(result?.description).toBeUndefined();
   });
 });

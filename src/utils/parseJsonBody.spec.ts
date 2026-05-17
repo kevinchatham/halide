@@ -62,4 +62,20 @@ describe('parseJsonBody', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it('returns PARSE_ERROR when error is not a SyntaxError', async () => {
+    const mockCtx = {
+      req: {
+        json: () => Promise.reject(new TypeError('network error')),
+      },
+    };
+    let error: BodyParseError;
+    try {
+      await parseJsonBody(mockCtx as unknown as Parameters<typeof parseJsonBody>[0]);
+    } catch (e) {
+      error = e as BodyParseError;
+    }
+    expect(error).toBeInstanceOf(BodyParseError);
+    expect(error!.code).toBe('PARSE_ERROR');
+  });
 });

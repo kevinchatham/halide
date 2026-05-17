@@ -165,6 +165,224 @@ export function installSkillsFromHalide(cwd: string): boolean {
 }
 
 /**
+ * Resolve the target project directory.
+ *
+ * @internal
+ * @param projectDir - Explicit directory, or `undefined` to prompt/fallback.
+ * @param dryRun - When true, use cwd without prompting.
+ * @param yes - When true, use cwd without prompting.
+ * @returns The resolved absolute path.
+ */
+async function resolveProjectDir(
+  projectDir: string | undefined,
+  dryRun: boolean,
+  yes: boolean,
+): Promise<string> {
+  const cwd = projectDir ?? process.cwd();
+
+  if (projectDir) {
+    return path.resolve(projectDir);
+  }
+  if (dryRun || yes) {
+    return cwd;
+  }
+  const projectPath = await input({
+    default: cwd,
+    message: 'Project directory?',
+  });
+  return path.resolve(projectPath);
+}
+
+/**
+ * Print a dry-run preview of what would be created.
+ *
+ * @internal
+ * @param resolvedDir - The target project directory.
+ * @param projectType - The project type (`'full'` or `'single'`).
+ * @param force - When true, overwrites existing files.
+ */
+function printDryRunPreview(
+  resolvedDir: string,
+  projectType: 'full' | 'single',
+  force: boolean,
+): void {
+  cliInfo('[dry-run] Skipping interactive prompts');
+  cliInfo(`Project directory: ${resolvedDir}`);
+  cliInfo(`Project type: ${projectType}`);
+  cliInfo('Would install halide');
+
+  if (projectType === 'full') {
+    const files = generateFullProject('my-app', 3553);
+    cliInfo('Would create:');
+    for (const filePath of Object.keys(files)) {
+      cliInfo(`  - ${filePath}`);
+    }
+  } else {
+    cliInfo('Would create: server.ts');
+  }
+
+  const isFull = projectType === 'full';
+  writeTsconfigServer(resolvedDir, true, force, isFull);
+  addServerReference(resolvedDir, true, force);
+  addToTsconfigExclude(resolvedDir, true, force, isFull ? 'src/server.ts' : 'server.ts');
+  addScriptsToPackageJson(resolvedDir, true, force, isFull);
+  cliLog('\nDone! (dry-run)');
+}
+
+/**
+ * Prompt the user for app configuration values.
+ *
+ * @internal
+ * @param yes - When true, return defaults without prompting.
+ * @param projectType - Pre-specified project type, or `undefined` to prompt.
+ * @returns Object with `appName`, `port`, `selectedProjectType`, and `installSkills`.
+ */
+async function promptForAppConfig(
+  yes: boolean,
+  projectType: 'full' | 'single' | undefined,
+): Promise<{
+  appName: string;
+  port: number;
+  selectedProjectType: 'full' | 'single';
+  installSkills: boolean;
+}> {
+  const appName = yes
+    ? 'halide-app'
+    : await input({
+        default: 'halide-app',
+        message: 'App name?',
+        validate: (value: string): boolean | string => {
+          if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
+          return 'App name must contain only letters, numbers, dashes, and underscores';
+        },
+      });
+
+  const port = yes
+    ? 3553
+    : Number(
+        await input({
+          default: '3553',
+          message: 'Port?',
+          validate: (value: string): boolean | string => {
+            const portNum = Number.parseInt(value, 10);
+            if (Number.isNaN(portNum) || portNum < 1 || portNum > 65535) {
+              return 'Please enter a valid port number (1-65535)';
+            }
+            return true;
+          },
+        }),
+      );
+
+  const selectedProjectType: 'full' | 'single' =
+    projectType ??
+    (yes
+      ? 'full'
+      : await select({
+          choices: [
+            { name: 'Full project', value: 'full' },
+            { name: 'Single file', value: 'single' },
+          ],
+          message: 'Project type?',
+        }));
+
+  const installSkills = yes
+    ? true
+    : await confirm({
+        default: true,
+        message: 'Install AI coding skills for halide?',
+      });
+
+  return { appName, installSkills, port, selectedProjectType };
+}
+
+/**
+ * Install halide via the detected package manager.
+ *
+ * @internal
+ * @param resolvedDir - The target project directory.
+ */
+function performInstallation(resolvedDir: string): void {
+  const pkgManager = detectPackageManager(resolvedDir);
+  const installCmd = getInstallCmd(pkgManager);
+
+  const installSpinner = ora('Installing halide...').start();
+  try {
+    runQuietly(installCmd, resolvedDir);
+    installSpinner.succeed();
+  } catch (err: unknown) {
+    installSpinner.fail('Installation failed');
+    throw err;
+  }
+}
+
+/**
+ * Write a single file, creating parent directories and updating spinner text.
+ *
+ * @internal
+ * @param fullPath - Absolute path of the file to write.
+ * @param content - File content to write.
+ * @param spinner - The ora spinner to update.
+ */
+function writeFileWithSpinner(
+  fullPath: string,
+  content: string,
+  spinner: ReturnType<typeof ora>,
+): void {
+  const dirPath = path.dirname(fullPath);
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+  if (fs.existsSync(fullPath)) {
+    spinner.text = `Setting up project files... (${fullPath} exists, skipping)`;
+  } else {
+    fs.writeFileSync(fullPath, content, 'utf8');
+  }
+}
+
+/**
+ * Generate and write project files, then configure tsconfig and scripts.
+ *
+ * @internal
+ * @param resolvedDir - The target project directory.
+ * @param appName - The application name.
+ * @param port - The server port.
+ * @param selectedProjectType - `'full'` for full project, `'single'` for single file.
+ * @param force - When true, overwrites existing files.
+ */
+function setupProjectFiles(
+  resolvedDir: string,
+  appName: string,
+  port: number,
+  selectedProjectType: 'full' | 'single',
+  force: boolean,
+): void {
+  const fileSpinner = ora('Setting up project files...').start();
+  try {
+    if (selectedProjectType === 'full') {
+      const files = generateFullProject(appName, port);
+      for (const [fp, content] of Object.entries(files)) {
+        const fullPath = path.join(resolvedDir, fp);
+        writeFileWithSpinner(fullPath, content, fileSpinner);
+      }
+    } else {
+      const singleServerPath = path.join(resolvedDir, 'server.ts');
+      writeFileWithSpinner(singleServerPath, generateServerTs(appName, port), fileSpinner);
+    }
+
+    const isFull = selectedProjectType === 'full';
+    writeTsconfigServer(resolvedDir, false, force, isFull);
+    addServerReference(resolvedDir, false, force);
+    addToTsconfigExclude(resolvedDir, false, force, isFull ? 'src/server.ts' : 'server.ts');
+    addScriptsToPackageJson(resolvedDir, false, force, isFull);
+
+    fileSpinner.succeed();
+  } catch (err: unknown) {
+    fileSpinner.fail('Failed to set up project files');
+    throw err;
+  }
+}
+
+/**
  * Initialize a new Halide project by prompting for project directory, app name, port, and project type.
  *
  * Installs halide, creates project files (single file or full project structure),
@@ -196,21 +414,8 @@ export async function init(options?: {
     projectType,
     yes = false,
   } = options ?? {};
-  const cwd = projectDir ?? process.cwd();
 
-  let resolvedDir: string;
-
-  if (projectDir) {
-    resolvedDir = path.resolve(projectDir);
-  } else if (dryRun || yes) {
-    resolvedDir = cwd;
-  } else {
-    const projectPath = await input({
-      default: cwd,
-      message: 'Project directory?',
-    });
-    resolvedDir = path.resolve(projectPath);
-  }
+  const resolvedDir = await resolveProjectDir(projectDir, dryRun, yes);
 
   const pkgPath = path.join(resolvedDir, 'package.json');
   if (!fs.existsSync(pkgPath)) {
@@ -226,31 +431,7 @@ export async function init(options?: {
   const effectiveProjectType = projectType ?? 'full';
 
   if (dryRun) {
-    cliInfo('[dry-run] Skipping interactive prompts');
-    cliInfo(`Project directory: ${resolvedDir}`);
-    cliInfo(`Project type: ${effectiveProjectType}`);
-    cliInfo('Would install halide');
-
-    if (effectiveProjectType === 'full') {
-      const files = generateFullProject('my-app', 3553);
-      cliInfo('Would create:');
-      for (const filePath of Object.keys(files)) {
-        cliInfo(`  - ${filePath}`);
-      }
-    } else {
-      cliInfo('Would create: server.ts');
-    }
-
-    writeTsconfigServer(resolvedDir, true, force, effectiveProjectType === 'full');
-    addServerReference(resolvedDir, true, force);
-    addToTsconfigExclude(
-      resolvedDir,
-      true,
-      force,
-      effectiveProjectType === 'full' ? 'src/server.ts' : 'server.ts',
-    );
-    addScriptsToPackageJson(resolvedDir, true, force, effectiveProjectType === 'full');
-    cliLog('\nDone! (dry-run)');
+    printDryRunPreview(resolvedDir, effectiveProjectType, force);
     return 0;
   }
 
@@ -258,102 +439,12 @@ export async function init(options?: {
     fs.mkdirSync(resolvedDir, { recursive: true });
   }
 
-  const appName = yes
-    ? 'halide-app'
-    : await input({
-        default: 'halide-app',
-        message: 'App name?',
-        validate: (value: string) => {
-          if (/^[a-zA-Z0-9_-]+$/.test(value)) return true;
-          return 'App name must contain only letters, numbers, dashes, and underscores';
-        },
-      });
+  const config = await promptForAppConfig(yes, projectType);
 
-  const port = yes
-    ? 3553
-    : Number(
-        await input({
-          default: '3553',
-          message: 'Port?',
-          validate: (value: string) => {
-            const portNum = Number.parseInt(value, 10);
-            if (Number.isNaN(portNum) || portNum < 1 || portNum > 65535) {
-              return 'Please enter a valid port number (1-65535)';
-            }
-            return true;
-          },
-        }),
-      );
+  performInstallation(resolvedDir);
+  setupProjectFiles(resolvedDir, config.appName, config.port, config.selectedProjectType, force);
 
-  const selectedProjectType =
-    projectType ??
-    (yes
-      ? 'full'
-      : await select({
-          choices: [
-            { name: 'Full project', value: 'full' },
-            { name: 'Single file', value: 'single' },
-          ],
-          message: 'Project type?',
-        }));
-
-  const installSkills = yes
-    ? true
-    : await confirm({
-        default: true,
-        message: 'Install AI coding skills for halide?',
-      });
-
-  const pkgManager = detectPackageManager(resolvedDir);
-  const installCmd = getInstallCmd(pkgManager);
-
-  const installSpinner = ora('Installing halide...').start();
-  try {
-    runQuietly(installCmd, resolvedDir);
-    installSpinner.succeed();
-  } catch (err: unknown) {
-    installSpinner.fail('Installation failed');
-    throw err;
-  }
-
-  const fileSpinner = ora('Setting up project files...').start();
-  try {
-    if (selectedProjectType === 'full') {
-      const files = generateFullProject(appName, port);
-      for (const [fp, content] of Object.entries(files)) {
-        const fullPath = path.join(resolvedDir, fp);
-        const dirPath = path.dirname(fullPath);
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-        }
-        if (fs.existsSync(fullPath)) {
-          fileSpinner.text = `Setting up project files... (${fp} exists, skipping)`;
-        } else {
-          fs.writeFileSync(fullPath, content, 'utf8');
-        }
-      }
-    } else {
-      const singleServerPath = path.join(resolvedDir, 'server.ts');
-      if (fs.existsSync(singleServerPath)) {
-        fileSpinner.text = 'Setting up project files... (server.ts exists, skipping)';
-      } else {
-        fs.writeFileSync(singleServerPath, generateServerTs(appName, port), 'utf8');
-      }
-    }
-
-    writeTsconfigServer(resolvedDir, false, force, selectedProjectType === 'full');
-    addServerReference(resolvedDir, false, force);
-    const finalServerPath = selectedProjectType === 'full' ? 'src/server.ts' : 'server.ts';
-    addToTsconfigExclude(resolvedDir, false, force, finalServerPath);
-    addScriptsToPackageJson(resolvedDir, false, force, selectedProjectType === 'full');
-
-    fileSpinner.succeed();
-  } catch (err: unknown) {
-    fileSpinner.fail('Failed to set up project files');
-    throw err;
-  }
-
-  if (installSkills) {
+  if (config.installSkills) {
     const skillsInstalled = installSkillsFromHalide(resolvedDir);
     if (!skillsInstalled) {
       cliWarn('To install skills manually, copy halide/skill/ to .agents/skills/halide/');

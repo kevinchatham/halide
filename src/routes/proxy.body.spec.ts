@@ -88,4 +88,19 @@ describe('collectProxyBody', () => {
     expect(result.body).toBe('chunk1');
     expect(result.error).toBeUndefined();
   });
+
+  it('captures collection error when stream throws', async () => {
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller: ReadableStreamDefaultController<Uint8Array>): void {
+          controller.error(new Error('stream error'));
+        },
+      }),
+    );
+    const signal = new AbortController().signal;
+    const result = await collectProxyBody(response, signal, 1024);
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error?.message).toBe('stream error');
+    expect(result.body).toBeUndefined();
+  });
 });

@@ -138,4 +138,29 @@ describe('extractBearerClaims', () => {
     await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
     expect(result).toMatchObject(claims);
   });
+
+  it('returns null when JWT header is not valid JSON', async () => {
+    const app = buildHonoApp();
+    // dG9rZW4 decodes to "token" which is not valid JSON
+    const token = 'dG9rZW4.e30.e30';
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret);
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when algorithm is not in allowed list', async () => {
+    const app = buildHonoApp();
+    const token = await createValidToken({ sub: 'test' });
+    let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
+    app.get('/test', async (c) => {
+      result = await extractBearerClaims<TestClaims>(c, secret, undefined, ['RS256']);
+      return c.json({});
+    });
+    await app.request('/test', { headers: { authorization: `Bearer ${token}` } });
+    expect(result).toBeNull();
+  });
 });
