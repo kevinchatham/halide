@@ -3,14 +3,21 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { Context, MiddlewareHandler } from 'hono';
 import { DEFAULTS } from '../config/defaults';
+import { createSecurityMiddleware } from '../middleware/security';
 import type { AppConfig } from '../types/app';
+import type { CspDirectives } from '../types/csp';
 
 /**
  * Create app static file serving and fallback handlers.
  * @param appConfig - The app configuration (must have root defined).
- * @returns Object containing static middleware and app fallback handler.
+ * @param csp - CSP directives to apply to the SPA fallback path.
+ * @returns Object containing CSP middleware, static middleware, and app fallback handler.
  */
-export function createAppHandler(appConfig: AppConfig & { root: string }): {
+export function createAppHandler(
+  appConfig: AppConfig & { root: string },
+  csp?: CspDirectives,
+): {
+  cspMiddleware: MiddlewareHandler;
   staticMiddleware: MiddlewareHandler;
   appFallback: (c: Context) => Promise<Response>;
 } {
@@ -18,6 +25,7 @@ export function createAppHandler(appConfig: AppConfig & { root: string }): {
 
   const resolvedRoot = path.resolve(root);
 
+  const cspMiddleware = createSecurityMiddleware(csp ?? {});
   const staticMiddleware = serveStatic({ root: resolvedRoot });
 
   const appFallback = async (c: Context): Promise<Response> => {
@@ -32,5 +40,5 @@ export function createAppHandler(appConfig: AppConfig & { root: string }): {
     }
   };
 
-  return { appFallback, staticMiddleware };
+  return { appFallback, cspMiddleware, staticMiddleware };
 }

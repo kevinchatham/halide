@@ -1,8 +1,10 @@
 # Full example
 
 ```ts
-import { createServer, apiRoute, proxyRoute, type THalideApp } from 'halide';
+import { defineHalide, type HalideContext } from 'halide';
 import { z } from 'zod';
+
+const { createServer, apiRoute, proxyRoute } = defineHalide();
 
 interface UserClaims {
   sub: string;
@@ -11,14 +13,14 @@ interface UserClaims {
 
 type LogScope = { requestId: string; service: string };
 
-type App = THalideApp<UserClaims, LogScope>;
+type App = HalideContext<UserClaims, LogScope>;
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
 });
 
-const server = createServer<App>({
+const server = createServer<UserClaims, LogScope>({
   app: {
     name: 'dashboard',
     root: './dist/browser',
@@ -31,11 +33,9 @@ const server = createServer<App>({
       methods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
     },
     csp: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        connectSrc: ["'self'"],
-      },
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
     },
     auth: {
       strategy: 'jwks',
@@ -50,15 +50,19 @@ const server = createServer<App>({
 
   observability: {
     requestId: true,
+    logScopeFactory: (ctx, claims) => ({
+      requestId: (ctx.headers as Record<string, string | undefined>)?.['x-request-id'] ?? 'no-id',
+      service: 'bff',
+    }),
     onRequest: (ctx, app) => {
       app.logger.info(
-        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' },
+        { requestId: 'request-id', service: 'bff' },
         `${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`,
       );
     },
     onResponse: (ctx, app, { statusCode, durationMs }) => {
       app.logger.info(
-        { requestId: ctx.headers['x-request-id'] ?? 'unknown', service: 'bff' },
+        { requestId: 'request-id', service: 'bff' },
         `${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`,
       );
     },
@@ -68,12 +72,12 @@ const server = createServer<App>({
     apiRoute({
       access: 'public',
       path: '/health',
-      handler: async () => ({ status: 'ok' }),
+      handler: async (_ctx, _app) => ({ status: 'ok' }),
     }),
     apiRoute({
       access: 'public',
       path: '/config',
-      handler: async () => ({ environment: process.env.NODE_ENV }),
+      handler: async (_ctx, _app) => ({ environment: process.env.NODE_ENV }),
     }),
     apiRoute({
       access: 'private',
@@ -95,7 +99,7 @@ const server = createServer<App>({
       access: 'private',
       path: '/admin/settings',
       authorize: (_ctx, app) => app.claims?.role === 'admin',
-      handler: async () => ({ maintenance: false }),
+      handler: async (_ctx, _app) => ({ maintenance: false }),
     }),
   ],
 

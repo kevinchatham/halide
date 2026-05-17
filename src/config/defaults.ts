@@ -1,6 +1,16 @@
 import { styleText } from 'node:util';
 import type { AuthorizeFn } from '../types/api';
-import type { Logger, RequestContext } from '../types/app';
+import type { HalideContext, InternalLogger, Logger, RequestContext } from '../types/app';
+import type { CspDirectives } from '../types/csp';
+import {
+  DEFAULT_MAX_FREE_SOCKETS,
+  DEFAULT_MAX_SOCKETS,
+  DEFAULT_PORT,
+  DEFAULT_PROXY_TIMEOUT_MS,
+  DEFAULT_RATE_LIMIT_MAX_REQUESTS,
+  DEFAULT_RATE_LIMIT_WINDOW_MS,
+  SECRET_CACHE_TTL_SECONDS,
+} from './constants';
 
 /**
  * Default configuration values used when options are omitted.
@@ -11,15 +21,15 @@ export const DEFAULTS = {
     apiPrefix: '/api',
     fallback: 'index.html',
     name: 'app',
-    port: 3553,
+    port: DEFAULT_PORT,
   },
   auth: {
-    secretTtl: 60,
+    secretTtl: SECRET_CACHE_TTL_SECONDS,
   },
   cors: {
     credentials: false,
     methods: ['get', 'post', 'put', 'delete', 'patch'] as string[],
-    origin: ['*'] as string[],
+    origin: [] as string[],
   },
   csp: {
     default: {
@@ -33,7 +43,12 @@ export const DEFAULTS = {
       objectSrc: ["'none'"],
       scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
-      styleSrc: ["'self'", 'https:'],
+      /**
+       * Only allows stylesheets from the same origin. To allow CDN-hosted
+       * stylesheets, override this directive with specific CDN hostnames
+       * (e.g., `["'self'", 'https://cdn.jsdelivr.net']`).
+       */
+      styleSrc: ["'self'"],
       upgradeInsecureRequests: [],
     },
     openapiOverrides: {
@@ -44,7 +59,7 @@ export const DEFAULTS = {
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
       styleSrcAttr: ["'unsafe-inline'"],
-    },
+    } as Partial<CspDirectives>,
   },
   openapi: {
     path: '/swagger',
@@ -52,20 +67,34 @@ export const DEFAULTS = {
     version: '1.0.0',
   },
   proxy: {
-    timeoutMs: 60_000,
+    maxFreeSockets: DEFAULT_MAX_FREE_SOCKETS,
+    maxSockets: DEFAULT_MAX_SOCKETS,
+    timeoutMs: DEFAULT_PROXY_TIMEOUT_MS,
   },
   rateLimit: {
-    maxRequests: 100,
-    windowMs: 900_000,
+    maxRequests: DEFAULT_RATE_LIMIT_MAX_REQUESTS,
+    windowMs: DEFAULT_RATE_LIMIT_WINDOW_MS,
   },
   route: {
     method: 'get' as const,
   },
 } as const;
 
-/** Default authorization function that allows all requests. */
-export const defaultAuthorize: AuthorizeFn<unknown> = async (_ctx: RequestContext, _app: unknown) =>
-  true;
+/**
+ * Default authorization function that permits any request with a valid JWT.
+ *
+ * This implements an "any authenticated user" policy — the JWT has already been
+ * validated (signature, expiration, audience) by the time this function runs.
+ * Routes with `access: 'private'` and no explicit `authorize` function accept
+ * any holder of a valid token.
+ *
+ * To restrict access to specific roles or claims, provide an `authorize`
+ * function on the route definition.
+ */
+export const defaultAuthorize: AuthorizeFn<unknown, unknown> = async (
+  _ctx: RequestContext,
+  _app: HalideContext,
+) => true;
 
 /**
  * Create a noop logger that discards all log messages.
@@ -124,4 +153,44 @@ export function createDefaultLogger<T = unknown>(): Logger<T> {
       console.log(format(['yellow', 'bold'], msg));
     },
   };
+}
+
+/**
+ * Wrap a logger so every method automatically applies a fixed scope.
+ *
+ * Used by the framework to create per-request loggers: the `logScopeFactory`
+ * produces a scope value for the current request, and `createScopedLogger`
+ * bakes it into every log call so handlers and hooks don't need to pass
+ * scope manually.
+ *
+ * @typeParam TLogScope - The type of the log scope object.
+ * @param logger - The underlying logger implementation.
+ * @param scope - The fixed scope value to pass as the first argument.
+ * @returns A new {@link Logger} that pre-applies `scope` to every method.
+ */
+export function createScopedLogger<TLogScope>(
+  logger: Logger<TLogScope>,
+  scope: TLogScope,
+): Logger<TLogScope> {
+  return {
+    debug: (_scope: TLogScope, ...args: unknown[]) => logger.debug(scope, ...args),
+    error: (_scope: TLogScope, ...args: unknown[]) => logger.error(scope, ...args),
+    info: (_scope: TLogScope, ...args: unknown[]) => logger.info(scope, ...args),
+    warn: (_scope: TLogScope, ...args: unknown[]) => logger.warn(scope, ...args),
+  };
+}
+
+/**
+ * Cast a typed logger to an internal logger for use in framework internals
+ * where ad-hoc scope objects are logged (e.g., validation errors, startup warnings).
+ *
+ * The cast is safe because the underlying logger implementation (e.g., `createDefaultLogger`)
+ * accepts any value via `stringifyScope(scope)` which operates on `unknown`.
+ *
+ * @typeParam T - The current type parameter of the logger.
+ * @param logger - The logger to cast.
+ * @returns The logger cast to {@link InternalLogger}.
+ */
+export function asInternalLogger<T>(logger: Logger<T>): InternalLogger {
+  return logger as InternalLogger;
 }

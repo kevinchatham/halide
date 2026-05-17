@@ -1,15 +1,6 @@
-export { type CreateAppResult, createApp, createServer, type Server } from './config/runtime';
-export { apiRoute } from './routes/apiRoute';
-export { proxyRoute } from './routes/proxyRoute';
-export type {
-  AppConfig,
-  Logger,
-  ObservabilityConfig,
-  RequestContext,
-  ResponseContext,
-  ServerConfig,
-  THalideApp,
-} from './types';
+export { defineHalide } from './config/builder';
+export { createDefaultLogger, createNoopLogger, createScopedLogger } from './config/defaults';
+export type { CreateAppResult, Server } from './config/runtime';
 export type {
   ApiRoute,
   ApiRouteHandler,
@@ -20,9 +11,16 @@ export type {
   TransformFn,
 } from './types/api';
 export type {
+  AppConfig,
+  HalideContext,
+  Logger,
+  ObservabilityConfig,
+  RequestContext,
+  ResponseContext,
+} from './types/app';
+export type {
   CspDirectives,
   CspDirectiveValue,
-  CspOptions,
 } from './types/csp';
 export type {
   OpenApiConfig,
@@ -37,3 +35,4 @@ export type {
   SecurityAuthConfig,
   SecurityConfig,
 } from './types/security';
+export type { ServerConfig } from './types/server-config';

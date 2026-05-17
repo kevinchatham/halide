@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateServerTs } from './init';
+import { generateServerTs } from './init.template';
 
 const mockExecSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
@@ -38,7 +38,7 @@ describe('generateServerTs', () => {
     const result = generateServerTs('my-custom-app', 8080);
     expect(result).toContain("name: 'my-custom-app'");
     expect(result).toContain('port: 8080');
-    expect(result).toContain("import { createServer, apiRoute } from 'halide'");
+    expect(result).toContain("import { defineHalide } from 'halide'");
   });
 
   it('generates server.ts with default app name', () => {

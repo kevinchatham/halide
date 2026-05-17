@@ -1,65 +1,94 @@
+import type { ServerResponse } from 'node:http';
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { type Context, Hono, type Next } from 'hono';
 import { cors } from 'hono/cors';
-import { createErrorHandler } from '../middleware/errorHandler.js';
-import { createRateLimitMiddleware } from '../middleware/rateLimit.js';
-import { createRequestIdMiddleware } from '../middleware/requestId.js';
-import { createSecurityMiddleware } from '../middleware/security.js';
-import { createOpenApiRoutes } from '../middleware/swagger.js';
-import { createAppHandler } from '../routes/app.js';
-import { registerRoutes } from '../routes/registry.js';
-import type { AppConfig, Logger, ServerConfig } from '../types.js';
-import { createDefaultLogger, DEFAULTS } from './defaults.js';
-import { validateServerConfig } from './validate.js';
-
-/** Hono context variables used internally by Halide middleware. */
-type HalideVariables = { rawBody?: unknown };
+import { csrf } from 'hono/csrf';
+import type { BlankSchema } from 'hono/types';
+import { createErrorHandler } from '../middleware/errorHandler';
+import type { SpecCacheState } from '../middleware/openapi';
+import { createOpenApiRoutes } from '../middleware/openapi';
+import { createRateLimitMiddleware, createRedisRateLimitStore } from '../middleware/rateLimit';
+import { createRequestIdMiddleware } from '../middleware/requestId';
+import { createSecurityMiddleware } from '../middleware/security';
+import { createAppHandler } from '../routes/app';
+import { registerRoutes } from '../routes/registry';
+import { createAgentCache } from '../services/proxy';
+import type { AppConfig, HalideVariables, HonoApp, Logger, RequestContext } from '../types/app';
+import type { ServerConfig } from '../types/server-config';
+import { MAX_DRAIN_TIMEOUT_MS } from './constants';
+import { asInternalLogger, createDefaultLogger, DEFAULTS } from './defaults';
+import { validateServerConfig, validateServerConfigSync } from './validate';
 
 /**
  * Halide HTTP server with lifecycle management.
+ *
+ * Created by {@link createServer}. Call `start()` to begin listening and `stop()` to shut down gracefully.
+ * Handles SIGINT/SIGTERM automatically, draining active connections before closing.
+ *
+ * @example
+ * ```ts
+ * const server = createServer({
+ *   apiRoutes: [],
+ *   app: { root: 'dist' },
+ * });
+ * server.start();
+ * await server.stop();
+ * ```
  */
 export interface Server {
   /** Promise that resolves when the server is ready to accept connections. */
   ready: Promise<void>;
   /**
    * Start the server and begin listening on the configured port.
+   *
+   * Registers SIGINT/SIGTERM handlers for graceful shutdown. Calls `onReady`
+   * callback with the port number once the server is bound.
    * @param onReady - Optional callback invoked with the port when the server starts.
    */
   start: (onReady?: (port: number) => void) => void;
-  /** Stop the server and close all connections. */
+  /**
+   * Stop the server and close all connections.
+   *
+   * Drains active requests (up to 30s timeout), disposes proxy HTTP agents
+   * and rate limit resources, then closes the HTTP server.
+   */
   stop: () => Promise<void>;
 }
 
 /**
- * Result of createApp, containing the Hono app and cleanup functions.
+ * Result of {@link createApp}, containing the Hono app and cleanup functions.
+ *
+ * Call `proxyDispose()` and `rateLimitDispose()` when shutting down to release
+ * HTTP agent connections and rate limit timers. These functions are `undefined`
+ * when no proxy or rate limit routes are configured.
  */
 export interface CreateAppResult {
-  /** The configured Hono application. */
-  app: Hono<{ Variables: HalideVariables }>;
+  /** The configured Hono application with all middleware and routes registered. */
+  app: HonoApp;
   /** Logger instance used throughout the server. */
   logger: Logger<unknown>;
-  /** Function to dispose of rate limit resources. */
+  /** Function to dispose of proxy HTTP agent connections. undefined when no proxy routes are configured. */
+  proxyDispose: (() => void) | undefined;
+  /** Function to dispose of rate limit resources (clears cleanup timer). undefined when rate limiting is disabled. */
   rateLimitDispose: (() => void) | undefined;
 }
 
 /**
- * Create a configured Hono application with all middleware, routes, and handlers.
+ * Apply CORS and optional CSRF middleware to the Hono app.
  *
- * This is the core function that builds the server. It validates the config,
- * applies middleware, registers routes, and sets up the SPA fallback handler.
+ * Configures `hono/cors` with the provided CORS settings and adds `hono/csrf`
+ * when credentials are enabled (to prevent cross-site request forgery).
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
- * @param configInput - The server configuration.
- * @returns An object containing the Hono app and cleanup functions.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing CORS settings.
  */
-export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): CreateAppResult {
-  validateServerConfig(configInput);
-
-  const logger = configInput.observability?.logger ?? createDefaultLogger();
-  const app = new Hono<{ Variables: HalideVariables }>();
-
-  const appName = configInput.app?.name ?? DEFAULTS.app.name;
-  const security = configInput.security;
+export function setupCorsAndCsrf<TClaims, TLogScope>(
+  app: HonoApp,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  const security = config.security;
   const corsConfig = security?.cors;
   const corsMethods = corsConfig?.methods ?? DEFAULTS.cors.methods;
   const corsOrigin = corsConfig?.origin ?? DEFAULTS.cors.origin;
@@ -69,7 +98,7 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
     '*',
     cors({
       allowHeaders: corsConfig?.allowedHeaders,
-      allowMethods: corsMethods.map((m) => m.toUpperCase()),
+      allowMethods: corsMethods.map((m: string) => m.toUpperCase()),
       credentials: corsCredentials,
       exposeHeaders: corsConfig?.exposedHeaders,
       maxAge: corsConfig?.maxAge,
@@ -77,63 +106,264 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
     }),
   );
 
-  if (corsOrigin === '*' || (Array.isArray(corsOrigin) && corsOrigin.includes('*'))) {
-    logger.warn(
-      { appName } as unknown,
-      `CORS wildcard origin detected. Consider restricting origins for production use.`,
-    );
+  if (corsCredentials) {
+    const origins = Array.isArray(corsOrigin) ? corsOrigin : [corsOrigin];
+    app.use('*', csrf({ origin: origins }));
   }
+}
 
-  let rateLimitDispose: (() => void) | undefined;
+/**
+ * Apply rate limiting middleware to the Hono app.
+ *
+ * When `security.rateLimit` is configured, creates either a Redis-backed
+ * store or an in-memory store with periodic cleanup. Returns a dispose
+ * function for cleanup.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param security - The security configuration containing rate limit settings.
+ * @returns A dispose function for cleanup, or undefined when rate limiting is disabled.
+ */
+export function setupRateLimit<TClaims, TLogScope>(
+  app: HonoApp,
+  security: ServerConfig<TClaims, TLogScope>['security'],
+): (() => void) | undefined {
+  if (!security?.rateLimit) return undefined;
 
-  if (security?.rateLimit) {
-    const rateLimitConfig = security.rateLimit;
-    const { middleware, dispose } = createRateLimitMiddleware({
-      maxEntries: rateLimitConfig.maxEntries,
-      maxRequests: rateLimitConfig.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
-      trustedProxies: rateLimitConfig.trustedProxies,
-      windowMs: rateLimitConfig.windowMs ?? DEFAULTS.rateLimit.windowMs,
+  const rl = security.rateLimit;
+  let middleware: (c: Context, next: Next) => Promise<Response | undefined>;
+  let dispose: (() => void) | undefined;
+
+  if (rl.redisClient) {
+    const { middleware: redisMw, dispose: redisDispose } = createRedisRateLimitStore(
+      rl.redisClient,
+      {
+        maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+        trustedProxies: rl.trustedProxies,
+        windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
+      },
+    );
+    middleware = redisMw;
+    dispose = redisDispose;
+  } else {
+    const { middleware: memMw, dispose: memDispose } = createRateLimitMiddleware({
+      maxEntries: rl.maxEntries,
+      maxRequests: rl.maxRequests ?? DEFAULTS.rateLimit.maxRequests,
+      trustedProxies: rl.trustedProxies,
+      windowMs: rl.windowMs ?? DEFAULTS.rateLimit.windowMs,
     });
-    app.use('*', middleware);
-    rateLimitDispose = dispose;
+    middleware = memMw;
+    dispose = memDispose;
   }
 
-  const openapiEnabled = configInput.openapi?.enabled ?? false;
+  app.use('*', middleware);
+  return dispose;
+}
 
-  if (openapiEnabled) {
-    logger.warn(
-      { appName } as unknown,
-      `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
-    );
-    const cspOverrides = DEFAULTS.csp.openapiOverrides as unknown as Partial<
-      import('../types.js').CspDirectives
-    >;
-    const swaggerPath = configInput.openapi?.path ?? DEFAULTS.openapi.path;
-    app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
-    app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
-  }
+/**
+ * Apply CSP overrides for OpenAPI/Swagger routes when OpenAPI is enabled.
+ *
+ * When OpenAPI UI is enabled, applies relaxed CSP directives (from
+ * {@link DEFAULTS.csp.openapiOverrides}) to the Swagger path so that
+ * the Scalar UI can load its scripts and styles.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing OpenAPI settings.
+ * @param logger - Logger instance for emitting warnings about relaxed CSP.
+ */
+export function setupOpenapi<TClaims, TLogScope>(
+  app: HonoApp,
+  config: ServerConfig<TClaims, TLogScope>,
+  logger: Logger<Record<string, unknown>>,
+): void {
+  const openapiEnabled = config.openapi?.enabled ?? false;
+  if (!openapiEnabled) return;
 
-  app.use('*', createSecurityMiddleware(security?.csp ?? {}));
+  const appName = config.app?.name ?? DEFAULTS.app.name;
+  const security = config.security;
+  const cspOverrides = DEFAULTS.csp.openapiOverrides;
+  const swaggerPath = config.openapi?.path ?? DEFAULTS.openapi.path;
 
-  if (configInput.observability?.requestId) {
+  logger.warn(
+    { appName },
+    `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
+  );
+
+  app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
+  app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
+}
+
+/**
+ * Apply CSP security headers middleware to the Hono app.
+ *
+ * Registers the {@link createSecurityMiddleware} as global middleware to
+ * apply Content Security Policy headers to all responses.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing CSP settings.
+ */
+export function setupSecurity<TClaims, TLogScope>(
+  app: HonoApp,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  app.use('*', createSecurityMiddleware(config.security?.csp ?? {}));
+}
+
+/**
+ * Apply request ID middleware when `observability.requestId` is enabled.
+ *
+ * Registers the {@link createRequestIdMiddleware} to add a unique request
+ * ID to each request (reusing `x-request-id` if present, otherwise generating a UUID).
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register middleware on.
+ * @param config - The server configuration containing observability settings.
+ */
+export function setupRequestId<TClaims, TLogScope>(
+  app: HonoApp,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  if (config.observability?.requestId) {
     app.use('*', createRequestIdMiddleware());
   }
+}
 
-  registerRoutes(app, configInput, logger);
+/** Register all API and proxy routes on the Hono app. */
+function setupRoutes<TClaims = unknown, TLogScope = unknown>(
+  app: HonoApp,
+  agentCache: ReturnType<typeof createAgentCache>,
+  config: ServerConfig<TClaims, TLogScope>,
+  logger: Logger<TLogScope>,
+): void {
+  registerRoutes({ agentCache, app, config, logger });
+}
 
-  createOpenApiRoutes(configInput, app as unknown as Hono);
+/** Register OpenAPI/Scalar documentation routes on the Hono app. */
+function setupOpenapiRoutes<TClaims = unknown, TLogScope = unknown>(
+  config: ServerConfig<TClaims, TLogScope>,
+  app: HonoApp,
+  specCacheState: SpecCacheState,
+  logger?: Logger<TLogScope>,
+): void {
+  createOpenApiRoutes(config, app, specCacheState, logger);
+}
 
-  if (configInput.app?.root) {
-    const { staticMiddleware, appFallback } = createAppHandler(
-      configInput.app as AppConfig & { root: string },
-    );
-    app.get('/*', staticMiddleware);
-    app.all('/*', appFallback);
+/**
+ * Apply SPA fallback and static file handler when `config.app.root` is set.
+ *
+ * Registers static file serving for the configured root directory and a
+ * fallback handler that serves the fallback file (e.g., `index.html`) for
+ * unmatched routes, supporting client-side routing.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register handlers on.
+ * @param config - The server configuration containing app settings.
+ */
+export function setupAppHandler<TClaims, TLogScope>(
+  app: HonoApp,
+  config: ServerConfig<TClaims, TLogScope>,
+): void {
+  if (!config.app?.root) return;
+
+  const { cspMiddleware, staticMiddleware, appFallback } = createAppHandler(
+    config.app as AppConfig & { root: string },
+    config.security?.csp,
+  );
+  app.get('/*', cspMiddleware, staticMiddleware);
+  app.all('/*', cspMiddleware, appFallback);
+}
+
+/**
+ * Apply the global error handler middleware to the Hono app.
+ *
+ * Registers an error handler via `app.onError()` that logs error details
+ * and returns a JSON error response. Supports error `.status` properties
+ * for HTTP error codes.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param app - The Hono application to register the error handler on.
+ * @param logger - Logger instance for error logging.
+ * @param logScopeFactory - Optional per-request factory that produces a typed log scope.
+ */
+export function setupErrorHandling<TClaims, TLogScope>(
+  app: HonoApp,
+  logger: Logger<TLogScope>,
+  logScopeFactory: ((ctx: RequestContext, claims: TClaims | undefined) => TLogScope) | undefined,
+): void {
+  app.onError(createErrorHandler<TClaims, TLogScope>(logger, logScopeFactory));
+}
+
+/**
+ * Create a configured Hono application with all middleware, routes, and handlers.
+ *
+ * This is the core function that builds the server. It validates the config,
+ * applies middleware, registers routes, and sets up the SPA fallback handler.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param config - The server configuration.
+ * @returns An object containing the Hono app and cleanup functions.
+ */
+export function createApp<TClaims = unknown, TLogScope = unknown>(
+  config: ServerConfig<TClaims, TLogScope>,
+): CreateAppResult {
+  const logger = config.observability?.logger ?? createDefaultLogger();
+  const internalLogger = asInternalLogger(logger);
+  const logScopeFactory = config.observability?.logScopeFactory;
+  const auth = config.security?.auth;
+  const hasFunctionSecret = auth?.secret && typeof auth.secret === 'function';
+
+  if (hasFunctionSecret) {
+    void validateServerConfig(config).then((result) => {
+      if (!result.valid) {
+        internalLogger.error(
+          { errors: result.errors },
+          'Async auth secret validation failed at startup:',
+          result.errors.map((e) => e.message).join(', '),
+        );
+        process.exit(1);
+      }
+    });
+  } else {
+    validateServerConfigSync(config, logger as Logger<unknown>);
   }
 
-  app.onError(createErrorHandler(logger));
+  const app = new Hono<
+    {
+      Variables: HalideVariables;
+    },
+    BlankSchema,
+    '/'
+  >();
+  const agentCache = createAgentCache();
 
-  return { app, logger, rateLimitDispose };
+  setupCorsAndCsrf(app, config);
+  const rateLimitDispose = setupRateLimit(app, config.security);
+  setupOpenapi(app, config, internalLogger);
+  setupSecurity(app, config);
+  setupRequestId(app, config);
+  setupRoutes(app, agentCache, config, logger);
+
+  const specCacheState: SpecCacheState = { cachedSpec: null, specResolution: null };
+  setupOpenapiRoutes(config, app, specCacheState, logger);
+
+  setupAppHandler(app, config);
+  setupErrorHandling(app, logger, logScopeFactory);
+
+  return {
+    app,
+    logger: logger as Logger<unknown>,
+    proxyDispose: () => agentCache.dispose(),
+    rateLimitDispose,
+  };
 }
 
 /**
@@ -142,12 +372,15 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
  * The server is synchronous to create. Call `server.start()` to listen.
  * Graceful shutdown is handled automatically on SIGINT/SIGTERM.
  *
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @param configInput - The server configuration.
  * @returns A `Server` object with `ready`, `start`, and `stop` methods.
  * @example
  * ```ts
- * import { createServer, apiRoute } from 'halide';
+ * import { defineHalide } from 'halide';
+ *
+ * const { createServer, apiRoute } = defineHalide();
  *
  * const server = createServer({
  *   apiRoutes: [
@@ -162,8 +395,12 @@ export function createApp<TApp = unknown>(configInput: ServerConfig<TApp>): Crea
  * server.start();
  * ```
  */
-export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): Server {
-  const { app, rateLimitDispose, logger } = createApp<TApp>(configInput);
+export function createServer<TClaims = unknown, TLogScope = unknown>(
+  configInput: ServerConfig<TClaims, TLogScope>,
+): Server {
+  const { app, proxyDispose, rateLimitDispose, logger } = createApp<TClaims, TLogScope>(
+    configInput,
+  );
 
   const appName = configInput.app?.name ?? DEFAULTS.app.name;
 
@@ -172,6 +409,8 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
   let readyResolve!: () => void;
   let readyReject!: (err: Error) => void;
 
+  const activeRequests = new Set<ServerResponse>();
+
   const ready = new Promise<void>((resolve, reject) => {
     readyResolve = resolve;
     readyReject = reject;
@@ -179,26 +418,47 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
 
   void ready.catch(() => {});
 
-  /** Gracefully shut down the server on SIGINT/SIGTERM. */
+  /** Dispose proxy/rate-limit resources, drain active connections, and close the HTTP server. */
+  const shutdownServer = async (exitCode?: number): Promise<void> => {
+    rateLimitDispose?.();
+    proxyDispose?.();
+    const server = httpServer;
+    if (server) {
+      const http = server as import('node:http').Server;
+      http.closeAllConnections?.();
+      http.close();
+      const drainPromise = new Promise<void>((resolve) => {
+        const checkDrain = (): void => {
+          if (activeRequests.size === 0) {
+            resolve();
+          } else {
+            setTimeout(checkDrain, 1000);
+          }
+        };
+        checkDrain();
+      });
+      const timeoutPromise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          logger.warn(
+            { appName },
+            `Drain timeout after ${MAX_DRAIN_TIMEOUT_MS}ms, forcing shutdown`,
+          );
+          resolve();
+        }, MAX_DRAIN_TIMEOUT_MS).unref();
+      });
+      await Promise.race([drainPromise, timeoutPromise]);
+    }
+    if (exitCode !== undefined) {
+      process.exitCode = exitCode;
+    }
+  };
+
+  /** Handle SIGINT/SIGTERM: set shutdown flag, log the signal, and drain connections. */
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    logger.info({ appName } as unknown, `Received ${signal}, shutting down...`);
-    rateLimitDispose?.();
-    const server = httpServer;
-    if (server) {
-      (server as import('node:http').Server).closeAllConnections?.();
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
-    }
-    process.exitCode = 0;
+    logger.info({ appName }, `Received ${signal}, shutting down...`);
+    await shutdownServer(0);
   };
 
   return {
@@ -207,7 +467,7 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
       if (httpServer) return;
       const port =
         Number.parseInt(process.env.PORT || '', 10) || (configInput.app?.port ?? DEFAULTS.app.port);
-      logger.info({ appName } as unknown, `Server starting on port ${port}`);
+      logger.info({ appName }, `Server starting on port ${port}`);
       httpServer = serve(
         {
           fetch: app.fetch,
@@ -218,10 +478,15 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
           onReady?.(port);
         },
       );
+      const http = httpServer as import('node:http').Server;
+      http.on('request', (_req, res) => {
+        activeRequests.add(res);
+        res.on('finish', () => activeRequests.delete(res));
+        res.on('close', () => activeRequests.delete(res));
+      });
       httpServer.on('error', (err: Error) => {
         readyReject(err);
-        logger.error({ appName } as unknown, `Failed to start: ${err.message}`);
-        process.exit(1);
+        logger.error({ appName }, `Failed to start: ${err.message}`);
       });
       process.on('SIGINT', () => {
         void shutdown('SIGINT');
@@ -233,21 +498,8 @@ export function createServer<TApp = unknown>(configInput: ServerConfig<TApp>): S
     stop: async () => {
       if (isShuttingDown) return;
       isShuttingDown = true;
-      rateLimitDispose?.();
-      const server = httpServer;
-      if (!server) {
-        return;
-      }
-      (server as import('node:http').Server).closeAllConnections?.();
-      await new Promise<void>((resolve, reject) => {
-        server.close((err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
+      if (!httpServer) return;
+      await shutdownServer();
     },
   };
 }

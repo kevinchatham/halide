@@ -1,256 +1,183 @@
-import type { Route } from '../types/api';
-import type { AppConfig } from '../types/app';
-import type { CspOptions } from '../types/csp';
-import type { CorsConfig, SecurityConfig } from '../types/security';
+import type { Logger } from '../types/app';
+import type { SecurityAuthConfig } from '../types/security';
+import { serverConfigSchema } from './schema';
 
-/** A single validation error with field location and message. */
+/** Partial auth config subset used for async secret validation. */
+type AuthInput = Pick<SecurityAuthConfig, 'strategy' | 'secret'>;
+
+/**
+ * A single validation error with field location and message.
+ *
+ * Used by {@link ValidationResult} to report configuration issues found
+ * during validation. The `field` uses dot-notation to identify the exact
+ * nested path (e.g., `'security.auth.secret'`).
+ */
 export type ValidationError = {
-  /** Dot-notation path to the offending field. */
+  /** Dot-notation path to the offending field (e.g., `'security.auth.secret'`). */
   field: string;
-  /** Human-readable error description. */
+  /** Human-readable error description explaining what went wrong. */
   message: string;
 };
 
-/** Result of validation with collected errors. */
+/**
+ * Result of validation with collected errors and warnings.
+ *
+ * When `valid` is true, `errors` is empty and `warnings` may contain
+ * non-blocking advisory messages about config choices (e.g., rate limiting
+ * without a Redis client).
+ *
+ * Returned by {@link validateServerConfig} and {@link validateAuthSecret}.
+ */
 export type ValidationResult = {
   /** List of accumulated validation errors. Empty when `valid` is true. */
   errors: ValidationError[];
   /** Whether validation passed (no errors). */
   valid: boolean;
+  /** Non-blocking warnings about config choices (e.g., rate limit without Redis). */
+  warnings?: ValidationError[];
 };
 
-/** Input type for route validation. Partial API or proxy route. */
-type RouteInput<TApp = unknown> =
-  | Partial<Extract<Route<TApp>, { type: 'api' }>>
-  | Partial<Extract<Route<TApp>, { type: 'proxy' }>>;
-
-/** Input type for app config validation. Partial AppConfig. */
-type AppInput = Partial<AppConfig>;
-
-/** Input type for CORS config validation. Partial CorsConfig. */
-type CorsInput = Partial<CorsConfig>;
-
-/** Input type for auth config validation. Partial SecurityAuthConfig. */
-type AuthInput = Partial<NonNullable<SecurityConfig['auth']>>;
-
-/** Input type for security config validation. Partial security fields. */
-type SecurityInput = {
-  cors?: CorsInput;
-  csp?: CspOptions;
-  auth?: AuthInput;
-  rateLimit?: { windowMs?: number; maxRequests?: number; maxEntries?: number };
-};
-
-/** Input type for server config validation. Partial server config fields. */
-type ServerConfigInput<TApp = unknown> = {
-  app?: AppInput;
-  apiRoutes?: RouteInput<TApp>[];
-  proxyRoutes?: RouteInput<TApp>[];
-  observability?: unknown;
-  security?: SecurityInput;
-};
-
-/** Validate the app configuration, checking port range and other app-level constraints. */
-function validateAppConfig(app?: AppInput): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (app?.port !== undefined) {
-    if (!Number.isInteger(app.port) || app.port < 1 || app.port > 65535) {
-      errors.push({
-        field: 'app.port',
-        message: 'app.port must be an integer between 1 and 65535',
-      });
-    }
+/** Collect non-blocking warnings from config that are not handled by Zod. */
+function collectValidationWarnings(config: Record<string, unknown>): ValidationError[] {
+  const warnings: ValidationError[] = [];
+  const rateLimit = (config.security as Record<string, unknown> | undefined)?.rateLimit as
+    | Record<string, unknown>
+    | undefined;
+  if (rateLimit && !rateLimit.redisClient) {
+    warnings.push({
+      field: 'security.rateLimit',
+      message:
+        'Rate limiting is configured without redisClient. Fallback to in-memory store is per-instance only and will not share state across multiple server instances; configure redisClient for distributed rate limiting.',
+    });
   }
-  return { errors, valid: errors.length === 0 };
+  return warnings;
 }
 
-/** Validate proxy route fields: target URL must be valid, at least one method required, proxyPath must start with /. */
-function validateProxyRoute<TApp = unknown>(
-  route: Partial<Extract<Route<TApp>, { type: 'proxy' }>>,
-  errors: ValidationError[],
-): void {
-  if (route.target == null || route.target === '') {
-    errors.push({ field: 'route.target', message: 'Proxy route requires target' });
-  } else {
-    try {
-      const u = new URL(route.target);
-      if (!['http:', 'https:'].includes(u.protocol)) {
+/**
+ * Parse the Zod schema and collect cross-field warnings, returning (errors, warnings) without throwing.
+ * @typeParam TConfig - The server configuration type.
+ * @param config - The server configuration to validate.
+ * @returns An object containing `errors` and `warnings` arrays.
+ */
+function parseConfig<TConfig extends Record<string, unknown>>(
+  config: TConfig,
+): { errors: ValidationError[]; warnings: ValidationError[] } {
+  const result = serverConfigSchema.safeParse(config);
+  const errors: ValidationError[] = result.success
+    ? []
+    : result.error.issues.map((issue) => ({
+        field: issue.path.join('.') || 'unknown',
+        message: issue.message,
+      }));
+  const warnings = result.success ? collectValidationWarnings(config) : [];
+  return { errors, warnings };
+}
+
+/**
+ * Validate an async auth secret by calling it and checking the resolved value.
+ *
+ * Zod already validates string-based secrets synchronously; this only handles
+ * function-based secrets that return a Promise. Checks that the resolved
+ * value is a non-empty string.
+ *
+ * @param auth - Partial auth config to validate (strategy and secret fields).
+ * @returns A `ValidationResult` with any errors from resolving the secret.
+ */
+export async function validateAuthSecret(auth?: AuthInput): Promise<ValidationResult> {
+  const errors: ValidationError[] = [];
+
+  if (auth?.strategy === 'bearer' && auth.secret && typeof auth.secret === 'function') {
+    const secretValue = auth.secret();
+    if (secretValue instanceof Promise) {
+      try {
+        const resolved = await secretValue;
+        if (typeof resolved === 'string' && resolved === '') {
+          errors.push({
+            field: 'auth.secret',
+            message: 'auth.secret must not be empty for bearer strategy',
+          });
+        }
+      } catch {
         errors.push({
-          field: 'route.target',
-          message: `Proxy route target is not a valid URL: ${route.target}`,
+          field: 'auth.secret',
+          message: 'auth.secret function rejected — secret could not be resolved',
         });
       }
-    } catch {
-      errors.push({
-        field: 'route.target',
-        message: `Proxy route target is not a valid URL: ${route.target}`,
-      });
     }
   }
-  if (!route.methods || route.methods.length === 0) {
-    errors.push({ field: 'route.methods', message: 'Proxy route requires at least one method' });
-  }
-  if (route.proxyPath && !route.proxyPath.startsWith('/')) {
-    errors.push({
-      field: 'route.proxyPath',
-      message: `Proxy route proxyPath must start with /: ${route.proxyPath}`,
-    });
-  }
-}
 
-/** Validate a single route configuration, checking path, handler, and proxy requirements. */
-function validateRoute<TApp = unknown>(route: RouteInput<TApp>): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (!route.path?.startsWith('/')) {
-    errors.push({
-      field: 'route.path',
-      message: `Route path must start with / (${route.type ?? 'api'}): ${route.path}`,
-    });
-  }
-  const isApiRoute = route.type === 'api' || route.type === undefined;
-  if (isApiRoute && !('handler' in route)) {
-    errors.push({ field: 'route.handler', message: 'API route requires handler' });
-  }
-  if (route.type === 'proxy') {
-    validateProxyRoute(route, errors);
-  }
-  return { errors, valid: errors.length === 0 };
-}
-
-/** Validate an array of routes by calling `validateRoute` on each entry and collecting errors. */
-function validateRoutes<TApp = unknown>(routes?: RouteInput<TApp>[]): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (!routes) return { errors, valid: true };
-  for (const route of routes) {
-    const result = validateRoute(route);
-    errors.push(...result.errors);
-  }
-  return { errors, valid: errors.length === 0 };
-}
-
-/** Validate that auth config is present when any route requires `access: 'private'`. */
-function validateSecurityForRoutes<TApp = unknown>(
-  routes?: RouteInput<TApp>[],
-  security?: SecurityInput,
-): ValidationResult {
-  const errors: ValidationError[] = [];
-  const hasPrivateRoute = routes?.some((r) => r.access === 'private');
-  if (hasPrivateRoute && !security?.auth) {
-    errors.push({
-      field: 'security.auth',
-      message: "security.auth is required when routes have access: 'private'",
-    });
-  }
-  return { errors, valid: errors.length === 0 };
-}
-
-/** Validate CORS config, rejecting wildcard origin (`*`) combined with credentials: true. */
-function validateCors(cors?: CorsInput): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (!cors?.credentials) return { errors, valid: true };
-  if (cors.origin === '*' || (Array.isArray(cors.origin) && cors.origin.includes('*'))) {
-    errors.push({
-      field: 'cors.origin',
-      message: 'Wildcard origin cannot be used with credentials: true',
-    });
-  }
-  return { errors, valid: errors.length === 0 };
-}
-
-/** Validate auth config, checking strategy-specific requirements and secretTtl range. */
-function validateAuth(auth?: AuthInput): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (auth?.strategy === 'bearer' && !auth.secret) {
-    errors.push({
-      field: 'auth.secret',
-      message: 'auth.secret is required when strategy is bearer',
-    });
-  }
-  if (auth?.strategy === 'jwks' && !auth.jwksUri) {
-    errors.push({
-      field: 'auth.jwksUri',
-      message: 'auth.jwksUri is required when strategy is jwks',
-    });
-  }
-  if (auth?.secretTtl !== undefined) {
-    if (!Number.isInteger(auth.secretTtl) || auth.secretTtl < 0) {
-      errors.push({
-        field: 'auth.secretTtl',
-        message: 'auth.secretTtl must be a non-negative integer (seconds)',
-      });
-    }
-  }
-  return { errors, valid: errors.length === 0 };
-}
-
-/** Validate rate limit config, checking that maxEntries is a positive integer when provided. */
-function validateRateLimit(rateLimit?: {
-  windowMs?: number;
-  maxRequests?: number;
-  maxEntries?: number;
-}): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (!rateLimit) return { errors, valid: true };
-  if (rateLimit.maxEntries !== undefined) {
-    if (!Number.isInteger(rateLimit.maxEntries) || rateLimit.maxEntries < 1) {
-      errors.push({
-        field: 'security.rateLimit.maxEntries',
-        message: 'rateLimit.maxEntries must be a positive integer',
-      });
-    }
-  }
-  return { errors, valid: errors.length === 0 };
-}
-
-/** Validate CSP directives use camelCase naming (reject kebab-case like `default-src`). */
-function validateCspDirectives(csp?: CspOptions): ValidationResult {
-  const errors: ValidationError[] = [];
-  if (!csp?.directives) return { errors, valid: true };
-  const kebabPattern = /^[a-z]+-[a-z]/;
-  for (const key of Object.keys(csp.directives)) {
-    if (kebabPattern.test(key)) {
-      errors.push({
-        field: 'csp.directives',
-        message: `CSP directive '${key}' uses kebab-case. Use camelCase instead (e.g., 'defaultSrc' not 'default-src').`,
-      });
-    }
-  }
   return { errors, valid: errors.length === 0 };
 }
 
 /**
- * Validate a server configuration object.
- * Throws descriptive errors for invalid configurations.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * Synchronously validate a server configuration object.
+ *
+ * Uses Zod schemas with superRefine for structural and cross-field validation.
+ * Throws if the config contains function-based auth secrets, as they cannot be
+ * validated synchronously — use {@link validateServerConfig} for async secret support.
+ *
+ * Emits warnings via `logger` for non-blocking issues (e.g., rate limiting without Redis).
+ *
+ * @typeParam TConfig - The server configuration type.
  * @param config - The server configuration to validate.
+ * @param logger - Optional logger for emitting validation warnings.
  * @throws {Error} When validation fails with a message listing all errors.
  */
-export function validateServerConfig<TApp = unknown>(config: ServerConfigInput<TApp>): void {
-  const results: ValidationResult[] = [
-    validateAppConfig(config.app),
-    ...validateRoutes(config.apiRoutes).errors.map((e) => ({ errors: [e], valid: false })),
-    ...validateRoutes(config.proxyRoutes).errors.map((e) => ({ errors: [e], valid: false })),
-    ...validateSecurityForRoutes(
-      [...(config.apiRoutes ?? []), ...(config.proxyRoutes ?? [])],
-      config.security,
-    ).errors.map((e) => ({ errors: [e], valid: false })),
-    ...validateCors(config.security?.cors).errors.map((e) => ({ errors: [e], valid: false })),
-    ...validateAuth(config.security?.auth).errors.map((e) => ({ errors: [e], valid: false })),
-    ...validateRateLimit(config.security?.rateLimit).errors.map((e) => ({
-      errors: [e],
-      valid: false,
-    })),
-    ...validateCspDirectives(config.security?.csp).errors.map((e) => ({
-      errors: [e],
-      valid: false,
-    })),
-  ];
+export function validateServerConfigSync<TConfig extends Record<string, unknown>>(
+  config: TConfig,
+  logger?: Logger<unknown>,
+): void {
+  const { errors, warnings } = parseConfig(config);
 
-  const allErrors = results.flatMap((r) => r.errors);
-  if (allErrors.length > 0) {
+  // Reject function-based secrets — they require async resolution
+  const auth = (config as { security?: { auth?: AuthInput } })?.security?.auth;
+  if (auth?.secret && typeof auth.secret === 'function') {
+    errors.push({
+      field: 'security.auth.secret',
+      message:
+        'Function-based auth secrets cannot be validated synchronously. Pass a string secret, or use `validateServerConfig` for async secret resolution.',
+    });
+  }
+
+  if (errors.length > 0) {
     throw new Error(
       'Configuration validation failed:\n' +
-        allErrors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
+        errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
     );
   }
+
+  for (const w of warnings) {
+    logger?.warn(`[Halide] ${w.field}: ${w.message}`);
+  }
+}
+
+/**
+ * Validate a server configuration object.
+ *
+ * Uses Zod schemas with superRefine for structural and cross-field validation.
+ * Returns a {@link ValidationResult} instead of throwing, allowing callers to
+ * handle validation errors programmatically. Resolves async auth secrets
+ * (function-based secrets) and validates the resolved value.
+ *
+ * @typeParam TConfig - The server configuration type.
+ * @param config - The server configuration to validate.
+ * @returns A `ValidationResult` with any errors and warnings.
+ */
+export async function validateServerConfig<TConfig extends Record<string, unknown>>(
+  config: TConfig,
+): Promise<ValidationResult> {
+  const { errors, warnings } = parseConfig(config);
+
+  // Run async auth secret validation (function-based secrets only; string secrets are validated by Zod)
+  const asyncResult = await validateAuthSecret(
+    (config as { security?: { auth?: AuthInput } })?.security?.auth,
+  );
+  const asyncErrors = asyncResult.errors;
+
+  const allErrors = [...errors, ...asyncErrors];
+  return {
+    errors: allErrors,
+    valid: allErrors.length === 0,
+    warnings: warnings.length > 0 ? warnings : undefined,
+  };
 }

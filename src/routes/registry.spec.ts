@@ -1,11 +1,16 @@
 import { z } from 'zod';
+import { createTestApp } from '../test-utils/index.js';
 import type { ProxyRoute } from '../types/api';
-import { createTestApp, resolveOpenApiSpec } from './registry.helpers';
+import { resolveOpenApiSpec } from './registry.openapi';
 
 vi.mock('../services/proxy', () => ({
   buildRequestContextFromHono: vi
     .fn()
     .mockReturnValue({ body: undefined, method: 'get', params: {}, path: '', query: {} }),
+  createAgentCache: () => ({
+    dispose: () => {},
+    getAgent: () => null as unknown as import('node:http').Agent,
+  }),
   createProxyService: vi.fn().mockReturnValue(async () => new Response('ok', { status: 200 })),
 }));
 
@@ -37,7 +42,7 @@ describe('registerRoutes', () => {
             path: '/proxy',
             target: 'https://api.example.com',
             type: 'proxy',
-          } as ProxyRoute<unknown>,
+          },
         ],
       });
 
@@ -65,7 +70,7 @@ describe('registerRoutes', () => {
             path: '/proxy',
             target: 'https://api.example.com',
             type: 'proxy',
-          } as ProxyRoute<unknown>,
+          },
         ],
       });
 
@@ -89,12 +94,41 @@ describe('registerRoutes', () => {
             path: '/proxy',
             target: 'https://api.example.com',
             type: 'proxy',
-          } as ProxyRoute<unknown>,
+          },
         ],
       });
 
       const res = await app.request('/proxy');
       expect(res.status).toBe(204);
+    });
+
+    it('uses configurable maxCollect from observability', async () => {
+      const { createProxyService } = await import('../services/proxy');
+      (createProxyService as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        async () =>
+          new Response(null, {
+            headers: { 'Content-Type': 'text/plain' },
+            status: 200,
+          }),
+      );
+
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        observability: { maxCollect: 512 },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            observe: true,
+            path: '/proxy',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+      });
+
+      const res = await app.request('/proxy');
+      expect(res.status).toBe(200);
     });
   });
 
@@ -262,6 +296,101 @@ describe('registerRoutes', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('returns Response with custom status', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => new Response('created', { status: 201 }),
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(201);
+    });
+
+    it('returns Response with custom headers', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () =>
+              new Response('ok', {
+                headers: { 'X-Custom': 'value' },
+              }),
+            path: '/headers',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/headers');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Custom')).toBe('value');
+    });
+
+    it('returns Response with 204 no content', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => new Response(null, { status: 204 }),
+            path: '/deleted',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/deleted');
+      expect(res.status).toBe(204);
+    });
+
+    it('returns Response with non-JSON content type', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () =>
+              new Response('plain text', {
+                headers: { 'Content-Type': 'text/plain' },
+              }),
+            path: '/text',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/text');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toContain('text/plain');
+    });
+
+    it('plain object return still works', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            handler: async () => ({ ok: true }),
+            path: '/data',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/data');
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ ok: true });
+    });
   });
 });
 
@@ -274,7 +403,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toEqual([]);
@@ -289,7 +418,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toHaveLength(1);
@@ -320,7 +449,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toHaveLength(1);
@@ -338,14 +467,14 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
       {
         access: 'public',
         methods: ['get'],
         path: '/api/orders',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     const result = await resolveOpenApiSpec(routes);
     expect(result).toHaveLength(1);
@@ -360,7 +489,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     await expect(resolveOpenApiSpec(routes)).rejects.toThrow('not valid JSON');
   });
@@ -384,7 +513,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     await expect(resolveOpenApiSpec(routes)).rejects.toThrow('Failed to fetch OpenAPI spec');
   });
@@ -398,7 +527,7 @@ describe('resolveOpenApiSpec', () => {
         path: '/api/users',
         target: 'https://api.example.com',
         type: 'proxy',
-      } as ProxyRoute<unknown>,
+      },
     ];
     await expect(resolveOpenApiSpec(routes)).rejects.toThrow('ENOENT');
   });

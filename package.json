@@ -1,6 +1,6 @@
 {
   "name": "halide",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "A declarative BFF (Backend for Frontend) framework that standardizes SPA communication with auth, proxy, CSP, rate limiting, OpenAPI support, and static file hosting",
   "keywords": [
     "angular",
@@ -83,9 +83,12 @@
     "@hono/standard-validator": "^0.2.2",
     "@inquirer/prompts": "^7.0.0",
     "@scalar/hono-api-reference": "^0.10.9",
+    "commander": "^12.1.0",
     "hono": "^4.12.14",
     "hono-openapi": "^1.3.0",
     "ipaddr.js": "^2.4.0",
+    "jsonc-parser": "^3.3.1",
+    "ora": "^8.0.1",
     "strip-json-comments": "^5.0.1",
     "zod": "^3.23.0",
     "zod-openapi": "^4.2.4"
@@ -94,14 +97,15 @@
     "@biomejs/biome": "2.4.12",
     "@sonar/scan": "^4.3.6",
     "@types/node": "^24.0.0",
-    "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.15",
+    "@vitest/coverage-v8": "^4.1.6",
+    "@vitest/ui": "^4.1.6",
     "dotenv-cli": "^11.0.0",
     "glob": "^13.0.6",
     "nodemon": "^3.1.14",
     "prettier": "^3.6.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.0",
-    "vitest": "^4.1.4"
+    "vite": "^8.0.13",
+    "vitest": "^4.1.6"
   }
 }

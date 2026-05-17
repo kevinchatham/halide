@@ -1,5 +1,13 @@
+import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
-import { createTestApp } from './registry.helpers';
+import { createOpenApiRoutes } from '../middleware/openapi';
+import { createSecurityMiddleware } from '../middleware/security';
+import { createAgentCache } from '../services/proxy';
+import { createTestApp, noopLogger } from '../test-utils/index.js';
+import type { HalideVariables } from '../types/app';
+import type { ServerConfig } from '../types/server-config';
+import { registerRoutes } from './registry';
+import { createClaimExtractor } from './registry.auth';
 
 const secret = 'test-secret';
 
@@ -10,7 +18,7 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
 describe('registerRoutes — auth', () => {
   describe('Authentication', () => {
     it('returns 401 for private routes without token', async () => {
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -30,7 +38,7 @@ describe('registerRoutes — auth', () => {
     });
 
     it('returns 401 for private routes with invalid token', async () => {
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -51,7 +59,7 @@ describe('registerRoutes — auth', () => {
 
     it('allows private routes with valid token', async () => {
       const token = await createValidToken({ role: 'admin', sub: 'user-123' });
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -73,7 +81,7 @@ describe('registerRoutes — auth', () => {
 
   describe('JWKS strategy', () => {
     it('uses JWKS auth when strategy is jwks', async () => {
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -100,7 +108,7 @@ describe('registerRoutes — auth', () => {
     it('caches secret and only calls secret function once within TTL', async () => {
       vi.useFakeTimers();
       const secretFn = vi.fn().mockReturnValue('test-secret');
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -137,7 +145,7 @@ describe('registerRoutes — auth', () => {
     it('re-fetches secret after TTL expires', async () => {
       vi.useFakeTimers();
       const secretFn = vi.fn().mockReturnValue('test-secret');
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -171,7 +179,7 @@ describe('registerRoutes — auth', () => {
 
     it('does not cache when secretTtl is 0', async () => {
       const secretFn = vi.fn().mockReturnValue('test-secret');
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -204,7 +212,7 @@ describe('registerRoutes — auth', () => {
 
   describe('Auth config without secret or jwks', () => {
     it('returns undefined claimExtractor when auth has no secret or jwks', async () => {
-      const app = await createTestApp({
+      const app = createTestApp({
         apiRoutes: [
           {
             access: 'private',
@@ -220,5 +228,184 @@ describe('registerRoutes — auth', () => {
       const res = await app.request('/profile');
       expect(res.status).toBe(200);
     });
+  });
+
+  describe('CSP headers on auth error responses', () => {
+    it('includes CSP header on 401 auth error', async () => {
+      const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
+
+      app.use('*', createSecurityMiddleware({ defaultSrc: ["'self'"] }));
+      registerRoutes({
+        agentCache,
+        app,
+        config: {
+          apiRoutes: [
+            {
+              access: 'private',
+              handler: async () => ({ ok: true }),
+              path: '/profile',
+              type: 'api',
+            },
+          ],
+          app: { root: '/var/www' },
+          security: { auth: { secret: () => secret, strategy: 'bearer' } },
+        },
+        logger: noopLogger,
+      });
+      createOpenApiRoutes({}, app);
+
+      const res = await app.request('/profile');
+      expect(res.status).toBe(401);
+      const csp = res.headers.get('Content-Security-Policy');
+      expect(csp).toContain("'self'");
+    });
+
+    it('includes CSP header on 403 authorization error', async () => {
+      const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
+
+      app.use('*', createSecurityMiddleware({ defaultSrc: ["'none'"] }));
+      registerRoutes({
+        agentCache,
+        app,
+        config: {
+          apiRoutes: [
+            {
+              access: 'private',
+              authorize: async () => false,
+              handler: async () => ({ ok: true }),
+              path: '/restricted',
+              type: 'api',
+            },
+          ],
+          app: { root: '/var/www' },
+          security: {
+            auth: { secret: () => secret, strategy: 'bearer' },
+          },
+        },
+        logger: noopLogger,
+      });
+      createOpenApiRoutes({}, app);
+
+      const token = await createValidToken({ role: 'admin', sub: 'user-123' });
+      const res = await app.request('/restricted', {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(403);
+      const csp = res.headers.get('Content-Security-Policy');
+      expect(csp).toContain("'none'");
+    });
+  });
+});
+
+describe('registerRoutes — authorization', () => {
+  describe('Authorization', () => {
+    it('returns 403 when authorize returns false', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            authorize: async () => false,
+            handler: async () => ({ ok: true }),
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({ error: 'Forbidden' });
+    });
+
+    it('allows when authorize returns true', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            authorize: async () => true,
+            handler: async () => ({ ok: true }),
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 403 when authorize throws', async () => {
+      const app = createTestApp({
+        apiRoutes: [
+          {
+            access: 'public',
+            authorize: async () => {
+              throw new Error('Auth error');
+            },
+            handler: async () => ({ ok: true }),
+            path: '/items',
+            type: 'api',
+          },
+        ],
+        app: { root: '/var/www' },
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('Proxy authorization', () => {
+    it('returns 403 when proxy authorize returns false', async () => {
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            authorize: async () => false,
+            methods: ['get'],
+            path: '/admin',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+      });
+
+      const res = await app.request('/admin');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 when proxy authorize throws', async () => {
+      const app = createTestApp({
+        app: { root: '/var/www' },
+        proxyRoutes: [
+          {
+            access: 'public',
+            authorize: async () => {
+              throw new Error('Auth error');
+            },
+            methods: ['get'],
+            path: '/admin',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+      });
+
+      const res = await app.request('/admin');
+      expect(res.status).toBe(403);
+    });
+  });
+});
+
+describe('createClaimExtractor', () => {
+  it('returns undefined when no auth is configured', () => {
+    const config = { apiRoutes: [] } as ServerConfig;
+    expect(createClaimExtractor(config, noopLogger)).toBeUndefined();
   });
 });

@@ -147,4 +147,41 @@ describe('addScriptsToPackageJson', () => {
       'tsc --project tsconfig.server.json',
     );
   });
+
+  it('preserves comments when writing package.json', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json'))
+        return '{\n  "name": "my-app",\n  // This is a comment\n  "scripts": {}\n}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir);
+
+    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('package.json'),
+    );
+    expect(written).toBeDefined();
+    expect(String(written![1])).toContain('// This is a comment');
+  });
+
+  it('overwrites scripts when force is true', () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.endsWith('package.json'))
+        return '{"version":"0.0.0","scripts":{"halide:start":"old command","halide:build":"old build"}}';
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    addScriptsToPackageJson(projectDir, false, true);
+
+    const written = mockWriteFileSync.mock.calls.find((c: unknown[]) =>
+      String(c[0]).endsWith('package.json'),
+    );
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written![1] as string) as Record<string, unknown>;
+    const scripts = parsed.scripts as Record<string, string>;
+    expect(scripts['halide:start']).toBe('npm run halide:build && node dist/server.js');
+    expect(scripts['halide:build']).toBe('tsc --project tsconfig.server.json');
+  });
 });

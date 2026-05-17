@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
-    <img src="https://img.shields.io/badge/docs-0.0.11-cyan" alt="Documentation"/>
+    <img src="https://img.shields.io/badge/docs-0.0.12-cyan" alt="Documentation"/>
   </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
@@ -56,13 +56,15 @@ npm install halide
 
 ```ts
 // routes.ts
-import { apiRoute, proxyRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute, proxyRoute } = defineHalide();
 
 export const healthRoute = apiRoute({
   access: 'public',
   method: 'get',
   path: '/api/health',
-  handler: async () => ({ status: 'ok' }),
+  handler: async (_ctx, _app) => ({ status: 'ok' }),
 });
 
 export const userProxyRoute = proxyRoute({
@@ -76,9 +78,11 @@ export const userProxyRoute = proxyRoute({
 ```ts
 // server.ts
 import { healthRoute, userProxyRoute } from './routes';
-import { createServer, type ServerConfig } from 'halide';
+import { defineHalide } from 'halide';
 
-const config: ServerConfig = {
+const { createServer } = defineHalide();
+
+const server = createServer({
   app: {
     root: './browser',
   },
@@ -91,9 +95,7 @@ const config: ServerConfig = {
   },
   apiRoutes: [healthRoute],
   proxyRoutes: [userProxyRoute],
-};
-
-const server = createServer(config);
+});
 
 server.start((port) => console.log(`Serving on ${port}`));
 ```

@@ -1,7 +1,12 @@
-import { Hono } from 'hono';
-import type { ServerConfig } from '../types';
 import type { ProxyRoute } from '../types/api';
-import { createOpenApiRoutes } from './swagger';
+import type { ServerConfig } from '../types/server-config';
+import { buildHonoApp } from '../utils/hono';
+import {
+  createOpenApiRoutes,
+  createSpecCacheState,
+  resetOpenApiCache,
+  type SpecCacheState,
+} from './openapi';
 
 function makeConfig(overrides: Partial<ServerConfig['openapi']> = {}): ServerConfig {
   return {
@@ -18,47 +23,52 @@ function makeProxyRoute(overrides: Partial<ProxyRoute> = {}): ProxyRoute {
     target: 'https://api.example.com',
     type: 'proxy',
     ...overrides,
-  } as ProxyRoute;
+  };
 }
 
 describe('createOpenApiRoutes', () => {
+  let specState: SpecCacheState;
+  beforeEach(() => {
+    specState = createSpecCacheState();
+    resetOpenApiCache(specState);
+  });
   it('does not register routes when openapi is disabled', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const config: ServerConfig = { app: { root: '.' } };
-    createOpenApiRoutes(config, app);
+    createOpenApiRoutes(config, app, specState);
 
     const res = await app.request('/swagger');
     expect(res.status).toBe(404);
   });
 
   it('does not register routes when openapi.enabled is false', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const config: ServerConfig = { app: { root: '.' }, openapi: { enabled: false } };
-    createOpenApiRoutes(config, app);
+    createOpenApiRoutes(config, app, specState);
 
     const res = await app.request('/swagger');
     expect(res.status).toBe(404);
   });
 
   it('registers routes with default path /swagger', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig(), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig(), app, specState);
 
     const res = await app.request('/swagger');
     expect(res.status).toBe(200);
   });
 
   it('registers openapi.json at the configured path', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig(), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig(), app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     expect(res.status).toBe(200);
   });
 
   it('uses a custom path when configured', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig({ path: '/docs' }), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig({ path: '/docs' }), app, specState);
 
     const res = await app.request('/docs');
     expect(res.status).toBe(200);
@@ -68,16 +78,16 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('does not register routes on the default path when a custom path is set', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig({ path: '/api-docs' }), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig({ path: '/api-docs' }), app, specState);
 
     const res = await app.request('/swagger');
     expect(res.status).toBe(404);
   });
 
   it('returns openapi.json with default title and version', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig(), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig(), app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     const body = (await res.json()) as { info: { title: string; version: string } };
@@ -87,8 +97,12 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('returns openapi.json with custom title and version', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig({ options: { title: 'My API', version: '2.0.0' } }), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(
+      makeConfig({ options: { title: 'My API', version: '2.0.0' } }),
+      app,
+      specState,
+    );
 
     const res = await app.request('/swagger/openapi.json');
     const body = (await res.json()) as { info: { title: string; version: string } };
@@ -98,8 +112,8 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('includes description in openapi.json when configured', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig({ options: { description: 'A test API' } }), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig({ options: { description: 'A test API' } }), app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     const body = (await res.json()) as { info: { description?: string } };
@@ -108,8 +122,8 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('does not override a default description when not configured', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig(), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig(), app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     const body = (await res.json()) as { info: { description?: string } };
@@ -118,10 +132,11 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('includes servers in openapi.json when configured', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     createOpenApiRoutes(
       makeConfig({ options: { servers: [{ url: 'https://api.example.com' }] } }),
       app,
+      specState,
     );
 
     const res = await app.request('/swagger/openapi.json');
@@ -131,8 +146,8 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('omits servers from openapi.json when not configured', async () => {
-    const app = new Hono();
-    createOpenApiRoutes(makeConfig(), app);
+    const app = buildHonoApp();
+    createOpenApiRoutes(makeConfig(), app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     const body = (await res.json()) as { servers?: unknown };
@@ -141,11 +156,11 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('merges external OpenAPI spec from file path', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const proxyRoute = makeProxyRoute({
       openapiSpec: { path: 'test/fixtures/test-spec.json' },
     });
-    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     expect(res.status).toBe(200);
@@ -169,11 +184,11 @@ describe('createOpenApiRoutes', () => {
       ),
     );
 
-    const app = new Hono();
+    const app = buildHonoApp();
     const proxyRoute = makeProxyRoute({
       openapiSpec: { path: 'https://api.example.com/openapi.json' },
     });
-    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     expect(res.status).toBe(200);
@@ -182,7 +197,7 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('applies openapi metadata overrides to merged external spec', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const proxyRoute = makeProxyRoute({
       openapi: {
         description: 'Proxy to users service',
@@ -191,7 +206,7 @@ describe('createOpenApiRoutes', () => {
       },
       openapiSpec: { path: 'test/fixtures/test-spec.json' },
     });
-    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     expect(res.status).toBe(200);
@@ -200,11 +215,11 @@ describe('createOpenApiRoutes', () => {
   });
 
   it('caches the resolved spec on first request', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const proxyRoute = makeProxyRoute({
       openapiSpec: { path: 'test/fixtures/test-spec.json' },
     });
-    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app, specState);
 
     const res1 = await app.request('/swagger/openapi.json');
     expect(res1.status).toBe(200);
@@ -236,12 +251,12 @@ describe('createOpenApiRoutes', () => {
       ),
     );
 
-    const app = new Hono();
+    const app = buildHonoApp();
     const proxyRoute = makeProxyRoute({
       methods: ['get', 'post', 'delete'],
       openapiSpec: { path: 'https://api.example.com/openapi.json' },
     });
-    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     expect(res.status).toBe(200);
@@ -277,12 +292,12 @@ describe('createOpenApiRoutes', () => {
       ),
     );
 
-    const app = new Hono();
+    const app = buildHonoApp();
     const proxyRoute = makeProxyRoute({
       methods: ['get', 'delete'],
       openapiSpec: { path: 'https://api.example.com/openapi.json' },
     });
-    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app);
+    createOpenApiRoutes({ ...makeConfig(), proxyRoutes: [proxyRoute] }, app, specState);
 
     const res = await app.request('/swagger/openapi.json');
     expect(res.status).toBe(200);

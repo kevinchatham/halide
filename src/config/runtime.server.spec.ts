@@ -87,7 +87,8 @@ describe('createServer', () => {
       });
       server.start();
       await server.stop();
-      expect(infoMessages[0]).toContain('48921');
+      const startupMsg = infoMessages.find((m) => m.includes('Server starting'));
+      expect(startupMsg).toContain('48921');
     } finally {
       if (originalPort === undefined) {
         delete process.env.PORT;
@@ -116,7 +117,8 @@ describe('createServer', () => {
       });
       server.start();
       await server.stop();
-      expect(infoMessages[0]).toContain('3999');
+      const startupMsg = infoMessages.find((m) => m.includes('Server starting'));
+      expect(startupMsg).toContain('3999');
     } finally {
       if (originalPort === undefined) {
         delete process.env.PORT;

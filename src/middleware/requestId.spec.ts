@@ -1,9 +1,9 @@
-import { Hono } from 'hono';
+import { buildHonoApp } from '../utils/hono';
 import { createRequestIdMiddleware } from './requestId';
 
 describe('createRequestIdMiddleware', () => {
   it('sets x-request-id header with a generated UUID when no header is provided', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use(createRequestIdMiddleware());
     app.get('/test', (c) => c.text('ok'));
 
@@ -15,7 +15,7 @@ describe('createRequestIdMiddleware', () => {
   });
 
   it('preserves an existing x-request-id header from the request', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use(createRequestIdMiddleware());
     app.get('/test', (c) => c.text('ok'));
 
@@ -27,7 +27,7 @@ describe('createRequestIdMiddleware', () => {
   });
 
   it('generates different IDs for separate requests', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     app.use(createRequestIdMiddleware());
     app.get('/test', (c) => c.text('ok'));
 

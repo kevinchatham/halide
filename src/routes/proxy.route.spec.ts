@@ -1,5 +1,5 @@
 import { defaultAuthorize } from '../config/defaults';
-import { proxyRoute } from './proxyRoute';
+import { proxyRoute } from './proxy.route';
 
 describe('proxyRoute', () => {
   it('sets type to proxy', () => {

@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
+import { buildHonoApp } from '../utils/hono';
 import { extractBearerClaims } from './auth';
 
 vi.mock('hono/jwk', () => ({
@@ -19,7 +19,7 @@ async function createValidToken(claims: Record<string, unknown>): Promise<string
 
 describe('extractBearerClaims', () => {
   it('returns null when aud is a non-string non-array type', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const token = await createValidToken({ aud: 42, sub: 'user-123' });
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
@@ -31,7 +31,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns null when authorization header is missing', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractBearerClaims<TestClaims>(c, secret);
@@ -42,7 +42,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns null when authorization header does not start with Bearer', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractBearerClaims<TestClaims>(c, secret);
@@ -53,7 +53,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns null when token is invalid', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
       result = await extractBearerClaims<TestClaims>(c, secret);
@@ -64,7 +64,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns claims with valid token', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const claims = { role: 'admin', sub: 'user-123' };
     const token = await createValidToken(claims);
     let result: TestClaims | null = null;
@@ -77,7 +77,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns null when audience does not match', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const token = await createValidToken({ aud: 'wrong-audience', sub: 'user-123' });
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
@@ -89,7 +89,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns claims when audience matches string aud', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const claims = { aud: 'my-api', sub: 'user-123' };
     const token = await createValidToken(claims);
     let result: TestClaims | null = null;
@@ -102,7 +102,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns claims when audience matches array aud', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const claims = { aud: ['my-api', 'other-api'], sub: 'user-123' };
     const token = await createValidToken(claims);
     let result: TestClaims | null = null;
@@ -115,7 +115,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('returns null when token has no aud but audience is required', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const token = await createValidToken({ sub: 'user-123' });
     let result: TestClaims | null = 'sentinel' as unknown as TestClaims | null;
     app.get('/test', async (c) => {
@@ -127,7 +127,7 @@ describe('extractBearerClaims', () => {
   });
 
   it('extracts token correctly from Bearer header', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const claims = { sub: 'test' };
     const token = await createValidToken(claims);
     let result: TestClaims | null = null;

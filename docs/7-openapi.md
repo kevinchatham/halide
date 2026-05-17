@@ -15,14 +15,16 @@ openapi: {
 }
 ```
 
-When enabled, a warning is logged at startup: Swagger routes use relaxed CSP directives, and custom CSP settings do not apply to these routes. This should be disabled in production.
+When enabled, a warning is logged at startup: Scalar routes use relaxed CSP directives, and custom CSP settings do not apply to these routes. This should be disabled in production.
 
 ## Per-route metadata
 
 Attach metadata to individual routes for richer documentation:
 
 ```ts
-import { apiRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute } = defineHalide();
 
 apiRoute({
   access: 'public',
@@ -35,7 +37,7 @@ apiRoute({
     description: 'Creates a new user with the given name and email.',
     tags: ['Users'],
   },
-  handler: async (ctx) => createUser(ctx.body),
+  handler: async (ctx, app) => createUser(ctx.body),
 });
 ```
 
@@ -55,7 +57,9 @@ Zod schemas from `requestSchema` are automatically used for the OpenAPI request 
 Instead of `responseSchema`, you can use `openapi.responses` to define multiple response codes:
 
 ```ts
-import { apiRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute } = defineHalide();
 
 apiRoute({
   access: 'public',
@@ -68,15 +72,15 @@ apiRoute({
       404: { description: 'User not found' },
     },
   },
-  handler: async (ctx) => getUser(ctx.params.id),
+  handler: async (ctx, app) => getUser(ctx.params.id),
 });
 ```
 
 When `responses` is present, `responseSchema` is ignored. When neither is present, a default `200` response with `'Successful response'` description is generated.
 
-## Hiding routes
+## Skipping observability hooks
 
-Set `observe: false` on a route to hide it from the OpenAPI documentation.
+Set `observe: false` on a route to skip `onRequest` and `onResponse` hooks for that route. The route will still appear in the OpenAPI documentation.
 
 ## Scalar UI
 

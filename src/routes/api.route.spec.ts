@@ -1,5 +1,5 @@
 import { defaultAuthorize } from '../config/defaults';
-import { apiRoute } from './apiRoute';
+import { apiRoute } from './api.route';
 
 const handler = async (): Promise<{ ok: boolean }> => ({ ok: true });
 
@@ -45,11 +45,12 @@ describe('apiRoute', () => {
     expect(route.responseSchema).toBe(schema);
   });
 
-  it('works with typed claims', () => {
+  it('works with typed claims and log scope', () => {
     type MyClaims = { role: string };
-    const route = apiRoute<MyClaims, { name: string }, { ok: boolean }>({
+    type MyLogScope = { requestId: string };
+    const route = apiRoute<MyClaims, MyLogScope, { name: string }, { ok: boolean }>({
       access: 'private',
-      handler: async (_ctx: unknown, _claims: unknown): Promise<{ ok: boolean }> => ({ ok: true }),
+      handler: async (_ctx: unknown, _app: unknown): Promise<{ ok: boolean }> => ({ ok: true }),
       path: '/items',
     });
     expect(route.type).toBe('api');
