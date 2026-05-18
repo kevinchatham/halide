@@ -158,11 +158,11 @@ interface RedisClient {
 
 ### Method Descriptions
 
-| Method                 | Description                                                                         |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| `expire(key, seconds)` | Set the expiration (in seconds) for the given key. Returns 1 if set, 0 otherwise.   |
-| `incr(key)`            | Increment the integer value of the given key by 1. Returns the new value.           |
-| `pttl(key)`            | Get the remaining time to live (in milliseconds) for the given key.                 |
+| Method                 | Description                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `expire(key, seconds)` | Set the expiration (in seconds) for the given key. Returns 1 if set, 0 otherwise. |
+| `incr(key)`            | Increment the integer value of the given key by 1. Returns the new value.         |
+| `pttl(key)`            | Get the remaining time to live (in milliseconds) for the given key.               |
 
 ### Usage
 

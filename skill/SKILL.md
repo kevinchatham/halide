@@ -25,6 +25,7 @@ A lightweight backend framework for Node.js built on Hono. Provides API routes, 
 | Testing              | `docs/11-testing.md`             | `skill/references/testing.md`       |
 | defineHalide Builder | `docs/12-define-halide.md`       | `skill/references/runtime.md`       |
 | Validation           | —                                | `skill/references/validation.md`    |
+
 ## Complete Type Reference
 
 ```ts
