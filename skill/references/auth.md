@@ -35,9 +35,12 @@ security: {
     strategy: 'jwks',
     jwksUri: 'https://idp.example.com/.well-known/jwks.json',
     audience: 'my-app',  // optional
+    algorithms: ['RS256'],  // optional — default: ['RS256']
   },
 }
 ```
+
+**JWKS caching:** Keys are cached for 1 hour (3600000ms) per unique JWKS URI. Maximum 100 cached entries (FIFO eviction). Background refresh runs at half-TTL (30 min) to proactively update soon-to-expire entries. Concurrent fetches for the same URI are deduplicated.
 
 ## How Auth Works
 
@@ -69,7 +72,7 @@ The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that
 
 - `app.claims` is populated only for private routes with successful auth
 - For public routes, `app.claims` will be `undefined` in handlers
-- Type claims via `HalideContext<TClaims>` — e.g., `type App = HalideContext<UserClaims>`
+- Type claims via `HalideContext<TClaims, TLogScope>` — e.g., `type App = HalideContext<UserClaims, LogScope>`
 
 ## Claim Extractor
 
@@ -77,4 +80,4 @@ The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that
 type ClaimExtractor<TClaims = unknown> = (c: Context) => Promise<TClaims | null>;
 ```
 
-The claim extractor is created from config (`createClaimExtractor`) and handles both bearer and JWKS strategies with secret caching. Extractors are cached by auth strategy key (FIFO eviction when cache exceeds limit).
+The `ClaimExtractor` type is exported but the extractor function itself is internal. The framework creates claim extractors from auth config and handles both bearer and JWKS strategies with secret caching. Extractors are cached by auth strategy key (FIFO eviction when cache exceeds limit).

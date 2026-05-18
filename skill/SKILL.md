@@ -9,19 +9,22 @@ A lightweight backend framework for Node.js built on Hono. Provides API routes, 
 
 ## Primary Resources
 
-| Topic               | Docs                      | Reference                           |
-| ------------------- | ------------------------- | ----------------------------------- |
-| App Config          | `docs/0-app.md`           | `skill/references/config.md`        |
-| API Routes          | `docs/1-api-routes.md`    | `skill/references/routes.md`        |
-| Proxy Routes        | `docs/2-proxy-routes.md`  | `skill/references/routes.md`        |
-| Authentication      | `docs/3-auth.md`          | `skill/references/auth.md`          |
-| Security (CORS/CSP) | `docs/4-security.md`      | `skill/references/security.md`      |
-| Observability       | `docs/5-observability.md` | `skill/references/observability.md` |
-| OpenAPI/Scalar UI   | `docs/6-openapi.md`       | `skill/references/openapi.md`       |
-| Testing Utilities   | —                         | `skill/references/testing.md`       |
-| Runtime Lifecycle   | —                         | `skill/references/runtime.md`       |
-| CLI                 | `docs/9-cli.md`           | —                                   |
-
+| Topic                | Docs                             | Reference                           |
+| -------------------- | -------------------------------- | ----------------------------------- |
+| App Config           | `docs/0-app.md`                  | `skill/references/config.md`        |
+| API Routes           | `docs/1-api-routes.md`           | `skill/references/routes.md`        |
+| Proxy Routes         | `docs/2-proxy-routes.md`         | `skill/references/routes.md`        |
+| Project Organization | `docs/3-project-organization.md` | —                                   |
+| Authentication       | `docs/4-auth.md`                 | `skill/references/auth.md`          |
+| Security (CORS/CSP)  | `docs/5-security.md`             | `skill/references/security.md`      |
+| Observability        | `docs/6-observability.md`        | `skill/references/observability.md` |
+| OpenAPI/Scalar UI    | `docs/7-openapi.md`              | `skill/references/openapi.md`       |
+| Full Example         | `docs/8-full-example.md`         | —                                   |
+| API Reference        | `docs/9-api-reference.md`        | —                                   |
+| CLI                  | `docs/10-cli.md`                 | —                                   |
+| Testing              | `docs/11-testing.md`             | `skill/references/testing.md`       |
+| defineHalide Builder | `docs/12-define-halide.md`       | `skill/references/runtime.md`       |
+| Validation           | —                                | `skill/references/validation.md`    |
 ## Complete Type Reference
 
 ```ts

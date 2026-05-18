@@ -1,30 +1,37 @@
 import { apiRoute } from '../routes/api.route';
 import { proxyRoute } from '../routes/proxy.route';
 import type { ApiRoute, ApiRouteInput, ProxyRoute, ProxyRouteInput } from '../types/api';
+import type { ExtractClaims, ExtractLogScope, HalideContext } from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import type { CreateAppResult, Server } from './runtime';
 import { createApp, createServer } from './runtime';
 
-/** Builder object returned by {@link defineHalide}, pre-baked with `TClaims` and `TLogScope`. */
-type HalideBuilder<TClaims, TLogScope> = {
+/** Builder object returned by {@link defineHalide}, pre-baked with extracted `TClaims` and `TLogScope` from `TApp`. */
+type HalideBuilder<TApp> = {
+  /** Factory for API routes with pre-baked claims and log scope types. */
   apiRoute: <TBody = unknown, TResponse = unknown>(
-    route: ApiRouteInput<TClaims, TLogScope, TBody, TResponse>,
-  ) => ApiRoute<TClaims, TLogScope, TBody, TResponse>;
-  createApp: (config: ServerConfig<TClaims, TLogScope>) => CreateAppResult;
-  createServer: (config: ServerConfig<TClaims, TLogScope>) => Server;
-  proxyRoute: (route: ProxyRouteInput<TClaims, TLogScope>) => ProxyRoute<TClaims, TLogScope>;
+    route: ApiRouteInput<ExtractClaims<TApp>, ExtractLogScope<TApp>, TBody, TResponse>,
+  ) => ApiRoute<ExtractClaims<TApp>, ExtractLogScope<TApp>, TBody, TResponse>;
+  /** Builds a Hono app with registered routes (does not start a server). */
+  createApp: (config: ServerConfig<ExtractClaims<TApp>, ExtractLogScope<TApp>>) => CreateAppResult;
+  /** Creates a full server lifecycle wrapper around {@link createApp} with start/stop/ready. */
+  createServer: (config: ServerConfig<ExtractClaims<TApp>, ExtractLogScope<TApp>>) => Server;
+  /** Factory for proxy routes with pre-baked claims and log scope types. */
+  proxyRoute: (
+    route: ProxyRouteInput<ExtractClaims<TApp>, ExtractLogScope<TApp>>,
+  ) => ProxyRoute<ExtractClaims<TApp>, ExtractLogScope<TApp>>;
 };
 
 /**
- * Builder factory that pre-bakes `TClaims` and `TLogScope` so callers only
- * specify body types per route.
+ * Builder factory that takes a {@link HalideContext} type and pre-bakes its
+ * claims and log scope types so callers only specify body types per route.
  *
- * @typeParam TClaims - The type of the decoded JWT claims.
- * @typeParam TLogScope - The type of the structured log scope object.
+ * @typeParam TApp - A {@link HalideContext} type that defines claims and logger scope.
  * @returns An object with `apiRoute`, `proxyRoute`, `createApp`, and `createServer`.
  * @example
  * ```ts
- * const { apiRoute, createServer } = defineHalide<UserClaims, LogScope>();
+ * type App = HalideContext<UserClaims, LogScope>;
+ * const { apiRoute, createServer } = defineHalide<App>();
  *
  * const server = createServer({
  *   apiRoutes: [
@@ -33,23 +40,23 @@ type HalideBuilder<TClaims, TLogScope> = {
  * });
  * ```
  */
-export function defineHalide<TClaims = unknown, TLogScope = unknown>(): HalideBuilder<
-  TClaims,
-  TLogScope
-> {
+export function defineHalide<TApp = HalideContext>(): HalideBuilder<TApp> {
+  type _TClaims = ExtractClaims<TApp>;
+  type _TLogScope = ExtractLogScope<TApp>;
+
   return {
     apiRoute: <TBody = unknown, TResponse = unknown>(
-      route: ApiRouteInput<TClaims, TLogScope, TBody, TResponse>,
-    ): ApiRoute<TClaims, TLogScope, TBody, TResponse> =>
-      apiRoute<TClaims, TLogScope, TBody, TResponse>(route),
+      route: ApiRouteInput<_TClaims, _TLogScope, TBody, TResponse>,
+    ): ApiRoute<_TClaims, _TLogScope, TBody, TResponse> =>
+      apiRoute<_TClaims, _TLogScope, TBody, TResponse>(route),
 
-    createApp: (config: ServerConfig<TClaims, TLogScope>): CreateAppResult =>
-      createApp<TClaims, TLogScope>(config),
+    createApp: (config: ServerConfig<_TClaims, _TLogScope>): CreateAppResult =>
+      createApp<_TClaims, _TLogScope>(config),
 
-    createServer: (config: ServerConfig<TClaims, TLogScope>): Server =>
-      createServer<TClaims, TLogScope>(config),
+    createServer: (config: ServerConfig<_TClaims, _TLogScope>): Server =>
+      createServer<_TClaims, _TLogScope>(config),
 
-    proxyRoute: (route: ProxyRouteInput<TClaims, TLogScope>): ProxyRoute<TClaims, TLogScope> =>
-      proxyRoute<TClaims, TLogScope>(route),
+    proxyRoute: (route: ProxyRouteInput<_TClaims, _TLogScope>): ProxyRoute<_TClaims, _TLogScope> =>
+      proxyRoute<_TClaims, _TLogScope>(route),
   };
 }

@@ -7,30 +7,17 @@ describe('createRedisRateLimitStore', () => {
   function createMockClient(): {
     counts: Map<string, number>;
     client: RedisClient;
-    del: ReturnType<typeof vi.fn>;
     expire: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
     incr: ReturnType<typeof vi.fn>;
     pttl: ReturnType<typeof vi.fn>;
-    set: ReturnType<typeof vi.fn>;
   } {
     const counts = new Map<string, number>();
     const expiries = new Map<string, number>();
     const pttls = new Map<string, number>();
 
-    const del = vi.fn(async (key: string) => {
-      counts.delete(key);
-      expiries.delete(key);
-      pttls.delete(key);
-      return 1;
-    });
     const expire = vi.fn(async (key: string, seconds: number) => {
       expiries.set(key, seconds);
       return 1;
-    });
-    const get = vi.fn(async (key: string) => {
-      const count = counts.get(key);
-      return count !== undefined ? String(count) : null;
     });
     const incr = vi.fn(async (key: string) => {
       const current = counts.get(key) ?? 0;
@@ -41,18 +28,14 @@ describe('createRedisRateLimitStore', () => {
     const pttl = vi.fn(async (key: string) => {
       return pttls.get(key) ?? -2;
     });
-    const set = vi.fn(async (_key: string, _value: string, _opts?: unknown) => 'OK' as const);
 
     const client: RedisClient = {
-      del,
       expire,
-      get,
       incr,
       pttl,
-      set,
     };
 
-    return { client, counts, del, expire, get, incr, pttl, set };
+    return { client, counts, expire, incr, pttl };
   }
 
   function createApp(

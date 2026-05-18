@@ -78,9 +78,9 @@ type OpenApiSource = {
   path: string; // local file path or URL
 };
 
-type ResolvedOpenApiSpec = {
+type ResolvedOpenApiSpec<TClaims = unknown, TLogScope = unknown> = {
   spec: Record<string, unknown>;
-  route: ProxyRoute<HalideContext>;
+  route: ProxyRoute<TClaims, TLogScope>;
 };
 ```
 

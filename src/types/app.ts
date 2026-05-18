@@ -98,6 +98,12 @@ export type HalideContext<TClaims = unknown, TLogScope = unknown> = {
   logger: Logger<TLogScope>;
 };
 
+/** Extracts the claims type from a {@link HalideContext}. Uses `NonNullable` to strip `| undefined`. */
+export type ExtractClaims<T> = T extends { claims: infer C } ? NonNullable<C> : unknown;
+
+/** Extracts the log scope type from a {@link HalideContext} via the `Logger<infer L>` field. */
+export type ExtractLogScope<T> = T extends { logger: Logger<infer L> } ? L : unknown;
+
 /**
  * Hono context variables used internally by Halide middleware.
  */

@@ -2,19 +2,21 @@
 
 Utilities in `src/test-utils` for unit testing Halide apps without starting a full server.
 
+**Important:** Test utilities are NOT exported from the `halide` npm package. They are only available when developing within the Halide repository. For consumers of the published package, use `createNoopLogger()` from `'halide'` instead.
+
 ## createTestApp
 
 Creates a Hono application configured with routes and selective middleware for testing. Does not start a server — returns a `Hono` app you can call `.request()` on.
 
 ```typescript
-import { createTestApp } from 'halide/test-utils';
+import { createTestApp } from '../test-utils';
 
 const app = createTestApp(config, options?);
 ```
 
 ### Parameters
 
-- `config: ServerConfig` — the same config object you'd pass to `createServer()`. Routes are registered from this config.
+- `config: ServerConfig` — the same config object you'd pass to `createServer()`. Routes and OpenAPI routes are always registered from this config.
 - `options?: TestAppOptions` — flags to selectively enable middleware. All default to `false`.
 
 ### Returns
@@ -25,7 +27,7 @@ A `Hono<{ Variables: HalideVariables }>` app with routes registered.
 
 ```typescript
 import { defineHalide } from 'halide';
-import { createTestApp, noopLogger } from 'halide/test-utils';
+import { createTestApp, noopLogger } from '../test-utils';
 
 const { apiRoute } = defineHalide();
 
@@ -75,17 +77,19 @@ type TestAppOptions = {
 Pre-created noop logger that discards all log messages. Use to suppress output during tests.
 
 ```typescript
-import { noopLogger } from 'halide/test-utils';
+import { noopLogger } from '../test-utils';
 
 const app = createTestApp(config, { logger: noopLogger });
 ```
+
+For consumers of the published package, use `createNoopLogger()` from `'halide'` instead.
 
 ## disposeRateLimit
 
 Cleanup function for rate limit tests. When `createTestApp` is called with `{ rateLimit: true }`, the rate limit middleware's dispose function is stored internally. Call `disposeRateLimit(app)` after tests complete to release resources (clears the cleanup timer).
 
 ```typescript
-import { createTestApp, disposeRateLimit } from 'halide/test-utils';
+import { createTestApp, disposeRateLimit } from '../test-utils';
 
 const app = createTestApp(config, { rateLimit: true });
 

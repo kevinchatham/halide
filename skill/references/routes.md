@@ -5,7 +5,7 @@
 Created with `apiRoute()`. These are handler functions that compose and return data directly.
 
 ```typescript
-type App = HalideContext<UserClaims>;
+type App = HalideContext<UserClaims, LogScope>;
 
 apiRoute({
   access: 'public' | 'private',    // REQUIRED
@@ -23,7 +23,7 @@ apiRoute({
 ### Handler Signature
 
 ```typescript
-handler: (ctx: RequestContext & { body: TBody }, app: HalideContext) =>
+handler: (ctx: RequestContext & { body: TBody }, app: HalideContext<TClaims, TLogScope>) =>
   Promise<TResponse | Response>;
 ```
 
@@ -34,7 +34,7 @@ handler: (ctx: RequestContext & { body: TBody }, app: HalideContext) =>
 
 ### Body Validation
 
-Attach a Zod schema with `requestSchema`. The body is parsed and validated before the handler runs. Failed validation returns `400 Bad Request`.
+Attach a Zod schema with `requestSchema`. The body is parsed and validated before the handler runs via the `hono-openapi` validator. Failed validation returns `400 Bad Request`.
 
 ```typescript
 import { z } from 'zod';
@@ -53,18 +53,18 @@ apiRoute({
 });
 ```
 
-For routes without `requestSchema`, the body is parsed from JSON for POST/PUT/PATCH requests (returns `undefined` if parsing fails).
+For routes without `requestSchema`, the body is parsed via `parseJsonBody()` for POST/PUT/PATCH requests. Empty body returns `400` with `EMPTY_BODY` code. Malformed JSON returns `400` with `MALFORMED_JSON` code.
 
 ### Supported Methods
 
-`'get'`, `'post'`, `'put'`, `'patch'`, `'delete'` — defaults to `'get'`.
+`'get'`, `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'` — defaults to `'get'`.
 
 ## Proxy Routes
 
 Created with `proxyRoute()`. These forward requests to backend services.
 
 ```typescript
-type App = HalideContext<UserClaims>;
+type App = HalideContext<UserClaims, LogScope>;
 
 proxyRoute({
   access: 'public' | 'private',    // REQUIRED

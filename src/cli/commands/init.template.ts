@@ -48,12 +48,11 @@ server.start();
 export function generateFullProject(appName: string, port: number): Record<string, string> {
   return {
     'src/halide/builder.ts': `import { defineHalide } from 'halide';
+import type { HalideContext } from 'halide';
 import type { UserClaims, LogScope } from './types';
 
-export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<
-  UserClaims,
-  LogScope
->();
+type App = HalideContext<UserClaims, LogScope>;
+export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<App>();
 `,
     'src/halide/types.ts': `export interface UserClaims {
   sub: string;

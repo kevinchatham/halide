@@ -132,6 +132,8 @@ security: {
 
 Client IP is extracted from `x-forwarded-for` (first value) when socket IP matches a trusted proxy, or falls back to socket IP. Returns `429 Too Many Requests` with `Retry-After` header. Uses an in-memory store with periodic cleanup (dispose-based).
 
+**Warning:** Without `redisClient`, rate limiting uses an in-memory store that is per-instance only and will not share state across multiple server instances. Configure `redisClient` for distributed rate limiting.
+
 | Field            | Default     | Description                                            |
 | ---------------- | ----------- | ------------------------------------------------------ |
 | `maxRequests`    | `100`       | Maximum requests per window                            |
@@ -139,3 +141,55 @@ Client IP is extracted from `x-forwarded-for` (first value) when socket IP match
 | `trustedProxies` | `[]`        | Trusted proxy IPs/CIDRs for x-forwarded-for validation |
 | `maxEntries`     | `10000`     | Max store entries; oldest evicted when exceeded        |
 | `redisClient`    | `undefined` | Redis client for distributed rate limiting             |
+
+## Redis Client
+
+The `RedisClient` interface defines the minimal Redis operations required for distributed rate limiting. It is exported from `halide` so consumers can type-check their implementation. Compatible with `ioredis`, `redis`, or any Redis client.
+
+### Interface
+
+```typescript
+interface RedisClient {
+  expire(key: string, seconds: number): Promise<number>;
+  incr(key: string): Promise<number>;
+  pttl(key: string): Promise<number>;
+}
+```
+
+### Method Descriptions
+
+| Method                 | Description                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| `expire(key, seconds)` | Set the expiration (in seconds) for the given key. Returns 1 if set, 0 otherwise.   |
+| `incr(key)`            | Increment the integer value of the given key by 1. Returns the new value.           |
+| `pttl(key)`            | Get the remaining time to live (in milliseconds) for the given key.                 |
+
+### Usage
+
+Pass a `RedisClient` implementation via `security.rateLimit.redisClient`:
+
+```typescript
+import { createClient } from 'redis';
+import type { RedisClient } from 'halide';
+
+const redis = createClient({ url: 'redis://localhost:6379' });
+await redis.connect();
+
+const redisClient: RedisClient = {
+  expire: (key, seconds) => redis.expire(key, seconds),
+  incr: (key) => redis.incr(key),
+  pttl: (key) => redis.pttl(key),
+};
+
+const server = createServer({
+  security: {
+    rateLimit: {
+      maxRequests: 100,
+      windowMs: 900000,
+      redisClient,
+    },
+  },
+});
+```
+
+Without `redisClient`, rate limiting uses an in-memory store that is per-instance only. In a multi-instance deployment (e.g., behind a load balancer), each instance maintains its own rate limit counters, meaning a client could exceed the intended limit by rotating between instances. Configuring `redisClient` ensures all instances share the same rate limit state.

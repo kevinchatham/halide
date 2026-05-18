@@ -45,13 +45,12 @@ src/
 **Generated `src/halide/builder.ts`:**
 
 ```ts
-import { defineHalide } from 'halide';
+import { defineHalide, type HalideContext } from 'halide';
 import type { UserClaims, LogScope } from './types';
 
-export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<
-  UserClaims,
-  LogScope
->();
+type App = HalideContext<UserClaims, LogScope>;
+
+export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<App>();
 ```
 
 **Generated `src/halide/types.ts`:**

@@ -51,7 +51,9 @@ const CreateUserSchema: z.ZodObject<{ email: z.ZodString; name: z.ZodString }> =
 /** Inferred TypeScript type from {@link CreateUserSchema}: `{ email: string; name: string }`. */
 type CreateUserSchema = z.infer<typeof CreateUserSchema>;
 
-const { apiRoute, proxyRoute, createServer } = defineHalide<UserClaims, LogScope>();
+type App = HalideContext<UserClaims, LogScope>;
+
+const { apiRoute, proxyRoute, createServer } = defineHalide<App>();
 
 /**
  * Private GET /profile route.
@@ -61,12 +63,8 @@ const { apiRoute, proxyRoute, createServer } = defineHalide<UserClaims, LogScope
  */
 const profileRoute = apiRoute({
   access: 'private',
-  authorize: (_ctx: RequestContext, app: HalideContext<UserClaims, LogScope>) =>
-    !!app.claims?.role && app.claims.role === 'admin',
-  handler: async (
-    ctx: RequestContext & { body: unknown },
-    app: HalideContext<UserClaims, LogScope>,
-  ) => ({
+  authorize: (_ctx: RequestContext, app: App) => !!app.claims?.role && app.claims.role === 'admin',
+  handler: async (ctx: RequestContext & { body: unknown }, app: App) => ({
     ctx: JSON.stringify(ctx),
     user: app.claims?.sub,
   }),
@@ -82,10 +80,7 @@ const profileRoute = apiRoute({
  */
 const userRoute = apiRoute<CreateUserSchema>({
   access: 'public',
-  handler: async (
-    ctx: RequestContext & { body: CreateUserSchema },
-    _app: HalideContext<UserClaims, LogScope>,
-  ) => {
+  handler: async (ctx: RequestContext & { body: CreateUserSchema }, _app: App) => {
     return {
       createdAt: new Date().toISOString(),
       email: ctx.body.email,
@@ -105,10 +100,7 @@ const userRoute = apiRoute<CreateUserSchema>({
  */
 const healthRoute = apiRoute({
   access: 'public',
-  handler: async (
-    _ctx: RequestContext & { body: unknown },
-    _app: HalideContext<UserClaims, LogScope>,
-  ) => ({ status: 'ok' }),
+  handler: async (_ctx: RequestContext & { body: unknown }, _app: App) => ({ status: 'ok' }),
   method: 'get',
   path: '/health',
 });
@@ -154,7 +146,7 @@ const usersProxyRoute = proxyRoute({
  */
 const ordersProxyRoute = proxyRoute({
   access: 'private',
-  authorize: (_ctx: RequestContext, app: HalideContext<UserClaims, LogScope>) =>
+  authorize: (_ctx: RequestContext, app: App) =>
     !!app.claims?.role && (app.claims.role === 'admin' || app.claims.role === 'user'),
   methods: ['get'],
   path: '/api/orders',
@@ -178,7 +170,7 @@ const observability: ObservabilityConfig<UserClaims, LogScope> = {
     requestId: ctx.path,
     userId: claims?.sub ?? undefined,
   }),
-  onRequest: (ctx: RequestContext, app: HalideContext<UserClaims, LogScope>) => {
+  onRequest: (ctx: RequestContext, app: App) => {
     app.logger.info(
       {
         requestId: ctx.path,
@@ -186,11 +178,7 @@ const observability: ObservabilityConfig<UserClaims, LogScope> = {
       `[Request] ${ctx.method} ${ctx.path}`,
     );
   },
-  onResponse: (
-    ctx: RequestContext,
-    app: HalideContext<UserClaims, LogScope>,
-    { statusCode, durationMs }: ResponseContext,
-  ) => {
+  onResponse: (ctx: RequestContext, app: App, { statusCode, durationMs }: ResponseContext) => {
     app.logger.info(
       {
         requestId: ctx.path,

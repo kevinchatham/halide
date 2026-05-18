@@ -5,14 +5,10 @@
 The top-level configuration object passed to `createServer()`:
 
 ```typescript
-import type { HalideContext } from 'halide';
-
-type App = HalideContext<UserClaims, { requestId: string }>;
-
-type ServerConfig<TApp = HalideContext> = {
-  observability?: ObservabilityConfig<TApp>;
-  apiRoutes?: ApiRoute<TApp, unknown, unknown>[];
-  proxyRoutes?: ProxyRoute<TApp>[];
+type ServerConfig<TClaims = unknown, TLogScope = unknown> = {
+  observability?: ObservabilityConfig<TClaims, TLogScope>;
+  apiRoutes?: ApiRoute<TClaims, TLogScope, unknown, unknown>[];
+  proxyRoutes?: ProxyRoute<TClaims, TLogScope>[];
   security?: SecurityConfig;
   app?: AppConfig;
   openapi?: OpenApiConfig;
@@ -72,34 +68,35 @@ type SecurityAuthConfig = {
 
 ## Key Types
 
-| Type                                | Description                                                                   |
-| ----------------------------------- | ----------------------------------------------------------------------------- |
-| `ServerConfig<TApp>`                | Top-level configuration object                                                |
-| `HalideContext<TClaims, TLogScope>` | Bundled app context: `{ claims, logger }`                                     |
-| `Server`                            | Server instance with `ready`, `start(onReady)`, `stop()`                      |
-| `CreateAppResult`                   | Return of `createApp()` — `{ app, logger, proxyDispose, rateLimitDispose }`   |
-| `ApiRoute<TApp, TBody>`             | API route definition                                                          |
-| `ApiRouteHandler<TApp, TBody>`      | Handler signature: `(ctx, app) => Promise<TResponse \| Response>`             |
-| `ApiRouteInput<TApp, TBody>`        | Input for `apiRoute()` factory — omits `type`, requires `handler`             |
-| `ProxyRoute<TApp>`                  | Proxy route definition                                                        |
-| `ProxyRouteInput<TApp>`             | Input for `proxyRoute()` factory — omits `type`                               |
-| `AuthorizeFn<TApp>`                 | `(ctx, app) => boolean \| Promise<boolean>`                                   |
-| `TransformFn`                       | `({ method, body, headers }) => { body, headers }`                            |
-| `RequestContext`                    | Normalized request context: `{ method, path, headers, params, query, body? }` |
-| `ResponseContext`                   | `{ statusCode, durationMs, error?, body?, bodyType? }`                        |
-| `SecurityConfig`                    | CORS, CSP, auth, rate limit configuration                                     |
-| `SecurityAuthConfig`                | Auth strategy, secret/JWKS, audience, algorithms                              |
-| `CorsConfig`                        | Origin, methods, credentials, headers                                         |
-| `CspDirectives`                     | CSP directive map (camelCase keys)                                            |
-| `CspDirectiveValue`                 | `string \| ContentSecurityPolicyOptionHandler`                                |
-| `AppConfig`                         | Static file serving configuration                                             |
-| `ObservabilityConfig<TApp>`         | Logger, requestId, lifecycle hooks, logScopeFactory, maxCollect               |
-| `OpenApiConfig`                     | OpenAPI toggle, path, options                                                 |
-| `OpenApiRouteMeta`                  | Per-route OpenAPI metadata                                                    |
-| `OpenApiSource`                     | External OpenAPI spec source: `{ path: string }`                              |
-| `ResolvedOpenApiSpec`               | Resolved spec with associated proxy route                                     |
-| `Logger<TLogScope>`                 | `{ debug, error, info, warn }` interface                                      |
-| `ClaimExtractor<TClaims>`           | Function to extract claims from a Hono Context                                |
+| Type                                                    | Description                                                                   |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ServerConfig<TClaims, TLogScope>`                      | Top-level configuration object                                                |
+| `HalideContext<TClaims, TLogScope>`                     | Bundled app context: `{ claims, logger }`                                     |
+| `Server`                                                | Server instance with `ready`, `start(onReady)`, `stop()`                      |
+| `CreateAppResult`                                       | Return of `createApp()` — `{ app, logger, proxyDispose, rateLimitDispose }`   |
+| `ApiRoute<TClaims, TLogScope, TBody, TResponse>`        | API route definition                                                          |
+| `ApiRouteHandler<TClaims, TLogScope, TBody, TResponse>` | Handler signature: `(ctx, app) => Promise<TResponse \| Response>`             |
+| `ApiRouteInput<TClaims, TLogScope, TBody, TResponse>`   | Input for `apiRoute()` factory — omits `type`, requires `handler`             |
+| `ProxyRoute<TClaims, TLogScope>`                        | Proxy route definition                                                        |
+| `ProxyRouteInput<TClaims, TLogScope>`                   | Input for `proxyRoute()` factory — omits `type`                               |
+| `AuthorizeFn<TClaims, TLogScope>`                       | `(ctx, app) => boolean \| Promise<boolean>`                                   |
+| `TransformFn`                                           | `({ method, body, headers }) => { body, headers }`                            |
+| `RequestContext`                                        | Normalized request context: `{ method, path, headers, params, query, body? }` |
+| `ResponseContext`                                       | `{ statusCode, durationMs, error?, body?, bodyType? }`                        |
+| `SecurityConfig`                                        | CORS, CSP, auth, rate limit configuration                                     |
+| `SecurityAuthConfig`                                    | Auth strategy, secret/JWKS, audience, algorithms                              |
+| `CorsConfig`                                            | Origin, methods, credentials, headers                                         |
+| `CspDirectives`                                         | CSP directive map (camelCase keys)                                            |
+| `CspDirectiveValue`                                     | `string \| ContentSecurityPolicyOptionHandler`                                |
+| `AppConfig`                                             | Static file serving configuration                                             |
+| `ObservabilityConfig<TClaims, TLogScope>`               | Logger, requestId, lifecycle hooks, logScopeFactory, maxCollect               |
+| `OpenApiConfig`                                         | OpenAPI toggle, path, options                                                 |
+| `OpenApiRouteMeta`                                      | Per-route OpenAPI metadata                                                    |
+| `OpenApiSource`                                         | External OpenAPI spec source: `{ path: string }`                              |
+| `ResolvedOpenApiSpec<TClaims, TLogScope>`               | Resolved spec with associated proxy route                                     |
+| `Logger<TLogScope>`                                     | `{ debug, error, info, warn }` interface                                      |
+| `ClaimExtractor<TClaims>`                               | Function to extract claims from a Hono Context                                |
+| `RedisClient`                                           | Minimal Redis interface for distributed rate limiting                         |
 
 ## App Configuration
 

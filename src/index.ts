@@ -29,6 +29,7 @@ export type {
   OpenApiSource,
   ResolvedOpenApiSpec,
 } from './types/openapi';
+export type { RedisClient } from './types/redis-client';
 export type {
   ClaimExtractor,
   CorsConfig,

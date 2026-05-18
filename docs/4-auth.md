@@ -4,6 +4,8 @@
 
 Verify JWTs using a shared secret or a remote key set. Auth is configured under `security.auth`. Halide supports two strategies:
 
+The `strategy` field defaults to `'bearer'` when omitted.
+
 **Bearer (shared secret)**
 
 ```ts

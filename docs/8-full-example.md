@@ -20,7 +20,7 @@ const CreateUserSchema = z.object({
   name: z.string().min(1),
 });
 
-const server = createServer<UserClaims, LogScope>({
+const server = createServer({
   app: {
     name: 'dashboard',
     root: './dist/browser',

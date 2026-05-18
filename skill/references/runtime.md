@@ -7,7 +7,8 @@ The entry point for building Halide apps. Returns a builder pre-baked with `TCla
 ```typescript
 import { defineHalide } from 'halide';
 
-const { apiRoute, proxyRoute, createApp, createServer } = defineHalide<UserClaims, LogScope>();
+type App = HalideContext<UserClaims, LogScope>;
+const { apiRoute, proxyRoute, createApp, createServer } = defineHalide<App>();
 ```
 
 The builder provides:
