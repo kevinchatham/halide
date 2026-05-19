@@ -96,5 +96,6 @@ server.start();
 
 ## Fallback References
 
+- Docs: `node_modules/halide/docs`
 - Type declarations: `node_modules/halide/dist/index.d.ts`
 - Runtime source: `node_modules/halide/dist/index.js`

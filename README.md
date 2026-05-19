@@ -33,7 +33,7 @@ Halide is not an API gateway, a service mesh, or a full backend framework. It is
 
 See the [demo app](https://github.com/kevinchatham/halide-demo) for a complete example.
 
-Run Halide in an empty project (`npm init`) or add it directly to your existing frontend project. The server runs as a standalone process alongside your SPA build tooling.
+Run Halide in an empty project (`npm init`). The server runs as a standalone process alongside your SPA build tooling.
 
 ```bash
 npx halide init
@@ -41,12 +41,10 @@ npx halide init
 
 This automatically:
 
-1. Detects your package manager
+1. Creates `package.json` and `nodemon.json` if missing
 2. Installs `halide`
-3. Scaffolds a `server.ts` entry point with a health route
-4. Creates `tsconfig.server.json` and updates project references
-5. Adds `halide:start` and `halide:build` scripts to `package.json`
-6. Installs agent skill via native copy from node_modules/halide/skill/
+3. Scaffolds a project structure with `server.ts` entry point and health route
+4. Creates `tsconfig.json` for the server build
 
 ### Manual Installation
 

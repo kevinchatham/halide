@@ -82,18 +82,14 @@ describe('CLI entry point', () => {
 
     await actionCallback!({
       dryRun: true,
-      force: false,
       projectDir: '/tmp/test',
-      projectType: 'full',
       skillsOnly: false,
       yes: true,
     });
 
     expect(mockInit).toHaveBeenCalledWith({
       dryRun: true,
-      force: false,
       projectDir: '/tmp/test',
-      projectType: 'full',
       skillsOnly: false,
       yes: true,
     });
