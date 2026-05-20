@@ -360,7 +360,7 @@ describe('createApp', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(logger.error).toHaveBeenCalled();
     const errorCall = logger.error.mock.calls[0]!;
-    expect(errorCall[1]).toContain('Async auth secret validation failed at startup');
+    expect(errorCall[0]).toContain('Async auth secret validation failed at startup');
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
   });
@@ -388,7 +388,7 @@ describe('createApp', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(logger.error).toHaveBeenCalled();
     const errorCall = logger.error.mock.calls[0]!;
-    expect(errorCall[1]).toContain('Async auth secret validation failed at startup');
+    expect(errorCall[0]).toContain('Async auth secret validation failed at startup');
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
   });

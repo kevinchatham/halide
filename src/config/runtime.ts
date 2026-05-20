@@ -325,9 +325,8 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
     void validateServerConfig(config).then((result) => {
       if (!result.valid) {
         internalLogger.error(
-          { errors: result.errors },
-          'Async auth secret validation failed at startup:',
-          result.errors.map((e) => e.message).join(', '),
+          'Async auth secret validation failed at startup:\n' +
+            result.errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
         );
         process.exit(1);
       }

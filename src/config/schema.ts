@@ -289,13 +289,30 @@ export const securitySchema = z
   .strict();
 
 /**
+ * Zod schema for OpenAPI options — mirrors `OpenApiOptions` type.
+ *
+ * Validates `title`, `version`, `description`, and `servers` fields.
+ * Uses `.strict()` to reject unknown keys.
+ */
+const openApiOptionsSchema = z
+  .object({
+    description: z.string().optional(),
+    servers: z.array(z.object({ description: z.string().optional(), url: z.string() })).optional(),
+    title: z.string().optional(),
+    version: z.string().optional(),
+  })
+  .strict();
+
+/**
  * Zod schema for OpenAPI config structural validation.
  *
- * Validates `enabled` (boolean) and `path` (string) fields. Strict mode rejects unknown keys.
+ * Validates `enabled` (boolean), `options` (OpenApiOptions), and `path` (string) fields.
+ * Strict mode rejects unknown keys.
  */
 export const openApiSchema = z
   .object({
     enabled: z.boolean().optional(),
+    options: openApiOptionsSchema.optional(),
     path: z.string().optional(),
   })
   .strict();

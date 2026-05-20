@@ -96,4 +96,27 @@ describe('validateServerConfig', () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors.at(0)?.field).toBe('observability.maxCollect');
   });
+
+  it('accepts openapi config with options', async () => {
+    const result = await validateServerConfig({
+      openapi: {
+        enabled: true,
+        options: { title: 'My API', version: '2.0.0' },
+        path: '/docs',
+      },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects openapi config with unknown key in options', async () => {
+    const result = await validateServerConfig({
+      openapi: {
+        enabled: true,
+        options: { unknownField: true } as never,
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors.at(0)?.field).toBe('openapi.options');
+  });
 });
