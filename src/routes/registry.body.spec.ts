@@ -248,4 +248,63 @@ describe('createProxyBodyParser', () => {
     const json = await res.json();
     expect(json).toEqual({ error: 'Malformed JSON in request body' });
   });
+
+  it('skips body parsing for GET methods', async () => {
+    const route = {
+      access: 'public' as const,
+      methods: ['get'] as const,
+      path: '/test',
+      target: 'https://example.com',
+      transform: () => ({ body: {}, headers: {} }),
+      type: 'proxy' as const,
+    } satisfies ProxyRoute;
+
+    let capturedParsed: unknown;
+    const app = new Hono<{ Variables: HalideVariables }>();
+    app.use('/test', createProxyBodyParser(route));
+    app.get('/test', (c) => {
+      capturedParsed = c.get('parsedBody');
+      return c.json({ ok: true });
+    });
+
+    const res = await app.request('/test');
+    expect(res.status).toBe(200);
+    expect(capturedParsed).toBeUndefined();
+  });
+
+  it('skips body parsing for DELETE methods', async () => {
+    const route = {
+      access: 'public' as const,
+      methods: ['delete'] as const,
+      path: '/test',
+      target: 'https://example.com',
+      transform: () => ({ body: {}, headers: {} }),
+      type: 'proxy' as const,
+    } satisfies ProxyRoute;
+
+    const app = new Hono<{ Variables: HalideVariables }>();
+    app.use('/test', createProxyBodyParser(route));
+    app.delete('/test', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/test', { method: 'DELETE' });
+    expect(res.status).toBe(200);
+  });
+
+  it('skips body parsing for HEAD methods', async () => {
+    const route = {
+      access: 'public' as const,
+      methods: ['get'] as const,
+      path: '/test',
+      target: 'https://example.com',
+      transform: () => ({ body: {}, headers: {} }),
+      type: 'proxy' as const,
+    } satisfies ProxyRoute;
+
+    const app = new Hono<{ Variables: HalideVariables }>();
+    app.use('/test', createProxyBodyParser(route));
+    app.all('/test', (c) => c.text('ok'));
+
+    const res = await app.request('/test', { method: 'HEAD' });
+    expect(res.status).toBe(200);
+  });
 });

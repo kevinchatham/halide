@@ -65,6 +65,11 @@ export function createProxyBodyParser<TClaims = unknown, TLogScope = unknown>(
   return async (c: Context, next: Next) => {
     if (!route.transform) return next();
 
+    const method = c.req.method.toUpperCase();
+    if (method === 'GET' || method === 'HEAD' || method === 'DELETE' || method === 'OPTIONS') {
+      return next();
+    }
+
     try {
       const parsed = await parseJsonBody(c);
       c.set('parsedBody', parsed);
