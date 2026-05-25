@@ -35,7 +35,7 @@ describe('createErrorHandler', () => {
     expect(logger.error).toHaveBeenCalled();
     const call = logger.error.mock.calls[0]!;
     expect(call[0]).toHaveProperty('errorStack');
-    expect(call[1]).toContain('Something broke');
+    expect(call[0].message).toContain('Internal server error: Something broke');
   });
 
   it('returns 500 with error message', async () => {
@@ -79,7 +79,7 @@ describe('createErrorHandler', () => {
     expect(mockJson).toHaveBeenCalledWith({ error: 'Internal Server Error' }, 500);
     expect(logger.error).toHaveBeenCalled();
     const call = logger.error.mock.calls[0]!;
-    expect(call[1]).toContain('string error');
+    expect(call[0].message).toContain('Internal server error: string error');
   });
 
   it('respects error status code', async () => {
@@ -151,6 +151,6 @@ describe('createErrorHandler', () => {
     expect(scope).toHaveProperty('userId', 'user-1');
     expect(scope).toHaveProperty('path', '/fail');
     expect(scope).toHaveProperty('errorStack');
-    expect(call[1]).toContain('boom');
+    expect(call[0].message).toContain('Internal server error: boom');
   });
 });

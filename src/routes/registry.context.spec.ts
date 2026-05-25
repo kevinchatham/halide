@@ -71,9 +71,9 @@ describe('createContextMiddleware', () => {
     expect(capturedLogger).not.toBe(baseLogger);
 
     if (capturedLogger && typeof capturedLogger === 'object' && 'info' in capturedLogger) {
-      const logger = capturedLogger as { info: (_s: unknown, ...args: unknown[]) => void };
-      logger.info(undefined, 'test message');
-      expect(baseLogger.info).toHaveBeenCalledWith(scopeValue, 'test message');
+      const logger = capturedLogger as { info: (_overrides?: unknown) => void };
+      logger.info({ message: 'test message' });
+      expect(baseLogger.info).toHaveBeenCalledWith({ ...scopeValue, message: 'test message' });
     }
   });
 

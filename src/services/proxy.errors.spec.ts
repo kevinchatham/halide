@@ -72,7 +72,7 @@ describe('createProxyService — errors', () => {
     });
 
     expect(res.status).toBe(502);
-    expect(errorLogger.error).toHaveBeenCalledWith({}, expect.any(String));
+    expect(errorLogger.error).toHaveBeenCalledWith({ message: expect.any(String) as string });
   });
 
   it('normalizes headers with non-string and array values in transform', async () => {

@@ -132,10 +132,9 @@ export async function checkAuthorization<TClaims = unknown, TLogScope = unknown>
     }
     return null;
   } catch (err) {
-    asInternalLogger(logger).error(
-      {},
-      `authorize function threw: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    asInternalLogger(logger).error({
+      message: `authorize function threw: ${err instanceof Error ? err.message : String(err)}`,
+    });
     return createAuthErrorResponse(c, 403, 'Forbidden');
   }
 }

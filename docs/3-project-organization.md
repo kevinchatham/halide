@@ -107,6 +107,22 @@ export const profileRoutes = [
 ];
 ```
 
+```ts
+// src/routes/proxy.ts
+import { proxyRoute } from '../halide/builder';
+
+export const usersProxyRoute = [
+  proxyRoute({
+    access: 'private',
+    path: '/api/users/*',
+    methods: ['get', 'post'],
+    target: 'http://users-service.internal',
+    proxyPath: '/users',
+    identity: (_ctx, app) => ({ 'x-user-id': app.claims?.sub }),
+  }),
+];
+```
+
 ## Barrel export
 
 Re-export all route arrays from a single entry point for clean imports.

@@ -59,9 +59,9 @@ server.start();
 }
 
 /**
- * TypeScript configuration for the project build.
+ * TypeScript configuration template for generated Halide projects.
  *
- * Used by `writeTsconfigServer` to create tsconfig.json.
+ * Used by `writeTsconfigServer` to create tsconfig.json during the `init` command.
  * Targets ES2022 with CommonJS modules for the server build.
  */
 export const TSCONFIG_PROJECT = `{

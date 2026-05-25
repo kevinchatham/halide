@@ -327,6 +327,7 @@ export const openApiSchema = z
  */
 export const observabilitySchema = z
   .object({
+    formatMessage: z.boolean().optional(),
     logger: z.any().optional(),
     logScopeFactory: z.function().optional(),
     maxCollect: z.number().int().positive().max(MAX_COLLECT_BYTES).optional(),

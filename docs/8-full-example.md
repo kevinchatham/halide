@@ -50,6 +50,7 @@ const server = createServer({
 
   observability: {
     requestId: true,
+    formatMessage: true,
     logScopeFactory: (ctx, claims) => ({
       requestId: (ctx.headers as Record<string, string | undefined>)?.['x-request-id'] ?? 'no-id',
       service: 'bff',

@@ -61,7 +61,7 @@ export function createErrorHandler<TClaims = unknown, TLogScope = unknown>(
 
     const logScope = buildErrorLogScope(stack, logScopeFactory, c);
 
-    internalLogger.error(logScope, `Internal server error: ${message}`);
+    internalLogger.error({ ...logScope, message: `Internal server error: ${message}` });
     return c.json({ error: 'Internal Server Error' }, status);
   };
 }

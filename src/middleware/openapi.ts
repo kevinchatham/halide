@@ -246,10 +246,10 @@ export function createOpenApiRoutes<TClaims = unknown, TLogScope = unknown>(
           state.cachedSpec = buildFinalSpec(mergedSpec, options);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          il?.error(
-            { error: 'openapi_spec_resolution_failed' },
-            `Failed to resolve OpenAPI spec: ${message}`,
-          );
+          il?.error({
+            error: 'openapi_spec_resolution_failed',
+            message: `Failed to resolve OpenAPI spec: ${message}`,
+          });
           state.specResolution = null;
         }
       })();

@@ -74,11 +74,13 @@ export function emitOnRequest<TClaims = unknown, TLogScope = unknown>(
       const result = config.observability.onRequest(ctx, config.app);
       if (result instanceof Promise) {
         result.catch((err) =>
-          il?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`),
+          il?.error({
+            message: `onRequest hook: ${err instanceof Error ? err.message : String(err)}`,
+          }),
         );
       }
     } catch (err) {
-      il?.error({}, `onRequest hook: ${err instanceof Error ? err.message : String(err)}`);
+      il?.error({ message: `onRequest hook: ${err instanceof Error ? err.message : String(err)}` });
     }
   }
 }
@@ -112,11 +114,15 @@ export function emitOnResponse<TClaims = unknown, TLogScope = unknown>(
       });
       if (result instanceof Promise) {
         result.catch((err) =>
-          il?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`),
+          il?.error({
+            message: `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
+          }),
         );
       }
     } catch (err) {
-      il?.error({}, `onResponse hook: ${err instanceof Error ? err.message : String(err)}`);
+      il?.error({
+        message: `onResponse hook: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 }

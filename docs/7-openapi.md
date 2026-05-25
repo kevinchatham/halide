@@ -109,4 +109,4 @@ Spec fetching uses a concurrency guard — concurrent requests for the same spec
 
 ## Scalar UI
 
-The documentation UI uses [Scalar](https://github.com/scalar/scalar) (`@scalar/hono-api-reference`), not Swagger UI. The Scalar agent, MCP server, client button, and developer tools are all disabled.
+The documentation UI uses [Scalar](https://github.com/scalar/scalar) (`@scalar/hono-api-reference`), not Swagger UI. The Scalar agent, MCP server, client button, and developer tools are all disabled. `showDeveloperTools` is set to `'never'`, meaning developer tools are completely hidden from the UI.

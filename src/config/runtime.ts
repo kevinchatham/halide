@@ -13,7 +13,14 @@ import { createSecurityMiddleware } from '../middleware/security';
 import { createAppHandler } from '../routes/app';
 import { registerRoutes } from '../routes/registry';
 import { createAgentCache } from '../services/proxy';
-import type { AppConfig, HalideVariables, HonoApp, Logger, RequestContext } from '../types/app';
+import type {
+  AppConfig,
+  HalideVariables,
+  HonoApp,
+  InternalLogger,
+  Logger,
+  RequestContext,
+} from '../types/app';
 import type { ServerConfig } from '../types/server-config';
 import { MAX_DRAIN_TIMEOUT_MS } from './constants';
 import { asInternalLogger, createDefaultLogger, DEFAULTS } from './defaults';
@@ -177,7 +184,7 @@ export function setupRateLimit<TClaims, TLogScope>(
 export function setupOpenapi<TClaims, TLogScope>(
   app: HonoApp,
   config: ServerConfig<TClaims, TLogScope>,
-  logger: Logger<Record<string, unknown>>,
+  internalLogger: InternalLogger,
 ): void {
   const openapiEnabled = config.openapi?.enabled ?? false;
   if (!openapiEnabled) return;
@@ -187,10 +194,11 @@ export function setupOpenapi<TClaims, TLogScope>(
   const cspOverrides = DEFAULTS.csp.openapiOverrides;
   const swaggerPath = config.openapi?.path ?? DEFAULTS.openapi.path;
 
-  logger.warn(
-    { appName },
-    `OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.`,
-  );
+  internalLogger.warn({
+    appName,
+    message:
+      'OpenAPI UI is enabled. Swagger routes use relaxed CSP directives; custom CSP settings do not apply to these routes. This should be disabled in production.',
+  });
 
   app.use(swaggerPath, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
   app.use(`${swaggerPath}/*`, createSecurityMiddleware(security?.csp ?? {}, cspOverrides));
@@ -315,7 +323,9 @@ export function setupErrorHandling<TClaims, TLogScope>(
 export function createApp<TClaims = unknown, TLogScope = unknown>(
   config: ServerConfig<TClaims, TLogScope>,
 ): CreateAppResult {
-  const logger = config.observability?.logger ?? createDefaultLogger();
+  const logger =
+    config.observability?.logger ??
+    createDefaultLogger({ formatMessage: config.observability?.formatMessage });
   const internalLogger = asInternalLogger(logger);
   const logScopeFactory = config.observability?.logScopeFactory;
   const auth = config.security?.auth;
@@ -324,10 +334,11 @@ export function createApp<TClaims = unknown, TLogScope = unknown>(
   if (hasFunctionSecret) {
     void validateServerConfig(config).then((result) => {
       if (!result.valid) {
-        internalLogger.error(
-          'Async auth secret validation failed at startup:\n' +
+        internalLogger.error({
+          message:
+            'Async auth secret validation failed at startup:\n' +
             result.errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n'),
-        );
+        });
         process.exit(1);
       }
     });
@@ -438,10 +449,10 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
       });
       const timeoutPromise = new Promise<void>((resolve) => {
         setTimeout(() => {
-          logger.warn(
-            { appName },
-            `Drain timeout after ${MAX_DRAIN_TIMEOUT_MS}ms, forcing shutdown`,
-          );
+          logger.warn({
+            appName,
+            message: `Drain timeout after ${MAX_DRAIN_TIMEOUT_MS}ms, forcing shutdown`,
+          });
           resolve();
         }, MAX_DRAIN_TIMEOUT_MS).unref();
       });
@@ -456,7 +467,7 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
   const shutdown = async (signal: string): Promise<void> => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    logger.info({ appName }, `Received ${signal}, shutting down...`);
+    logger.info({ appName, message: `Received ${signal}, shutting down...` });
     await shutdownServer(0);
   };
 
@@ -466,7 +477,7 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
       if (httpServer) return;
       const port =
         Number.parseInt(process.env.PORT || '', 10) || (configInput.app?.port ?? DEFAULTS.app.port);
-      logger.info({ appName }, `Server starting on port ${port}`);
+      logger.info({ appName, message: `Server starting on port ${port}` });
       httpServer = serve(
         {
           fetch: app.fetch,
@@ -485,7 +496,7 @@ export function createServer<TClaims = unknown, TLogScope = unknown>(
       });
       httpServer.on('error', (err: Error) => {
         readyReject(err);
-        logger.error({ appName }, `Failed to start: ${err.message}`);
+        logger.error({ appName, message: `Failed to start: ${err.message}` });
       });
       process.on('SIGINT', () => {
         void shutdown('SIGINT');

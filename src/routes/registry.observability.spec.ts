@@ -160,8 +160,12 @@ describe('registerRoutes — observability', () => {
       expect(onRequest).toHaveBeenCalledTimes(1);
       expect(onResponse).toHaveBeenCalledTimes(1);
       expect(errorLogger.error).toHaveBeenCalled();
-      expect(errorLogger.error.mock.calls[0]![1]).toContain('onRequest hook');
-      expect(errorLogger.error.mock.calls[0]![1]).toContain('hook failed');
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('onRequest hook'),
+      });
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('hook failed'),
+      });
     });
 
     it('logs error when sync onRequest hook throws', async () => {
@@ -197,7 +201,9 @@ describe('registerRoutes — observability', () => {
       expect(res.status).toBe(200);
       expect(onRequest).toHaveBeenCalledTimes(1);
       expect(errorLogger.error).toHaveBeenCalled();
-      expect(errorLogger.error.mock.calls[0]![1]).toContain('onRequest hook');
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('onRequest hook'),
+      });
     });
 
     it('logs error when async onResponse hook throws', async () => {
@@ -232,8 +238,54 @@ describe('registerRoutes — observability', () => {
       expect(onRequest).toHaveBeenCalledTimes(1);
       expect(onResponse).toHaveBeenCalledTimes(1);
       expect(errorLogger.error).toHaveBeenCalled();
-      expect(errorLogger.error.mock.calls[0]![1]).toContain('onResponse hook');
-      expect(errorLogger.error.mock.calls[0]![1]).toContain('response hook failed');
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('onResponse hook'),
+      });
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('response hook failed'),
+      });
+    });
+
+    it('logs error when sync onResponse hook throws', async () => {
+      const errorLogger = {
+        error: vi.fn(),
+      };
+      const onRequest = vi.fn();
+      const onResponse = vi.fn(() => {
+        throw new Error('sync response hook failed');
+      });
+
+      const app = new Hono<{ Variables: HalideVariables }>();
+      const agentCache = createAgentCache();
+      await registerRoutes({
+        agentCache,
+        app,
+        config: {
+          apiRoutes: [
+            {
+              access: 'public',
+              handler: async () => ({ ok: true }),
+              path: '/items',
+              type: 'api',
+            },
+          ],
+          app: { root: '/var/www' },
+          observability: { onRequest, onResponse },
+        },
+        logger: errorLogger as unknown as typeof noopLogger,
+      });
+
+      const res = await app.request('/items');
+      expect(res.status).toBe(200);
+      expect(onRequest).toHaveBeenCalledTimes(1);
+      expect(onResponse).toHaveBeenCalledTimes(1);
+      expect(errorLogger.error).toHaveBeenCalled();
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('onResponse hook'),
+      });
+      expect(errorLogger.error.mock.calls[0]![0]).toMatchObject({
+        message: expect.stringContaining('sync response hook failed'),
+      });
     });
 
     it('captures response body from handler returning Response', async () => {

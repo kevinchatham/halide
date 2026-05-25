@@ -432,7 +432,7 @@ function applyTransform<TClaims = unknown, TLogScope = unknown>(
     }
     return body;
   } catch (err) {
-    il?.error({}, err instanceof Error ? err.message : String(err));
+    il?.error({ message: err instanceof Error ? err.message : String(err) });
     throw err;
   }
 }

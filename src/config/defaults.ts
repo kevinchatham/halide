@@ -1,4 +1,6 @@
+import process from 'node:process';
 import { styleText } from 'node:util';
+
 import type { AuthorizeFn } from '../types/api';
 import type { HalideContext, InternalLogger, Logger, RequestContext } from '../types/app';
 import type { CspDirectives } from '../types/csp';
@@ -103,55 +105,55 @@ export const defaultAuthorize: AuthorizeFn<unknown, unknown> = async (
  */
 export function createNoopLogger<T = unknown>(): Logger<T> {
   return {
-    debug: (_scope: T) => {},
-    error: (_scope: T) => {},
-    info: (_scope: T) => {},
-    warn: (_scope: T) => {},
+    debug: (_overrides?: Partial<T>) => {},
+    error: (_overrides?: Partial<T>) => {},
+    info: (_overrides?: Partial<T>) => {},
+    warn: (_overrides?: Partial<T>) => {},
   };
 }
 
 /**
- * Create a styled logger that outputs colored, level-prefixed messages.
+ * Create a structured logger that outputs formatted plain text or compact JSON.
  * @typeParam T - The type of the log scope (defaults to unknown).
- * @returns A {@link Logger} implementation with styled output.
+ * @param options - Optional configuration for the logger.
+ * @param options.formatMessage - When true (default), outputs formatted plain text. When false, outputs compact JSON.
+ * @returns A {@link Logger} implementation with structured output.
  */
-export function createDefaultLogger<T = unknown>(): Logger<T> {
-  const useColors = process.stdout.isTTY === true;
-  const format = (styles: Parameters<typeof styleText>[0], msg: string): string =>
-    useColors ? styleText(styles, msg) : msg;
-  const stringifyScope = (scope: unknown): string => {
-    if (!scope || typeof scope !== 'object') return '';
-    try {
-      return ` [${JSON.stringify(scope)}]`;
-    } catch {
-      return '';
+const useColors = process.stdout.isTTY === true;
+
+const LEVEL_STYLES: Record<string, Parameters<typeof styleText>[0]> = {
+  DEBUG: ['gray', 'dim'],
+  ERROR: 'red',
+  INFO: 'cyan',
+  WARN: 'yellow',
+};
+
+const formatLevel = (level: string): string =>
+  useColors ? styleText(LEVEL_STYLES[level] ?? 'white', level) : level;
+
+export function createDefaultLogger<T = unknown>(options?: { formatMessage?: boolean }): Logger<T> {
+  const formatMessage = options?.formatMessage ?? true;
+  const formatScope = (scope: Record<string, unknown>): string => {
+    const pairs = Object.entries(scope).map(([k, v]) => `${k}=${JSON.stringify(v)}`);
+    return pairs.length ? ` ${pairs.join(' ')}` : '';
+  };
+  const buildLog = (level: string, overrides?: Partial<T>): void => {
+    const scope = overrides ?? ({} as Record<string, unknown>);
+    if (!formatMessage) {
+      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
+      console.log(JSON.stringify({ level, scope }));
+      return;
     }
+    const body = formatScope(scope);
+    const formatted = formatLevel(level);
+    // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
+    console.log(`[${formatted}]${body}`);
   };
   return {
-    debug: (scope: T, ...args: unknown[]) => {
-      const scopeStr = stringifyScope(scope);
-      const msg = `[DEBUG]${scopeStr} ${args.map(String).join(' ')}`;
-      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
-      console.log(format(['gray', 'bold'], msg));
-    },
-    error: (scope: T, ...args: unknown[]) => {
-      const scopeStr = stringifyScope(scope);
-      const msg = `[ERROR]${scopeStr} ${args.map(String).join(' ')}`;
-      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
-      console.log(format(['red', 'bold'], msg));
-    },
-    info: (scope: T, ...args: unknown[]) => {
-      const scopeStr = stringifyScope(scope);
-      const msg = `[INFO]${scopeStr} ${args.map(String).join(' ')}`;
-      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
-      console.log(format(['cyan', 'bold'], msg));
-    },
-    warn: (scope: T, ...args: unknown[]) => {
-      const scopeStr = stringifyScope(scope);
-      const msg = `[WARN]${scopeStr} ${args.map(String).join(' ')}`;
-      // biome-ignore lint/suspicious/noConsole: styled logger must use console.log
-      console.log(format(['yellow', 'bold'], msg));
-    },
+    debug: (overrides?: Partial<T>) => buildLog('DEBUG', overrides),
+    error: (overrides?: Partial<T>) => buildLog('ERROR', overrides),
+    info: (overrides?: Partial<T>) => buildLog('INFO', overrides),
+    warn: (overrides?: Partial<T>) => buildLog('WARN', overrides),
   };
 }
 
@@ -163,34 +165,56 @@ export function createDefaultLogger<T = unknown>(): Logger<T> {
  * bakes it into every log call so handlers and hooks don't need to pass
  * scope manually.
  *
+ * Caller-provided overrides are merged with the baked-in scope (last-write-wins).
+ *
  * @typeParam TLogScope - The type of the log scope object.
  * @param logger - The underlying logger implementation.
- * @param scope - The fixed scope value to pass as the first argument.
- * @returns A new {@link Logger} that pre-applies `scope` to every method.
+ * @param scope - The fixed scope value to merge with caller overrides.
+ * @returns A new {@link Logger} that merges `scope` with caller-provided overrides.
  */
 export function createScopedLogger<TLogScope>(
   logger: Logger<TLogScope>,
   scope: TLogScope,
 ): Logger<TLogScope> {
   return {
-    debug: (_scope: TLogScope, ...args: unknown[]) => logger.debug(scope, ...args),
-    error: (_scope: TLogScope, ...args: unknown[]) => logger.error(scope, ...args),
-    info: (_scope: TLogScope, ...args: unknown[]) => logger.info(scope, ...args),
-    warn: (_scope: TLogScope, ...args: unknown[]) => logger.warn(scope, ...args),
+    debug: (overrides?: Partial<TLogScope>) => {
+      logger.debug({ ...scope, ...overrides });
+    },
+    error: (overrides?: Partial<TLogScope>) => {
+      logger.error({ ...scope, ...overrides });
+    },
+    info: (overrides?: Partial<TLogScope>) => {
+      logger.info({ ...scope, ...overrides });
+    },
+    warn: (overrides?: Partial<TLogScope>) => {
+      logger.warn({ ...scope, ...overrides });
+    },
   };
 }
 
 /**
- * Cast a typed logger to an internal logger for use in framework internals
+ * Wrap a typed logger as an internal logger for use in framework internals
  * where ad-hoc scope objects are logged (e.g., validation errors, startup warnings).
  *
- * The cast is safe because the underlying logger implementation (e.g., `createDefaultLogger`)
- * accepts any value via `stringifyScope(scope)` which operates on `unknown`.
+ * The wrapper handles the type difference between `Partial<T>` and `Record<string, unknown>`.
  *
  * @typeParam T - The current type parameter of the logger.
- * @param logger - The logger to cast.
- * @returns The logger cast to {@link InternalLogger}.
+ * @param logger - The logger to wrap.
+ * @returns A new {@link InternalLogger} that delegates to the underlying logger.
  */
 export function asInternalLogger<T>(logger: Logger<T>): InternalLogger {
-  return logger as InternalLogger;
+  return {
+    debug: (overrides?: Record<string, unknown>) => {
+      logger.debug(overrides as Partial<T>);
+    },
+    error: (overrides?: Record<string, unknown>) => {
+      logger.error(overrides as Partial<T>);
+    },
+    info: (overrides?: Record<string, unknown>) => {
+      logger.info(overrides as Partial<T>);
+    },
+    warn: (overrides?: Record<string, unknown>) => {
+      logger.warn(overrides as Partial<T>);
+    },
+  };
 }

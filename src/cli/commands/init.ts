@@ -317,14 +317,14 @@ function writeProjectFiles(resolvedDir: string, config: { appName: string; port:
   const files = generateFullProject(config.appName, config.port);
   for (const [fp, content] of Object.entries(files)) {
     const fullPath = path.join(resolvedDir, fp);
-    if (!fs.existsSync(fullPath)) {
+    if (fs.existsSync(fullPath)) {
+      cliInfo(`Skipping existing file: ${fp}`);
+    } else {
       const dirPath = path.dirname(fullPath);
       if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
       }
       fs.writeFileSync(fullPath, content, 'utf8');
-    } else {
-      cliInfo(`Skipping existing file: ${fp}`);
     }
   }
 }

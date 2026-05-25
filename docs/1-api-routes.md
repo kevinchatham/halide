@@ -58,7 +58,7 @@ Handler return values are JSON-serialized. Returning a native `Response` bypasse
 
 ## Supported methods
 
-`'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`. The methods `'head'` and `'options'` are proxy-only and not available for API routes.
+``'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'`.
 
 ## Body handling
 

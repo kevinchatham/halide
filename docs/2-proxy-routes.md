@@ -76,8 +76,13 @@ This prevents routing issues with CDNs that use the `host` header to route reque
 
 The following headers are stripped from proxied requests and cannot be overridden by `identity` or `transform`:
 
+**Readonly headers** (writable in HTTP but stripped to prevent manipulation):
+
 - `host`
 - `connection`
 - `content-length`
 - `transfer-encoding`
-- `set-cookie` (multi-value, not writable)
+
+**Multi-value headers** (can have multiple values, not writable as single value):
+
+- `set-cookie`

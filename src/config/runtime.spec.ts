@@ -275,10 +275,10 @@ describe('createApp', () => {
 
   it('logs errors through the custom logger', async () => {
     const logger = {
-      debug: (_scope: unknown) => {},
+      debug: (_overrides?: unknown) => {},
       error: vi.fn(),
-      info: (_scope: unknown) => {},
-      warn: (_scope: unknown) => {},
+      info: (_overrides?: unknown) => {},
+      warn: (_overrides?: unknown) => {},
     };
     const { app } = createApp({
       ...minimalConfig,
@@ -296,7 +296,7 @@ describe('createApp', () => {
         logger,
         onResponse: (_ctx: unknown, _claims: unknown, { error }: { error?: Error }) => {
           if (error) {
-            logger.error(_ctx, `Request failed: ${error.message}`);
+            logger.error({ message: `Request failed: ${error.message}` });
           }
         },
       },
@@ -360,7 +360,8 @@ describe('createApp', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(logger.error).toHaveBeenCalled();
     const errorCall = logger.error.mock.calls[0]!;
-    expect(errorCall[0]).toContain('Async auth secret validation failed at startup');
+    expect(errorCall[0]).toHaveProperty('message');
+    expect(errorCall[0].message).toContain('Async auth secret validation failed at startup');
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
   });
@@ -388,7 +389,8 @@ describe('createApp', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(logger.error).toHaveBeenCalled();
     const errorCall = logger.error.mock.calls[0]!;
-    expect(errorCall[0]).toContain('Async auth secret validation failed at startup');
+    expect(errorCall[0]).toHaveProperty('message');
+    expect(errorCall[0].message).toContain('Async auth secret validation failed at startup');
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
   });
@@ -412,10 +414,10 @@ describe('createApp', () => {
   it('provides scoped logger when logScopeFactory is configured', async () => {
     const infoFn = vi.fn();
     const logger = {
-      debug: (_scope: unknown) => {},
-      error: (_scope: unknown) => {},
+      debug: (_overrides?: unknown) => {},
+      error: (_overrides?: unknown) => {},
       info: infoFn,
-      warn: (_scope: unknown) => {},
+      warn: (_overrides?: unknown) => {},
     };
     const { app } = createApp({
       ...minimalConfig,
@@ -426,13 +428,12 @@ describe('createApp', () => {
             _ctx: unknown,
             appCtx: {
               claims: unknown;
-              logger: { info: (...args: unknown[]) => void };
+              logger: {
+                info: (_overrides?: Partial<{ message?: string; requestId: string }>) => void;
+              };
             },
           ) => {
-            (appCtx.logger.info as (...args: unknown[]) => void)(
-              { ignored: true },
-              'handler message',
-            );
+            appCtx.logger.info({ message: 'handler message' });
             return { ok: true };
           },
           path: '/scoped',
@@ -449,7 +450,6 @@ describe('createApp', () => {
     await app.request('/scoped');
     expect(infoFn).toHaveBeenCalled();
     const call = infoFn.mock.calls[0]!;
-    expect(call[0]).toEqual({ requestId: '/scoped' });
-    expect(call[1]).toBe('handler message');
+    expect(call[0]).toMatchObject({ message: 'handler message', requestId: '/scoped' });
   });
 });

@@ -29,7 +29,7 @@ describe('createServer', () => {
   });
 
   it('logs startup with custom app.name', async () => {
-    const logs: { scope: Record<string, unknown>; message: string }[] = [];
+    const logs: { overrides: Record<string, unknown> }[] = [];
     const server = createServer({
       ...minimalConfig,
       app: { ...minimalConfig.app, name: 'my-app', port: getFreePort() },
@@ -37,8 +37,8 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (scope: unknown, ...messageArgs: unknown[]) =>
-            logs.push({ message: String(messageArgs[0]), scope: scope as Record<string, unknown> }),
+          info: (overrides?: unknown) =>
+            logs.push({ overrides: (overrides ?? {}) as Record<string, unknown> }),
           warn: () => {},
         },
       },
@@ -46,11 +46,11 @@ describe('createServer', () => {
     server.start();
     await server.stop();
     expect(logs.length).toBe(1);
-    expect(logs[0]!.scope.appName).toBe('my-app');
+    expect(logs[0]!.overrides.appName).toBe('my-app');
   });
 
   it('logs startup with default app.name', async () => {
-    const logs: { scope: Record<string, unknown>; message: string }[] = [];
+    const logs: { overrides: Record<string, unknown> }[] = [];
     const server = createServer({
       ...minimalConfig,
       app: { ...minimalConfig.app, port: getFreePort() },
@@ -58,15 +58,15 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (scope: unknown, ...messageArgs: unknown[]) =>
-            logs.push({ message: String(messageArgs[0]), scope: scope as Record<string, unknown> }),
+          info: (overrides?: unknown) =>
+            logs.push({ overrides: (overrides ?? {}) as Record<string, unknown> }),
           warn: () => {},
         },
       },
     });
     server.start();
     await server.stop();
-    expect(logs[0]!.scope.appName).toBe('app');
+    expect(logs[0]!.overrides.appName).toBe('app');
   });
 
   it('resolves port from process.env.PORT', async () => {
@@ -80,7 +80,13 @@ describe('createServer', () => {
           logger: {
             debug: () => {},
             error: () => {},
-            info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+            info: (overrides?: unknown) => {
+              const msg =
+                overrides && typeof overrides === 'object' && 'message' in overrides
+                  ? String((overrides as Record<string, string>).message)
+                  : '';
+              infoMessages.push(msg);
+            },
             warn: () => {},
           },
         },
@@ -110,7 +116,13 @@ describe('createServer', () => {
           logger: {
             debug: () => {},
             error: () => {},
-            info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+            info: (overrides?: unknown) => {
+              const msg =
+                overrides && typeof overrides === 'object' && 'message' in overrides
+                  ? String((overrides as Record<string, string>).message)
+                  : '';
+              infoMessages.push(msg);
+            },
             warn: () => {},
           },
         },
@@ -195,7 +207,13 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+          info: (overrides?: unknown) => {
+            const msg =
+              overrides && typeof overrides === 'object' && 'message' in overrides
+                ? String((overrides as Record<string, string>).message)
+                : '';
+            infoMessages.push(msg);
+          },
           warn: () => {},
         },
       },
@@ -227,7 +245,13 @@ describe('createServer', () => {
         logger: {
           debug: () => {},
           error: () => {},
-          info: (...args: unknown[]) => infoMessages.push(args.join(' ')),
+          info: (overrides?: unknown) => {
+            const msg =
+              overrides && typeof overrides === 'object' && 'message' in overrides
+                ? String((overrides as Record<string, string>).message)
+                : '';
+            infoMessages.push(msg);
+          },
           warn: () => {},
         },
       },

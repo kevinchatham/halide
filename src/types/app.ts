@@ -60,14 +60,10 @@ export type ResponseContext = {
  * consumer's `TLogScope` type parameter.
  */
 export type InternalLogger = {
-  /** Log a debug-level message with arbitrary scope (e.g., validation errors, startup info). */
-  debug: (scope: unknown, ...args: unknown[]) => void;
-  /** Log an error-level message with arbitrary scope (e.g., middleware failures). */
-  error: (scope: unknown, ...args: unknown[]) => void;
-  /** Log an info-level message with arbitrary scope (e.g., server startup). */
-  info: (scope: unknown, ...args: unknown[]) => void;
-  /** Log a warning-level message with arbitrary scope (e.g., deprecated config). */
-  warn: (scope: unknown, ...args: unknown[]) => void;
+  debug: (_overrides?: Record<string, unknown>) => void;
+  error: (_overrides?: Record<string, unknown>) => void;
+  info: (_overrides?: Record<string, unknown>) => void;
+  warn: (_overrides?: Record<string, unknown>) => void;
 };
 
 /**
@@ -75,14 +71,10 @@ export type InternalLogger = {
  * @typeParam TLogScope - The type of the structured log scope object passed to each log method.
  */
 export type Logger<TLogScope = unknown> = {
-  /** Log a debug-level message with the typed log scope (e.g., request details). */
-  debug: (scope: TLogScope, ...args: unknown[]) => void;
-  /** Log an error-level message with the typed log scope (e.g., error details). */
-  error: (scope: TLogScope, ...args: unknown[]) => void;
-  /** Log an info-level message with the typed log scope (e.g., request lifecycle). */
-  info: (scope: TLogScope, ...args: unknown[]) => void;
-  /** Log a warning-level message with the typed log scope (e.g., deprecated usage). */
-  warn: (scope: TLogScope, ...args: unknown[]) => void;
+  debug: (_overrides?: Partial<TLogScope>) => void;
+  error: (_overrides?: Partial<TLogScope>) => void;
+  info: (_overrides?: Partial<TLogScope>) => void;
+  warn: (_overrides?: Partial<TLogScope>) => void;
 };
 
 /**
@@ -195,6 +187,13 @@ export type ObservabilityConfig<TClaims = unknown, TLogScope = unknown> = {
    * what is captured for logging purposes. Defaults to 1024.
    */
   maxCollect?: number;
+  /**
+   * Controls the output format of the default logger.
+   * When `true` (default), outputs formatted plain text (`[LEVEL] key=val ...`).
+   * When `false`, outputs compact JSON (`{"level":"INFO","scope":{...}}`).
+   * Has no effect when a custom `logger` is provided.
+   */
+  formatMessage?: boolean;
   /**
    * Hook called before each request is handled. Use for logging, metrics, or request tracing.
    * Fired per-route unless `observe: false` is set on the route.

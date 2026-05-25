@@ -27,8 +27,14 @@ import { defineHalide } from './index';
 
 /** Structured log scope shape for typed logging throughout the application. */
 interface LogScope {
+  /** Response duration in milliseconds, set by onResponse hook. */
+  durationMs?: number;
+  /** Log message describing the event. */
+  message?: string;
   /** Unique request identifier from the x-request-id header. */
   requestId: string;
+  /** HTTP status code, set by onResponse hook. */
+  statusCode?: number;
   /** Authenticated user subject, when available. */
   userId?: string;
 }
@@ -160,7 +166,7 @@ const ordersProxyRoute = proxyRoute({
  * (containing requestId and userId) to every logger call within a request.
  * This eliminates the need to manually construct and pass scope objects
  * in each `logger.info(scope, ...)` call — the framework does it for you.
- * Handlers still pass a scope as the first arg (it's ignored by the scoped logger).
+ * Handlers can pass optional scope overrides as the first arg, which are merged with the auto-populated scope.
  *
  * - `onRequest`: called on every incoming request with the request context and app
  * - `onResponse`: called when a response is sent, includes status code and duration in milliseconds
@@ -168,23 +174,13 @@ const ordersProxyRoute = proxyRoute({
 const observability: ObservabilityConfig<UserClaims, LogScope> = {
   logScopeFactory: (ctx: RequestContext, claims: UserClaims | undefined) => ({
     requestId: ctx.path,
-    userId: claims?.sub ?? undefined,
+    userId: claims?.sub,
   }),
   onRequest: (ctx: RequestContext, app: App) => {
-    app.logger.info(
-      {
-        requestId: ctx.path,
-      },
-      `[Request] ${ctx.method} ${ctx.path}`,
-    );
+    app.logger.info({ message: `[Request] ${ctx.method} ${ctx.path}` });
   },
   onResponse: (ctx: RequestContext, app: App, { statusCode, durationMs }: ResponseContext) => {
-    app.logger.info(
-      {
-        requestId: ctx.path,
-      },
-      `[Response] ${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`,
-    );
+    app.logger.info({ durationMs, message: `[Response] ${ctx.method} ${ctx.path}`, statusCode });
   },
 };
 

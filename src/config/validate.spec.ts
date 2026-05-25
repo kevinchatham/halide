@@ -97,6 +97,29 @@ describe('validateServerConfig', () => {
     expect(result.errors.at(0)?.field).toBe('observability.maxCollect');
   });
 
+  it('accepts observability with formatMessage true', async () => {
+    const result = await validateServerConfig({
+      observability: { formatMessage: true },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('accepts observability with formatMessage false', async () => {
+    const result = await validateServerConfig({
+      observability: { formatMessage: false },
+    });
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects observability with non-boolean formatMessage', async () => {
+    const result = await validateServerConfig({
+      observability: { formatMessage: 'yes' } as never,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors.at(0)?.field).toBe('observability.formatMessage');
+  });
+
   it('accepts openapi config with options', async () => {
     const result = await validateServerConfig({
       openapi: {

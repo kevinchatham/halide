@@ -76,11 +76,10 @@ describe('createSecretCache', () => {
 
     await expect(resolver(fetcher)).rejects.toThrow('Vault unavailable');
 
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      { error: 'secret_refresh_failed' },
-      'Failed to refresh JWT secret from secret provider:',
-      'Vault unavailable',
-    );
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      error: 'secret_refresh_failed',
+      message: 'Failed to refresh JWT secret from secret provider: Vault unavailable',
+    });
   });
 
   it('does not cache failures — next call retries', async () => {
@@ -102,11 +101,10 @@ describe('createSecretCache', () => {
 
     await expect(resolver(fetcher)).rejects.toBe('string error');
 
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      { error: 'secret_refresh_failed' },
-      'Failed to refresh JWT secret from secret provider:',
-      'string error',
-    );
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      error: 'secret_refresh_failed',
+      message: 'Failed to refresh JWT secret from secret provider: string error',
+    });
   });
 
   it('deduplicates concurrent calls — fetcher called once', async () => {

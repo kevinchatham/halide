@@ -31,6 +31,14 @@ Creates a logger that discards all log messages.
 
 Wraps a logger so every method automatically applies a fixed scope.
 
+### `disposeRateLimit(): void`
+
+Cleans up the in-memory rate limit store and its internal dispose timer.
+
+### `createTestApp(config, options?): HonoApp`
+
+Creates a Hono app with routes registered for testing. Accepts `config` and optional `options` with flags for `cors`, `csp`, `rateLimit`, `requestId`, `errorHandler`, `appHandler`, and `logger`.
+
 ## Interfaces
 
 ### `Server`
@@ -74,10 +82,11 @@ Wraps a logger so every method automatically applies a fixed scope.
 | `CspDirectives`                                         | Content Security Policy directives map with camelCase keys (e.g., `defaultSrc`, `scriptSrc`)                                                                                             |
 | `CspDirectiveValue`                                     | `string \| ContentSecurityPolicyOptionHandler` — value for a CSP directive. `ContentSecurityPolicyOptionHandler` is an external type from `hono/secure-headers`                          |
 | `AppConfig`                                             | `{ apiPrefix?, fallback?, name?, port?, root? }` — static file serving and port configuration                                                                                            |
-| `ObservabilityConfig<TClaims, TLogScope>`               | `{ requestId?, logger?, logScopeFactory?, maxCollect?, onRequest?, onResponse? }` — observability config                                                                                 |
+| `ObservabilityConfig<TClaims, TLogScope>`               | `{ requestId?, logger?, logScopeFactory?, maxCollect?, formatMessage?, onRequest?, onResponse? }` — observability config                                                                 |
 | `OpenApiConfig`                                         | `{ enabled?, path?, options? }` — OpenAPI/Scalar UI configuration                                                                                                                        |
 | `OpenApiOptions`                                        | `{ title?, version?, description?, servers? }` — OpenAPI specification options                                                                                                           |
 | `OpenApiRouteMeta`                                      | Per-route OpenAPI metadata (`summary`, `description`, `tags`, `responses`)                                                                                                               |
 | `OpenApiSource`                                         | `{ path: string }` — source of an OpenAPI spec (local file or URL)                                                                                                                       |
+| `TestAppOptions`                                        | `{ cors?, csp?, rateLimit?, requestId?, errorHandler?, appHandler?, logger? }` — options for `createTestApp()`                                                                           |
 | `ResolvedOpenApiSpec<TClaims, TLogScope>`               | `{ spec: Record<string, unknown>, route: ProxyRoute }` — resolved external spec                                                                                                          |
 | `ClaimExtractor<TClaims>`                               | `(c: Context) => Promise<TClaims \| null>` — function to extract claims from a Hono Context                                                                                              |

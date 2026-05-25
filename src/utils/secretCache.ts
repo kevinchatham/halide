@@ -51,11 +51,10 @@ export function createSecretCache<TLogScope = unknown>(
         cache = { expiresAt: freshNow + ttlSeconds * MILLIS_PER_SECOND, value };
         return value;
       } catch (err) {
-        il.error(
-          { error: 'secret_refresh_failed' },
-          'Failed to refresh JWT secret from secret provider:',
-          err instanceof Error ? err.message : String(err),
-        );
+        il.error({
+          error: 'secret_refresh_failed',
+          message: `Failed to refresh JWT secret from secret provider: ${err instanceof Error ? err.message : String(err)}`,
+        });
         throw err;
       } finally {
         pendingPromise = null;

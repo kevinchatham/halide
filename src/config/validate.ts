@@ -147,7 +147,7 @@ export function validateServerConfigSync<TConfig extends Record<string, unknown>
   }
 
   for (const w of warnings) {
-    logger?.warn(`[Halide] ${w.field}: ${w.message}`);
+    logger?.warn({ message: `[Halide] ${w.field}: ${w.message}` });
   }
 }
 
