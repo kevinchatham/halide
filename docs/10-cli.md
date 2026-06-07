@@ -16,11 +16,11 @@ Scaffolds a new Halide project. It prompts for:
 
 ### CLI flags
 
-| Flag            | Description                                                |
-| --------------- | ---------------------------------------------------------- |
-| `--dry-run`     | Preview changes without modifying any files                |
-| `--skills-only` | Only install AI coding skills, skip project scaffolding  |
-| `--project-dir` | Target directory for the project                           |
+| Flag            | Description                                                            |
+| --------------- | ---------------------------------------------------------------------- |
+| `--dry-run`     | Preview changes without modifying any files                            |
+| `--skills-only` | Only install AI coding skills, skip project scaffolding                |
+| `--project-dir` | Target directory for the project                                       |
 | `--yes` / `-y`  | Accept defaults for app name and port (skips project directory prompt) |
 
 ### Full project structure

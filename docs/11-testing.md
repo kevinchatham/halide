@@ -33,14 +33,14 @@ expect(await res.json()).toEqual({ status: 'ok' });
 
 Optional second argument to `createTestApp` that controls which middleware pipelines are applied. All flags default to `false` for isolated testing — only the routes and OpenAPI routes are registered by default.
 
-| Flag           | Default      | Description                                   |
-| -------------- | ------------ | --------------------------------------------- |
-| `cors`         | `false`      | Apply CORS + CSRF middleware                  |
-| `csp`          | `false`      | Apply CSP security headers middleware         |
-| `rateLimit`    | `false`      | Apply rate limiting middleware                |
-| `requestId`    | `false`      | Apply request ID middleware                   |
-| `errorHandler` | `false`      | Apply global error handler middleware         |
-| `appHandler`   | `false`      | Apply SPA fallback + static file handler      |
+| Flag           | Default | Description                              |
+| -------------- | ------- | ---------------------------------------- |
+| `cors`         | `false` | Apply CORS + CSRF middleware             |
+| `csp`          | `false` | Apply CSP security headers middleware    |
+| `rateLimit`    | `false` | Apply rate limiting middleware           |
+| `requestId`    | `false` | Apply request ID middleware              |
+| `errorHandler` | `false` | Apply global error handler middleware    |
+| `appHandler`   | `false` | Apply SPA fallback + static file handler |
 
 All flags default to `false` for isolated testing. The logger always defaults to `noopLogger` internally — there is no logger override option.
 

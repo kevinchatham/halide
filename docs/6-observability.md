@@ -26,7 +26,11 @@ const server = createServer({
     },
     onResponse: (ctx, app, { statusCode, durationMs }) => {
       // The logger is already scoped — pass overrides as an object
-      app.logger.info({ message: `${ctx.method} ${ctx.path}`, status: statusCode, duration: durationMs });
+      app.logger.info({
+        message: `${ctx.method} ${ctx.path}`,
+        status: statusCode,
+        duration: durationMs,
+      });
     },
   },
 });

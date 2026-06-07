@@ -42,10 +42,10 @@ apiRoute({
 
 The handler receives 2 parameters:
 
-| Parameter | Type                                | Description                                              |
-| --------- | ----------------------------------- | -------------------------------------------------------- |
+| Parameter | Type                                | Description                                                                              |
+| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------- |
 | `ctx`     | `RequestContext & { body: TBody }`  | Normalized request context with method, path, headers, params, query, and validated body |
-| `app`     | `HalideContext<TClaims, TLogScope>` | Bundled app context with `claims` and `logger`           |
+| `app`     | `HalideContext<TClaims, TLogScope>` | Bundled app context with `claims` and `logger`                                           |
 
 `app` is a `HalideContext<TClaims, TLogScope>` object containing:
 
