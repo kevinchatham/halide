@@ -6,7 +6,7 @@ Routes are plain data objects — they carry no runtime dependency on the `defin
 
 ```
 src/
-  halide/
+  app/
     builder.ts        # Single call to defineHalide(), exports factories
     types.ts          # Shared types (TClaims, TLogScope)
   routes/
@@ -23,7 +23,7 @@ src/
 Call `defineHalide()` once in a dedicated module, passing your global types. This exports typed `apiRoute`, `proxyRoute`, `createServer`, and `createApp` factories for use across your project.
 
 ```ts
-// src/halide/builder.ts
+// src/app/builder.ts
 import { defineHalide, type HalideContext } from 'halide';
 import type { UserClaims, LogScope } from './types';
 
@@ -37,7 +37,7 @@ export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<Ap
 Colocate your claim and log scope types with the builder so all route files share the same definitions.
 
 ```ts
-// src/halide/types.ts
+// src/app/types.ts
 export interface UserClaims {
   sub: string;
   role: 'admin' | 'user';
@@ -55,7 +55,7 @@ Each route file imports the factory from the shared builder and exports an array
 
 ```ts
 // src/routes/health.ts
-import { apiRoute } from '../halide/builder';
+import { apiRoute } from '../app/builder';
 
 export const healthRoutes = [
   apiRoute({
@@ -69,7 +69,7 @@ export const healthRoutes = [
 ```ts
 // src/routes/users.ts
 import { z } from 'zod';
-import { apiRoute } from '../halide/builder';
+import { apiRoute } from '../app/builder';
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -95,7 +95,7 @@ export const userRoutes = [
 
 ```ts
 // src/routes/profile.ts
-import { apiRoute } from '../halide/builder';
+import { apiRoute } from '../app/builder';
 
 export const profileRoutes = [
   apiRoute({
@@ -109,7 +109,7 @@ export const profileRoutes = [
 
 ```ts
 // src/routes/proxy.ts
-import { proxyRoute } from '../halide/builder';
+import { proxyRoute } from '../app/builder';
 
 export const usersProxyRoute = [
   proxyRoute({
@@ -141,7 +141,7 @@ Import route arrays and spread them into the server config.
 
 ```ts
 // src/server.ts
-import { createServer } from './halide/builder';
+import { createServer } from './app/builder';
 import { healthRoutes, userRoutes, profileRoutes, usersProxyRoute } from './routes';
 
 const server = createServer({

@@ -80,7 +80,7 @@ When `responses` is present, `responseSchema` is ignored. When neither is presen
 
 ## Skipping observability hooks
 
-Set `observe: false` on a route to skip `onRequest` and `onResponse` hooks for that route. The route will still appear in the OpenAPI documentation.
+Set `observe: false` on a route to skip `onRequest` and `onResponse` hooks for that route (default: hooks are fired). The route will still appear in the OpenAPI documentation.
 
 ## External specs via `openapiSpec`
 

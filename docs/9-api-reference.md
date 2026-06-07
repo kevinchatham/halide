@@ -13,15 +13,15 @@ const { apiRoute, createServer } = defineHalide<App>();
 
 ### `apiRoute<TClaims, TLogScope, TBody, TResponse>(input): ApiRoute`
 
-Factory (obtained via `defineHalide()`) that fills in `type: 'api'` and a default `authorize` function (accepts any valid JWT). The input omits `type` and requires `handler`.
+Factory (obtained via `defineHalide()`) that fills in `type: 'api'` and a default `authorize` function (accepts any request that has already passed JWT authentication). The input omits `type` and requires `handler`.
 
 ### `proxyRoute<TClaims, TLogScope>(input): ProxyRoute`
 
-Factory (obtained via `defineHalide()`) that fills in `type: 'proxy'` and a default `authorize` function (accepts any valid JWT). The input omits `type`.
+Factory (obtained via `defineHalide()`) that fills in `type: 'proxy'` and a default `authorize` function (accepts any request that has already passed JWT authentication). The input omits `type`.
 
-### `createDefaultLogger<TLogScope>(): Logger<TLogScope>`
+### `createDefaultLogger<TLogScope>(options?): Logger<TLogScope>`
 
-Creates a styled logger with colored, level-prefixed messages. Uses `node:util.styleText` for colors in TTY, plain text otherwise.
+Creates a styled logger with colored, level-prefixed messages. Uses `node:util.styleText` for colors in TTY, plain text otherwise. Accepts an optional `formatMessage` option: `true` outputs formatted plain text (`[LEVEL] key=val`), `false` outputs compact JSON.
 
 ### `createNoopLogger<TLogScope>(): Logger<TLogScope>`
 
@@ -29,7 +29,7 @@ Creates a logger that discards all log messages.
 
 ### `createScopedLogger<TLogScope>(logger, scope): Logger<TLogScope>`
 
-Wraps a logger so every method automatically applies a fixed scope.
+Wraps a logger so every method automatically applies a fixed scope. Caller-provided scope overrides are merged with the baked-in scope (last-write-wins).
 
 ### `disposeRateLimit(): void`
 
@@ -37,7 +37,7 @@ Cleans up the in-memory rate limit store and its internal dispose timer.
 
 ### `createTestApp(config, options?): HonoApp`
 
-Creates a Hono app with routes registered for testing. Accepts `config` and optional `options` with flags for `cors`, `csp`, `rateLimit`, `requestId`, `errorHandler`, `appHandler`, and `logger`.
+Creates a Hono app with routes registered for testing. Accepts `config` and optional `options` with flags for `cors`, `csp`, `rateLimit`, `requestId`, `errorHandler`, and `appHandler`.
 
 ## Interfaces
 
@@ -65,10 +65,10 @@ Creates a Hono app with routes registered for testing. Accepts `config` and opti
 | `ServerConfig<TClaims, TLogScope>`                      | Top-level configuration object with `apiRoutes`, `proxyRoutes`, `security`, `app`, `observability`, `openapi`                                                                            |
 | `Server`                                                | Running server instance (`ready`, `start`, `stop`)                                                                                                                                       |
 | `CreateAppResult`                                       | Return type of `createApp()` — `{ app, logger, proxyDispose, rateLimitDispose }`                                                                                                         |
-| `ApiRoute<TClaims, TLogScope, TBody, TResponse>`        | API route definition with `access`, `method`, `path`, `handler`, `requestSchema`, `responseSchema`, `openapi`                                                                            |
+| `ApiRoute<TClaims, TLogScope, TBody, TResponse>`        | API route definition with `access`, `method`, `path`, `handler`, `requestSchema`, `responseSchema`, `openapi`, `observe`                                                             |
 | `ApiRouteHandler<TClaims, TLogScope, TBody, TResponse>` | `(ctx: RequestContext & { body: TBody }, app: HalideContext<TClaims, TLogScope>) => Promise<TResponse \| Response>`                                                                      |
-| `ApiRouteInput<TClaims, TLogScope, TBody, TResponse>`   | Input type for `apiRoute()` factory — omits `type`; requires `handler`                                                                                                                   |
-| `ProxyRoute<TClaims, TLogScope>`                        | Proxy route definition with `access`, `methods`, `path`, `target`, `proxyPath`, `identity`, `transform`, `openapi`, `openapiSpec`, `forwardHeaders`, `trustedProxies`, `connection`      |
+| `ApiRouteInput<TClaims, TLogScope, TBody, TResponse>`   | Input type for `apiRoute()` factory — omits `type`; requires `handler`; includes `access`, `method`, `path`, `observe`, `authorize`, `requestSchema`, `responseSchema`, `openapi`            |
+| `ProxyRoute<TClaims, TLogScope>`                        | Proxy route definition with `access`, `methods`, `path`, `target`, `proxyPath`, `identity`, `transform`, `openapi`, `openapiSpec`, `forwardHeaders`, `trustedProxies`, `connection`, `observe`  |
 | `ProxyRouteInput<TClaims, TLogScope>`                   | Input type for `proxyRoute()` factory — omits `type`                                                                                                                                     |
 | `AuthorizeFn<TClaims, TLogScope>`                       | `(ctx: RequestContext, app: HalideContext<TClaims, TLogScope>) => boolean \| Promise<boolean>`                                                                                           |
 | `TransformFn`                                           | `({ method, body, headers }) => { body, headers }` — transforms request body/headers before forwarding                                                                                   |
@@ -87,6 +87,6 @@ Creates a Hono app with routes registered for testing. Accepts `config` and opti
 | `OpenApiOptions`                                        | `{ title?, version?, description?, servers? }` — OpenAPI specification options                                                                                                           |
 | `OpenApiRouteMeta`                                      | Per-route OpenAPI metadata (`summary`, `description`, `tags`, `responses`)                                                                                                               |
 | `OpenApiSource`                                         | `{ path: string }` — source of an OpenAPI spec (local file or URL)                                                                                                                       |
-| `TestAppOptions`                                        | `{ cors?, csp?, rateLimit?, requestId?, errorHandler?, appHandler?, logger? }` — options for `createTestApp()`                                                                           |
+| `TestAppOptions`                                        | `{ cors?, csp?, rateLimit?, requestId?, errorHandler?, appHandler? }` — options for `createTestApp()`                                                                                |
 | `ResolvedOpenApiSpec<TClaims, TLogScope>`               | `{ spec: Record<string, unknown>, route: ProxyRoute }` — resolved external spec                                                                                                          |
 | `ClaimExtractor<TClaims>`                               | `(c: Context) => Promise<TClaims \| null>` — function to extract claims from a Hono Context                                                                                              |

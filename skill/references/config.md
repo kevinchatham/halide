@@ -121,12 +121,35 @@ Port resolution: `PORT` env variable → `app.port` config → default **3553**.
 ```typescript
 import { createDefaultLogger, createNoopLogger, createScopedLogger } from 'halide';
 
-// Styled logger — colored in TTY, plain text otherwise
+// Formatted text logger — colored in TTY, plain text otherwise
 const logger = createDefaultLogger();
+
+// Compact JSON output
+const jsonLogger = createDefaultLogger({ formatMessage: false });
 
 // Silent logger — all methods are no-ops
 const silent = createNoopLogger();
 
 // Wrap a logger with a fixed scope (used internally for per-request loggers)
 const scoped = createScopedLogger(logger, { requestId: 'abc123' });
+
+// Scoped logger merges caller overrides with baked-in scope (last-write-wins)
+scoped.info({ message: 'hello' });
+// Output: [INFO] requestId="abc123" message="hello"
+
+scoped.info({ requestId: 'override' });
+// Output: [INFO] requestId="override"  // caller wins
 ```
+
+## Logger Interface
+
+```typescript
+interface Logger<TLogScope = unknown> {
+  debug: (overrides?: Partial<TLogScope>) => void;
+  error: (overrides?: Partial<TLogScope>) => void;
+  info: (overrides?: Partial<TLogScope>) => void;
+  warn: (overrides?: Partial<TLogScope>) => void;
+}
+```
+
+All methods accept a single optional object of overrides. Methods take a single argument — no variadic `...args`.

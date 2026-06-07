@@ -1,3 +1,11 @@
+/**
+ * Halide runtime constants.
+ *
+ * Shared configuration values used across middleware, services, and routing
+ * layers. All constants are exported as read-only bindings (const) so that
+ * they can be imported by any module without circular-dependency risk.
+ */
+
 /** Per-URI JWKS cache TTL in milliseconds (1 hour). Used to cache fetched JWKS keys. */
 export const JWKS_CACHE_TTL_MS = 3_600_000;
 

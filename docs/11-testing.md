@@ -8,7 +8,7 @@ Creates a Hono application configured with routes and OpenAPI routes for testing
 
 ```ts
 import { createTestApp } from 'halide/test-utils';
-import { apiRoute } from './halide/builder';
+import { apiRoute } from './app/builder';
 
 const app = createTestApp({
   apiRoutes: [
@@ -41,7 +41,8 @@ Optional second argument to `createTestApp` that controls which middleware pipel
 | `requestId`    | `false`      | Apply request ID middleware                   |
 | `errorHandler` | `false`      | Apply global error handler middleware         |
 | `appHandler`   | `false`      | Apply SPA fallback + static file handler      |
-| `logger`       | `noopLogger` | Logger override — defaults to the noop logger |
+
+All flags default to `false` for isolated testing. The logger always defaults to `noopLogger` internally — there is no logger override option.
 
 ```ts
 const app = createTestApp(config, {
@@ -78,7 +79,7 @@ Returns `true` if a dispose function was found and invoked, `false` otherwise.
 
 ```ts
 import { createTestApp, noopLogger } from 'halide/test-utils';
-import { apiRoute } from './halide/builder';
+import { apiRoute } from './app/builder';
 import { z } from 'zod';
 
 describe('User routes', () => {
@@ -152,4 +153,4 @@ describe('User routes', () => {
 - **Isolate tests**: Each test should create its own app instance to avoid shared state.
 - **Enable middleware selectively**: Use `TestAppOptions` flags to test specific middleware behavior without configuring the full stack.
 - **Clean up rate limits**: Always call `disposeRateLimit(app)` after tests that enable rate limiting, to prevent timer leaks.
-- **Use `noopLogger`**: Pass `logger: noopLogger` in TestAppOptions to suppress log output during tests.
+- **Use `noopLogger`**: Tests always use the noop logger internally — no configuration needed to suppress log output.

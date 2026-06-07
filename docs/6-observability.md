@@ -21,12 +21,12 @@ const server = createServer({
       service: 'bff',
     }),
     onRequest: (ctx, app) => {
-      // The logger is already scoped via logScopeFactory — no scope arg needed
-      app.logger.info(`${ctx.method} ${ctx.path}`);
+      // The logger is already scoped via logScopeFactory — pass overrides as an object
+      app.logger.info({ message: `${ctx.method} ${ctx.path}` });
     },
-    onResponse: (ctx, app, response) => {
-      // The logger is already scoped — just pass the message
-      app.logger.info(`${ctx.method} ${ctx.path} ${response.statusCode} ${response.durationMs}ms`);
+    onResponse: (ctx, app, { statusCode, durationMs }) => {
+      // The logger is already scoped — pass overrides as an object
+      app.logger.info({ message: `${ctx.method} ${ctx.path}`, status: statusCode, duration: durationMs });
     },
   },
 });
@@ -52,20 +52,22 @@ The `Logger` interface is generic over a log scope type `TLogScope`, allowing st
 
 ```ts
 interface Logger<TLogScope = unknown> {
-  debug: (scope: TLogScope, ...args: unknown[]) => void;
-  error: (scope: TLogScope, ...args: unknown[]) => void;
-  info: (scope: TLogScope, ...args: unknown[]) => void;
-  warn: (scope: TLogScope, ...args: unknown[]) => void;
+  debug: (overrides?: Partial<TLogScope>) => void;
+  error: (overrides?: Partial<TLogScope>) => void;
+  info: (overrides?: Partial<TLogScope>) => void;
+  warn: (overrides?: Partial<TLogScope>) => void;
 }
 ```
+
+Each method accepts an optional `Partial<TLogScope>` for per-call overrides. When `logScopeFactory` is configured, the framework merges the per-request scope with these overrides automatically — callers simply pass `logger.info({ userId: '123' })` and the framework appends the request-level scope.
 
 Built-in logger factories:
 
 - **`createDefaultLogger()`** — styled logger with colored, level-prefixed messages. Uses `node:util.styleText` for colors in TTY, plain text otherwise.
 - **`createNoopLogger()`** — discards all log messages.
-- **`createScopedLogger(logger, scope)`** — wraps a logger so every method automatically applies a fixed scope. The returned logger ignores the scope argument passed to each method, using the pre-baked scope instead. This means handlers and hooks can call `logger.info(...args)` without manually passing a scope object.
+- **`createScopedLogger(logger, scope)`** — wraps a logger so every method automatically applies a fixed scope. The returned logger ignores the scope argument passed to each method, using the pre-baked scope instead. Caller-provided overrides are merged with the baked-in scope (overrides take precedence). This means handlers and hooks can call `logger.info({ userId: '123' })` without manually passing a scope object.
 
-When `logScopeFactory` is configured, the framework creates a scoped logger per request. The factory produces a typed scope value that is automatically applied to every logger call within that request. Handlers and hooks receive the scoped logger via `app.logger` and simply call `logger.info(...args)` — the scope is injected automatically.
+When `logScopeFactory` is configured, the framework creates a scoped logger per request. The factory produces a typed scope value that is automatically applied to every logger call within that request. Handlers and hooks receive the scoped logger via `app.logger` and simply call `logger.info({ userId: '123' })` — the scope is injected automatically.
 
 ## Lifecycle hooks
 

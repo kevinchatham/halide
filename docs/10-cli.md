@@ -19,9 +19,9 @@ Scaffolds a new Halide project. It prompts for:
 | Flag            | Description                                                |
 | --------------- | ---------------------------------------------------------- |
 | `--dry-run`     | Preview changes without modifying any files                |
-| `--skills-only` | Only install AI coding skills, skip other scaffolding      |
-| `--project-dir` | Target directory for non-interactive setup                 |
-| `--yes` / `-y`  | Accept all defaults without prompts (non-interactive mode) |
+| `--skills-only` | Only install AI coding skills, skip project scaffolding  |
+| `--project-dir` | Target directory for the project                           |
+| `--yes` / `-y`  | Accept defaults for app name and port (skips project directory prompt) |
 
 ### Full project structure
 
@@ -133,7 +133,7 @@ server.start();
 
 Then it:
 
-1. Runs `npm install`
-2. Installs `halide` and `@types/node`
-3. Creates project files (full project structure)
-4. Creates `tsconfig.json` for the server build
+1. Creates `package.json` (if missing) and `nodemon.json`
+2. Creates `tsconfig.json` for the server build
+3. Installs dependencies (`npm install` or `npm install halide && npm install -D @types/node`)
+4. Creates project files (full project structure)

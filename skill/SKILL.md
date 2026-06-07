@@ -46,6 +46,7 @@ import type {
   ResolvedOpenApiSpec,
   ObservabilityConfig,
   Logger,
+  InternalLogger,
   RequestContext,
   ResponseContext,
   ApiRoute,
@@ -60,6 +61,26 @@ import type {
   CreateAppResult,
 } from 'halide';
 ```
+
+### Logger Interface
+
+```ts
+interface Logger<TLogScope = unknown> {
+  debug: (overrides?: Partial<TLogScope>) => void;
+  error: (overrides?: Partial<TLogScope>) => void;
+  info: (overrides?: Partial<TLogScope>) => void;
+  warn: (overrides?: Partial<TLogScope>) => void;
+}
+
+interface InternalLogger {
+  debug: (overrides?: Record<string, unknown>) => void;
+  error: (overrides?: Record<string, unknown>) => void;
+  info: (overrides?: Record<string, unknown>) => void;
+  warn: (overrides?: Record<string, unknown>) => void;
+}
+```
+
+All methods take a single optional object argument. No variadic `...args`.
 
 Note: `createApp` and `createServer` are NOT direct exports — they come from the `defineHalide()` builder pattern.
 
@@ -84,6 +105,10 @@ server.start();
 
 ## Key Gotchas
 
+- **Logger methods take a single object** — `app.logger.info({ message: '...' })`, not `app.logger.info('...')`. No variadic `...args`.
+- **Scoped logger merges overrides** — `createScopedLogger` merges caller-provided keys with baked-in scope. Caller keys win (last-write-wins).
+- **`createDefaultLogger()` accepts `{ formatMessage?: boolean }`** — `true` (default) outputs formatted text, `false` outputs compact JSON.
+- **`asInternalLogger` is a wrapper** — not a type cast. Wraps `Logger<T>` into `InternalLogger` with proper type handling.
 - **CSP uses camelCase** — `defaultSrc`, not `default-src`. Validator throws on kebab-case.
 - **Wildcard CORS origin + `credentials: true`** is forbidden — validator throws.
 - **CSRF auto-enabled** — when `credentials: true`, CSRF protection is automatically added using `hono/csrf` with CORS origins.

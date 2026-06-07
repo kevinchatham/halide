@@ -1,3 +1,14 @@
+/**
+ * Halide — Backend For Frontend (BFF) framework.
+ *
+ * Re-exports the public API: builder utilities, type definitions, and
+ * configuration helpers. Import from this file to access the full framework.
+ *
+ * @example
+ *   import { defineHalide, createDefaultLogger } from 'halide';
+ *
+ * @module halide
+ */
 export { defineHalide } from './config/builder';
 export { createDefaultLogger, createNoopLogger, createScopedLogger } from './config/defaults';
 export type { CreateAppResult, Server } from './config/runtime';

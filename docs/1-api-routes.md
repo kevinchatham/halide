@@ -44,7 +44,7 @@ The handler receives 2 parameters:
 
 | Parameter | Type                                | Description                                              |
 | --------- | ----------------------------------- | -------------------------------------------------------- |
-| `ctx`     | `RequestContext & { body: TBody }`  | Method, path, headers, params, query, and validated body |
+| `ctx`     | `RequestContext & { body: TBody }`  | Normalized request context with method, path, headers, params, query, and validated body |
 | `app`     | `HalideContext<TClaims, TLogScope>` | Bundled app context with `claims` and `logger`           |
 
 `app` is a `HalideContext<TClaims, TLogScope>` object containing:
@@ -58,7 +58,7 @@ Handler return values are JSON-serialized. Returning a native `Response` bypasse
 
 ## Supported methods
 
-``'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`, `'head'`, `'options'`.
+Supported methods: `'get'` (default), `'post'`, `'put'`, `'patch'`, `'delete'`.
 
 ## Body handling
 

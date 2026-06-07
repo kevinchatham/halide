@@ -69,4 +69,4 @@ apiRoute({
 
 The `authorize` function receives `(ctx: RequestContext, app: HalideContext<TClaims, TLogScope>)` where `app` contains `claims` and `logger`. Returns `boolean | Promise<boolean>`. Unauthorized requests receive a `403 Forbidden` response with `{ error: 'Forbidden' }`.
 
-The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that always returns `true`.
+The `apiRoute()` and `proxyRoute()` factories fill in a default `authorize` that accepts any request that has already passed JWT authentication.

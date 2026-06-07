@@ -45,7 +45,7 @@ Internally, `defineHalide` uses `ExtractClaims<TApp>` and `ExtractLogScope<TApp>
 For multi-file projects, call `defineHalide()` once in a dedicated module and export the factories. All route files then import from this shared builder, ensuring consistent typing across the project:
 
 ```ts
-// src/halide/builder.ts
+// src/app/builder.ts
 import { defineHalide, type HalideContext } from 'halide';
 import type { UserClaims, LogScope } from './types';
 
@@ -56,7 +56,7 @@ export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<Ap
 
 ```ts
 // src/routes/health.ts
-import { apiRoute } from '../halide/builder';
+import { apiRoute } from '../app/builder';
 
 export const healthRoutes = [
   apiRoute({

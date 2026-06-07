@@ -1,3 +1,10 @@
+/**
+ * Build script: removes common generated and cache directories.
+ *
+ * Deletes `.scannerwork`, `dist`, `coverage`, `node_modules`, and
+ * `package-lock.json` files matching the configured glob patterns.
+ * Runs as an unconditional side-effect when executed (`npx tsx scripts/clean.ts`).
+ */
 import { rmSync } from 'node:fs';
 import { glob } from 'glob';
 
