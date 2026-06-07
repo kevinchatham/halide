@@ -23,3 +23,7 @@ app: {
 | `port`      | `3553`         | Server listen port                                                          |
 
 Port resolution order: `PORT` environment variable → `app.port` → default `3553`.
+
+## CSRF protection
+
+When `security.cors.credentials` is `true`, the `hono/csrf` middleware is automatically applied with the configured CORS origins. This prevents cross-site request forgery attacks by validating the `Origin` and `Referer` headers against the allowed origins list.

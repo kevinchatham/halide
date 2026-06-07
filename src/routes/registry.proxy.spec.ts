@@ -1,4 +1,4 @@
-import { createTestApp } from './registry.helpers';
+import { createTestApp } from '../test-utils/index.js';
 
 describe('registerRoutes — proxy', () => {
   describe('Proxy routes', () => {
@@ -156,6 +156,60 @@ describe('registerRoutes — proxy', () => {
 
       await app.request('/users');
       expect(onRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Proxy body streaming', () => {
+    it('collects response body when observability is enabled', async () => {
+      const onResponse = vi.fn();
+      const app = await createTestApp({
+        app: { root: '/var/www' },
+        observability: {
+          maxCollect: 512,
+          onResponse,
+        },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/stream',
+            target: 'https://api.example.com',
+            type: 'proxy',
+          },
+        ],
+      });
+
+      const res = await app.request('/stream');
+      expect(res.status).toBeLessThan(600);
+      expect(onResponse).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Proxy error handling', () => {
+    it('emits 500 status when proxy request fails', async () => {
+      const onResponse = vi.fn();
+      const app = await createTestApp({
+        app: { root: '/var/www' },
+        observability: {
+          maxCollect: 100,
+          onResponse,
+        },
+        proxyRoutes: [
+          {
+            access: 'public',
+            methods: ['get'],
+            path: '/proxy-fail',
+            target: 'https://nonexistent.invalid',
+            type: 'proxy',
+          },
+        ],
+      });
+
+      await app.request('/proxy-fail');
+      expect(onResponse).toHaveBeenCalledTimes(1);
+      const emitCtx = onResponse.mock.calls?.[0]?.[2];
+      expect(emitCtx?.statusCode).toBe(500);
+      expect(emitCtx?.error).toBeDefined();
     });
   });
 });

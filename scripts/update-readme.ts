@@ -1,3 +1,14 @@
+/**
+ * Build script: updates the README.md badge URL to reflect the current package version.
+ *
+ * Reads `package.json` to extract the version string, then replaces the
+ * hardcoded version in the shields.io badge URL in `README.md` with the
+ * extracted value. Useful for keeping the documentation badge in sync
+ * with the published package version.
+ *
+ * @example
+ *   npx tsx scripts/update-readme.ts
+ */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';

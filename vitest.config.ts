@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  define: {
+    __PKG_VERSION__: '"0.0.0"',
+  },
   test: {
     coverage: {
       exclude: [

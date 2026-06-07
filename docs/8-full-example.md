@@ -1,0 +1,123 @@
+# Full example
+
+```ts
+import { defineHalide, type HalideContext } from 'halide';
+import { z } from 'zod';
+
+const { createServer, apiRoute, proxyRoute } = defineHalide();
+
+interface UserClaims {
+  sub: string;
+  role: 'admin' | 'user';
+}
+
+type LogScope = { requestId: string; service: string };
+
+type App = HalideContext<UserClaims, LogScope>;
+
+const CreateUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+});
+
+const server = createServer({
+  app: {
+    name: 'dashboard',
+    root: './dist/browser',
+  },
+
+  security: {
+    cors: {
+      origin: ['https://dashboard.example.com'],
+      credentials: true,
+      methods: ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'],
+    },
+    csp: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
+    },
+    auth: {
+      strategy: 'jwks',
+      jwksUri: 'https://idp.example.com/.well-known/jwks.json',
+      audience: 'dashboard',
+    },
+    rateLimit: {
+      maxRequests: 100,
+      windowMs: 900000,
+    },
+  },
+
+  observability: {
+    requestId: true,
+    formatMessage: true,
+    logScopeFactory: (ctx, claims) => ({
+      requestId: (ctx.headers as Record<string, string | undefined>)?.['x-request-id'] ?? 'no-id',
+      service: 'bff',
+    }),
+    onRequest: (ctx, app) => {
+      // Logger is already scoped via logScopeFactory — no scope arg needed
+      app.logger.info(`${ctx.method} ${ctx.path} user=${app.claims?.sub ?? 'anon'}`);
+    },
+    onResponse: (ctx, app, { statusCode, durationMs }) => {
+      app.logger.info(`${ctx.method} ${ctx.path} ${statusCode} ${durationMs}ms`);
+    },
+  },
+
+  apiRoutes: [
+    apiRoute({
+      access: 'public',
+      path: '/health',
+      handler: async (_ctx, _app) => ({ status: 'ok' }),
+    }),
+    apiRoute({
+      access: 'public',
+      path: '/config',
+      handler: async (_ctx, _app) => ({ environment: process.env.NODE_ENV }),
+    }),
+    apiRoute({
+      access: 'private',
+      path: '/users',
+      method: 'post',
+      requestSchema: CreateUserSchema,
+      responseSchema: z.object({ id: z.string(), email: z.string(), name: z.string() }),
+      openapi: {
+        summary: 'Create a user',
+        tags: ['Users'],
+      },
+      handler: async (ctx, app) => ({
+        id: crypto.randomUUID(),
+        email: ctx.body.email,
+        name: ctx.body.name,
+      }),
+    }),
+    apiRoute({
+      access: 'private',
+      path: '/admin/settings',
+      authorize: (_ctx, app) => app.claims?.role === 'admin',
+      handler: async (_ctx, _app) => ({ maintenance: false }),
+    }),
+  ],
+
+  proxyRoutes: [
+    proxyRoute({
+      access: 'private',
+      path: '/api/orders',
+      methods: ['get'],
+      target: 'http://orders.internal:8080',
+      proxyPath: '/orders',
+      identity: (_ctx, app) => ({ 'x-user-id': app.claims?.sub }),
+    }),
+  ],
+
+  openapi: {
+    enabled: true,
+    options: {
+      title: 'Dashboard API',
+      description: 'API documentation for the dashboard BFF',
+    },
+  },
+});
+
+server.start();
+```

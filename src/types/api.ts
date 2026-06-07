@@ -1,5 +1,7 @@
 import type { ZodSchema } from 'zod';
-import type { RequestContext, THalideApp } from './app';
+import type { HalideContext, RequestContext } from './app';
+
+export type { HalideContext } from './app';
 
 /**
  * Metadata for OpenAPI/Scalar documentation generation on a route.
@@ -26,11 +28,17 @@ export type OpenApiSource = {
 /**
  * Definition of an API route that executes a handler function.
  * Created via the {@link apiRoute} factory function.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.
  */
-export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = {
+export type ApiRoute<
+  TClaims = unknown,
+  TLogScope = unknown,
+  TBody = unknown,
+  TResponse = unknown,
+> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP method for this route. Defaults to GET. */
@@ -42,9 +50,12 @@ export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = 
   /** Route type discriminator. Set automatically by {@link apiRoute}. */
   type: 'api';
   /** Authorization function called after JWT validation. */
-  authorize?: AuthorizeFn<TApp>;
+  authorize?: AuthorizeFn<TClaims, TLogScope>;
   /** Handler function that processes the request and returns a response. */
-  handler: ApiRouteHandler<TApp, TBody, TResponse>;
+  handler(
+    ctx: RequestContext & { body: TBody },
+    app: HalideContext<TClaims, TLogScope>,
+  ): Promise<TResponse | Response>;
   /** Zod schema for validating the request body and documenting it in OpenAPI. */
   requestSchema?: ZodSchema<TBody>;
   /** Zod schema for documenting the response body in OpenAPI. */
@@ -56,13 +67,23 @@ export type ApiRoute<TApp = THalideApp, TBody = unknown, TResponse = unknown> = 
 /**
  * Definition of a proxy route that forwards requests to an upstream target.
  * Created via the {@link proxyRoute} factory function.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type ProxyRoute<TApp = THalideApp> = {
+export type ProxyRoute<TClaims = unknown, TLogScope = unknown> = {
   /** Whether the route is public (no auth required) or private (requires valid JWT). */
   access: 'public' | 'private';
   /** HTTP methods this proxy route handles. At least one is required. */
   methods: Array<'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options'>;
+  /** HTTP agent to use for upstream connections. Pass `http.Agent({ keepAlive: true })` for connection pooling. */
+  agent?: import('node:http').Agent;
+  /** Connection pool settings for the default agent. Applied when `agent` is not set. */
+  connection?: {
+    /** Maximum number of sockets per host. Default: 50. */
+    maxSockets?: number;
+    /** Maximum number of free sockets per host. Default: 10. */
+    maxFreeSockets?: number;
+  };
   /** Whether to fire observability hooks for this route. Defaults to true. */
   observe?: boolean;
   /** URL path pattern to match. Supports Hono-style path parameters and wildcards. */
@@ -71,21 +92,33 @@ export type ProxyRoute<TApp = THalideApp> = {
   proxyPath?: string;
   /** Upstream target URL to forward requests to. Required. */
   target: string;
-  /** Timeout in milliseconds for upstream requests. Defaults to 60000. */
+  /** Timeout in milliseconds for upstream requests. Defaults to 10000 (10 seconds). */
   timeout?: number;
   /** Route type discriminator. Set automatically by {@link proxyRoute}. */
   type: 'proxy';
   /** Authorization function called after JWT validation. */
-  authorize?: AuthorizeFn<TApp>;
+  authorize?: AuthorizeFn<TClaims, TLogScope>;
   /**
    * Function to extract identity headers from claims and add to the upstream request.
    * Useful for passing user ID or tenant info to the backend.
    */
-  identity?: (ctx: RequestContext, app: TApp) => Record<string, string> | undefined;
+  identity?: (
+    ctx: RequestContext,
+    app: HalideContext<TClaims, TLogScope>,
+  ) => Record<string, string> | undefined;
   /** Transform function to modify the request body/headers before forwarding. */
   transform?: TransformFn;
-  /** Headers to forward to upstream. Defaults to a safe subset; omit authorization, cookie, x-forwarded-for. */
+  /**
+   * Headers to forward to upstream. Defaults to a safe subset
+   * (accept, accept-encoding, accept-language, cache-control, content-type,
+   * origin, user-agent); omits authorization, cookie, and x-forwarded-for
+   * headers. Set to an empty array `[]` to forward no headers at all.
+   * When `trustedProxies` is configured, x-forwarded-for is forwarded only
+   * if the immediate sender is a trusted proxy.
+   */
   forwardHeaders?: string[];
+  /** Trusted proxy IPs/CIDRs for x-forwarded-for header validation. */
+  trustedProxies?: string[];
   /** OpenAPI/Scalar metadata for documentation. */
   openapi?: OpenApiRouteMeta;
   /** External OpenAPI spec source for documenting the proxied API. */
@@ -94,26 +127,33 @@ export type ProxyRoute<TApp = THalideApp> = {
 
 /**
  * Handler function for API routes.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteHandler<TApp = THalideApp, TBody = unknown, TResponse = unknown> = (
+export type ApiRouteHandler<
+  TClaims = unknown,
+  TLogScope = unknown,
+  TBody = unknown,
+  TResponse = unknown,
+> = (
   /** Request context including path, method, headers, params, query, and body. */
   ctx: RequestContext & { body: TBody },
   /** Bundled app context with claims and logger. */
-  app: TApp,
-) => Promise<TResponse>;
+  app: HalideContext<TClaims, TLogScope>,
+) => Promise<TResponse | Response>;
 
 /**
  * Authorization function that determines if a request should be allowed.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type AuthorizeFn<TApp = THalideApp> = (
+export type AuthorizeFn<TClaims = unknown, TLogScope = unknown> = (
   /** Normalized request context. */
   ctx: RequestContext,
   /** Bundled app context with claims and logger. */
-  app: TApp,
+  app: HalideContext<TClaims, TLogScope>,
 ) => boolean | Promise<boolean>;
 
 /**
@@ -137,33 +177,30 @@ export type TransformFn = (request: {
 /**
  * Input type for creating an API route via the factory function.
  * Omits 'type', 'authorize' (has default), and 'handler' (required).
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  * @typeParam TBody - The type of the request body.
  * @typeParam TResponse - The type of the response body.
  */
-export type ApiRouteInput<TApp, TBody = unknown, TResponse = unknown> = Omit<
-  ApiRoute<TApp, TBody, TResponse>,
-  'type' | 'authorize' | 'handler'
-> & {
+export type ApiRouteInput<
+  TClaims = unknown,
+  TLogScope = unknown,
+  TBody = unknown,
+  TResponse = unknown,
+> = Omit<ApiRoute<TClaims, TLogScope, TBody, TResponse>, 'type' | 'authorize' | 'handler'> & {
   /** Handler function that processes the request and returns a response. */
-  handler: ApiRouteHandler<TApp, TBody, TResponse>;
+  handler: ApiRouteHandler<TClaims, TLogScope, TBody, TResponse>;
   /** Authorization function called after JWT validation. */
-  authorize?: AuthorizeFn<TApp>;
+  authorize?: AuthorizeFn<TClaims, TLogScope>;
 };
 
 /**
  * Input type for creating a proxy route via the factory function.
  * Omits 'type' which is set automatically.
- * @typeParam TApp - The bundled app context type combining claims and logger.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type ProxyRouteInput<TApp = THalideApp> = Omit<ProxyRoute<TApp>, 'type'>;
-
-/**
- * Union of all route types.
- * @typeParam TApp - The bundled app context type combining claims and logger.
- * @typeParam TBody - The type of the request body.
- * @typeParam TResponse - The type of the response body.
- */
-export type Route<TApp = THalideApp, TBody = unknown, TResponse = unknown> =
-  | ApiRoute<TApp, TBody, TResponse>
-  | ProxyRoute<TApp>;
+export type ProxyRouteInput<TClaims = unknown, TLogScope = unknown> = Omit<
+  ProxyRoute<TClaims, TLogScope>,
+  'type'
+>;

@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { Hono } from 'hono';
+import { buildHonoApp } from '../utils/hono';
 import { createAppHandler } from './app';
 
 describe('createAppHandler', () => {
@@ -17,7 +17,7 @@ describe('createAppHandler', () => {
   });
 
   it('fallback returns 404 for /api paths', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const { appFallback } = createAppHandler({
       apiPrefix: '/api',
       fallback: 'index.html',
@@ -34,7 +34,7 @@ describe('createAppHandler', () => {
   });
 
   it('fallback returns 404 for paths matching custom apiPrefix', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const { appFallback } = createAppHandler({
       apiPrefix: '/v1',
       fallback: 'index.html',
@@ -51,7 +51,7 @@ describe('createAppHandler', () => {
   });
 
   it('fallback returns notFound when file does not exist', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const { appFallback } = createAppHandler({
       fallback: 'index.html',
       name: 'test-app',
@@ -65,7 +65,7 @@ describe('createAppHandler', () => {
   });
 
   it('fallback serves html when file exists', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const { appFallback } = createAppHandler({
       fallback: 'index.html',
       name: 'test-app',
@@ -89,7 +89,7 @@ describe('createAppHandler', () => {
   });
 
   it('fallback tries to serve file when apiPrefix is empty string', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const { appFallback } = createAppHandler({
       apiPrefix: '',
       fallback: 'index.html',
@@ -104,7 +104,7 @@ describe('createAppHandler', () => {
   });
 
   it('fallback tries to serve file for paths not matching custom apiPrefix', async () => {
-    const app = new Hono();
+    const app = buildHonoApp();
     const { appFallback } = createAppHandler({
       apiPrefix: '/graphql',
       fallback: 'index.html',
@@ -122,7 +122,7 @@ describe('createAppHandler', () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'halide-app-'));
     try {
       await fs.writeFile(path.join(tmpDir, 'index.html'), '<html><body>Hello</body></html>');
-      const app = new Hono();
+      const app = buildHonoApp();
       const { appFallback } = createAppHandler({
         fallback: 'index.html',
         name: 'test-app',

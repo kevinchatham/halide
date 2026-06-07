@@ -2,36 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runQuietly } from './init';
 
 const mockExecSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
-const mockExistsSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
-const mockWriteFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
-const mockReadFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
-const mockAppendFileSync: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
-const mockInput: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
-const mockConfirm: ReturnType<typeof vi.fn> = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', () => ({
   execSync: mockExecSync,
 }));
-
-vi.mock('node:fs', () => {
-  const mocks = {
-    appendFileSync: mockAppendFileSync,
-    existsSync: mockExistsSync,
-    readFileSync: mockReadFileSync,
-    writeFileSync: mockWriteFileSync,
-  };
-  return {
-    ...mocks,
-    default: mocks,
-  };
-});
-
-vi.mock('@inquirer/prompts', () => ({
-  confirm: mockConfirm,
-  input: mockInput,
-}));
-
-const _originalCwd: () => string = process.cwd;
 
 describe('runQuietly', () => {
   afterEach(() => {

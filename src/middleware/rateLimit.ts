@@ -1,7 +1,94 @@
 import type { Context, Next } from 'hono';
-import ipaddr from 'ipaddr.js';
+import {
+  DEFAULT_MAX_ENTRIES,
+  MAX_SWEEP_INTERVAL_MS,
+  MILLIS_PER_SECOND,
+  MIN_SWEEP_INTERVAL_MS,
+} from '../config/constants';
+import type { RedisClient } from '../types/redis-client';
+import { getClientIp } from '../utils/trustedProxies';
 
-/** Configuration for rate limiting. */
+/**
+ * Create a Redis-backed rate limit store implementation.
+ *
+ * Uses Redis for distributed rate limiting across multiple server instances.
+ * Each client IP gets a key with a TTL matching the window duration.
+ * When the request count exceeds `maxRequests`, returns a 429 Too Many Requests response
+ * with a `Retry-After` header.
+ *
+ * Respects `trustedProxies` for `x-forwarded-for` header validation.
+ *
+ * @param client - A Redis client implementing the {@link RedisClient} interface.
+ * @param config - Rate limit configuration (`maxRequests`, `windowMs`, `trustedProxies`).
+ * @returns Object containing the middleware and a dispose function (no-op for Redis).
+ */
+export function createRedisRateLimitStore(
+  client: RedisClient,
+  config: Omit<RateLimitConfig, 'maxEntries'>,
+): {
+  middleware: (c: Context, next: Next) => Promise<Response | undefined>;
+  dispose: () => void;
+} {
+  const windowSeconds = Math.ceil(config.windowMs / MILLIS_PER_SECOND);
+
+  const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
+    const nodeReq = c.req as { socket?: { remoteAddress?: string } };
+    const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
+    const forwarded = c.req.header('x-forwarded-for');
+    const clientIp = getClientIp(socketIp, config.trustedProxies, forwarded);
+    const key = `rate-limit:${clientIp}`;
+
+    const count = await client.incr(key);
+
+    if (count === 1) {
+      await client.expire(key, windowSeconds);
+    }
+
+    if (count > config.maxRequests) {
+      const pttl = await client.pttl(key);
+      const retryAfter = pttl > 0 ? Math.ceil(pttl / MILLIS_PER_SECOND) : 1;
+      c.header('Retry-After', String(retryAfter));
+      return c.json({ error: 'Too Many Requests' }, 429);
+    }
+
+    await next();
+  };
+
+  return {
+    dispose: () => {
+      // No-op: Redis keys are cleaned up by TTL.
+    },
+    middleware,
+  };
+}
+
+/**
+ * Interface for rate limit storage backends.
+ *
+ * Implementations can use Redis, DynamoDB, or any other distributed store
+ * to share rate limit state across multiple server instances.
+ *
+ * The in-memory implementation ({@link createMemoryStore}) is used internally
+ * by {@link createRateLimitMiddleware}.
+ *
+ * @internal
+ */
+export interface RateLimitStore {
+  /** Remove the entry for the given key. */
+  delete(key: string): Promise<void>;
+  /** Retrieve the current window entry for a key, or `undefined` if not found. */
+  get(key: string): Promise<WindowEntry | undefined>;
+  /** Store a window entry for the given key, evicting the oldest when at capacity. */
+  set(key: string, entry: WindowEntry): Promise<void>;
+  /** Remove expired entries from the store. Called periodically by the middleware. */
+  sweep(now: number): Promise<void>;
+}
+
+/**
+ * Configuration for the in-memory rate limit store.
+ *
+ * @internal
+ */
 interface RateLimitConfig {
   /** Maximum number of entries in the store. Oldest entries are evicted when exceeded. */
   maxEntries?: number;
@@ -13,7 +100,11 @@ interface RateLimitConfig {
   windowMs: number;
 }
 
-/** Internal storage for rate limit tracking per client IP. */
+/**
+ * Internal storage for rate limit tracking per client IP.
+ *
+ * @internal
+ */
 interface WindowEntry {
   /** Number of requests in current window. */
   count: number;
@@ -21,80 +112,81 @@ interface WindowEntry {
   resetTime: number;
 }
 
-/** Check if the socket IP matches a trusted proxy CIDR or exact IP. */
-function isTrustedProxy(ip: string | undefined, trustedProxies?: string[]): boolean {
-  if (!trustedProxies?.length || !ip) return false;
-  const addr = ipaddr.parse(ip);
-  return trustedProxies.some((tp) => {
-    if (tp.includes('/')) {
-      const [net, prefix] = tp.split('/');
-      const parsedNet = ipaddr.parse(net!);
-      return addr!.match(parsedNet, Number(prefix));
-    }
-    return addr!.toString() === tp;
-  });
-}
+/**
+ * Create an in-memory rate limit store with LRU eviction.
+ *
+ * Uses a Map with LRU eviction when `maxEntries` is configured.
+ * Suitable for single-instance deployments.
+ *
+ * @param maxEntries - Maximum number of entries. Oldest entries are evicted when exceeded.
+ * @returns A {@link RateLimitStore} implementation.
+ */
+function createMemoryStore(maxEntries: number = DEFAULT_MAX_ENTRIES): RateLimitStore {
+  const store = new Map<string, WindowEntry>();
 
-/** Extract client IP from request headers, falling back to socket IP. Uses X-Forwarded-For only when the socket IP is from a trusted proxy. */
-function getClientIp(c: Context, trustedProxies?: string[]): string {
-  const nodeReq = c.req as { socket?: { remoteAddress?: string } };
-  const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
-  if (isTrustedProxy(socketIp, trustedProxies)) {
-    const forwarded = c.req.header('x-forwarded-for');
-    if (forwarded) {
-      const first = forwarded.split(',')[0];
-      if (first) return first.trim();
-    }
-  }
-  return socketIp;
+  return {
+    async delete(key: string): Promise<void> {
+      store.delete(key);
+    },
+    async get(key: string): Promise<WindowEntry | undefined> {
+      return store.get(key);
+    },
+    async set(key: string, entry: WindowEntry): Promise<void> {
+      if (maxEntries && store.size >= maxEntries) {
+        const oldestKey = store.keys().next().value;
+        if (oldestKey) store.delete(oldestKey);
+      }
+      store.set(key, entry);
+    },
+    async sweep(now: number): Promise<void> {
+      for (const [key, entry] of store.entries()) {
+        if (now > entry.resetTime) {
+          store.delete(key);
+        }
+      }
+    },
+  };
 }
 
 /**
  * Create rate limiting middleware that restricts requests per client IP.
  *
- * Uses an in-memory store with periodic cleanup. Returns 429 when the client
- * has exceeded its window quota. The dispose function clears the cleanup timer.
+ * Uses an in-memory store with periodic cleanup and LRU eviction.
+ * Returns 429 Too Many Requests when the client has exceeded its window quota.
+ * The dispose function clears the cleanup timer.
  *
- * @param config - Rate limit configuration (maxRequests and windowMs).
+ * Respects `trustedProxies` for `x-forwarded-for` header validation.
+ *
+ * @param config - Rate limit configuration (`maxRequests`, `windowMs`, `maxEntries`, `trustedProxies`).
  * @returns Object containing the middleware and a dispose function for cleanup.
  */
 export function createRateLimitMiddleware(config: RateLimitConfig): {
   middleware: (c: Context, next: Next) => Promise<Response | undefined>;
   dispose: () => void;
 } {
-  const store = new Map<string, WindowEntry>();
+  const store = createMemoryStore(config.maxEntries);
 
-  /** Evict oldest entry when store exceeds maxEntries. */
-  const evictOldest = (): void => {
-    if (!config.maxEntries || store.size < config.maxEntries) return;
-    const firstKey = store.keys().next().value!;
-    store.delete(firstKey);
-  };
-
-  /** Remove expired entries from the rate limit store. */
-  const sweep = (): void => {
+  const sweepInterval = Math.min(
+    Math.max(config.windowMs * 2, MIN_SWEEP_INTERVAL_MS),
+    MAX_SWEEP_INTERVAL_MS,
+  );
+  const timer = setInterval(() => {
     const now = Date.now();
-    for (const ip of store.keys()) {
-      const entry = store.get(ip);
-      if (entry && now > entry.resetTime) {
-        store.delete(ip);
-      }
-    }
-  };
-
-  const sweepInterval = Math.max(config.windowMs * 2, 60_000);
-  const timer = setInterval(sweep, sweepInterval);
+    void store.sweep(now);
+  }, sweepInterval);
   timer.unref();
 
   /** Per-request rate limit check: returns 429 if the client IP has exceeded its window quota. */
   const middleware = async (c: Context, next: Next): Promise<Response | undefined> => {
-    const clientIp = getClientIp(c, config.trustedProxies);
+    const nodeReq = c.req as { socket?: { remoteAddress?: string } };
+    const socketIp = nodeReq.socket?.remoteAddress || 'unknown';
+    const forwarded = c.req.header('x-forwarded-for');
+    const clientIp = getClientIp(socketIp, config.trustedProxies, forwarded);
     const now = Date.now();
-    const entry = store.get(clientIp);
+    const entry = await store.get(clientIp);
 
     if (!entry || now > entry.resetTime) {
-      evictOldest();
-      store.set(clientIp, {
+      await store.set(clientIp, {
         count: 1,
         resetTime: now + config.windowMs,
       });
@@ -102,10 +194,12 @@ export function createRateLimitMiddleware(config: RateLimitConfig): {
       return;
     }
 
+    store.delete(clientIp);
+    store.set(clientIp, entry);
     entry.count += 1;
 
     if (entry.count > config.maxRequests) {
-      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      const retryAfter = Math.ceil((entry.resetTime - now) / MILLIS_PER_SECOND);
       c.header('Retry-After', String(retryAfter));
       return c.json({ error: 'Too Many Requests' }, 429);
     }

@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'tsup';
+
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
 export default defineConfig([
   {
@@ -14,6 +17,9 @@ export default defineConfig([
       js: '#!/usr/bin/env node',
     },
     clean: true,
+    define: {
+      __PKG_VERSION__: `'${pkg.version}'`,
+    },
     entry: ['src/cli/index.ts'],
     format: ['esm'],
     outDir: 'dist/cli',

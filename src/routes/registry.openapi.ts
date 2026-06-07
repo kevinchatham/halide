@@ -2,10 +2,26 @@ import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DescribeRouteOptions, ResponsesWithResolver } from 'hono-openapi';
 import { resolver } from 'hono-openapi';
+import { OPENAPI_FETCH_TIMEOUT_MS } from '../config/constants';
 import type { ApiRoute, ProxyRoute } from '../types/api';
 import type { OpenApiSource, ResolvedOpenApiSpec } from '../types/openapi';
 
-/** Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file. */
+/**
+ * Check whether a Zod schema is wrapped in ZodOptional or ZodNullable.
+ *
+ * Inspects the internal `typeName` property — stable across Zod 3.x releases.
+ * This is the only public way to detect optional wrappers without using
+ * `schema.unwrap()` which only works for ZodOptional.
+ */
+function isOptionalSchema(schema: unknown): boolean {
+  const s = schema as { _def?: { typeName?: string } };
+  return s._def?.typeName === 'ZodOptional' || s._def?.typeName === 'ZodNullable';
+}
+
+/**
+ * Resolve an external OpenAPI spec by fetching from URL or reading a local JSON file.
+ * Accepts http/https URLs and file:// URIs in addition to plain file paths.
+ */
 async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<string, unknown>> {
   let isUrl = false;
   let path = source.path;
@@ -22,7 +38,8 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
   }
 
   if (isUrl) {
-    const response = await fetch(path);
+    const signal = AbortSignal.timeout(OPENAPI_FETCH_TIMEOUT_MS);
+    const response = await fetch(path, { signal });
     if (!response.ok) {
       throw new Error(`Failed to fetch OpenAPI spec from ${path}: ${response.statusText}`);
     }
@@ -40,15 +57,24 @@ async function resolveOpenApiSource(source: OpenApiSource): Promise<Record<strin
 }
 
 /**
- * Resolve external OpenAPI specs from proxy routes.
+ * Resolve external OpenAPI specs from proxy routes that have `openapiSpec` configured.
  *
- * Filters proxy routes that have `openapiSpec` configured and resolves each
- * spec by fetching from URL or reading a local JSON file.
+ * Filters proxy routes for those with an `openapiSpec` property (pointing to a
+ * local JSON file or URL), fetches or reads each spec, and returns them paired
+ * with their owning route for later merging into the final OpenAPI document.
+ *
+ * Supports http/https URLs and file:// URIs in addition to plain file paths.
+ * Fetches use a 10-second timeout to avoid hanging on unreachable URLs.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param proxyRoutes - The proxy routes to check for external spec sources.
+ * @returns A list of resolved specs paired with their owning routes.
  */
-export async function resolveOpenApiSpec(
-  proxyRoutes: ProxyRoute<unknown>[],
-): Promise<ResolvedOpenApiSpec[]> {
-  const results: ResolvedOpenApiSpec[] = [];
+export async function resolveOpenApiSpec<TClaims = unknown, TLogScope = unknown>(
+  proxyRoutes: ProxyRoute<TClaims, TLogScope>[],
+): Promise<ResolvedOpenApiSpec<TClaims, TLogScope>[]> {
+  const results: ResolvedOpenApiSpec<TClaims, TLogScope>[] = [];
 
   for (const route of proxyRoutes) {
     if (route.openapiSpec) {
@@ -60,9 +86,22 @@ export async function resolveOpenApiSpec(
   return results;
 }
 
-/** Build OpenAPI describeRoute options from route metadata, including hidden flag and request body schema. */
-export function buildDescribeRouteOptions<TApp>(
-  route: ApiRoute<TApp> | ProxyRoute<TApp>,
+/**
+ * Build OpenAPI describeRoute options from route metadata, including hidden flag
+ * and request body schema.
+ *
+ * Extracts `summary`, `description`, and `tags` from `route.openapi`, sets
+ * `hide: true` when `observe` is false, and builds request body + response
+ * definitions from route schemas. Detects ZodOptional/ZodNullable wrappers
+ * to set `required: false` on optional request bodies.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param route - The API or proxy route to build options for.
+ * @returns Describe route options for hono-openapi.
+ */
+export function buildDescribeRouteOptions<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope> | ProxyRoute<TClaims, TLogScope>,
 ): DescribeRouteOptions {
   const meta = route.openapi;
   const options: DescribeRouteOptions = {};
@@ -79,15 +118,26 @@ export function buildDescribeRouteOptions<TApp>(
   return options;
 }
 
-/** Build OpenAPI request body configuration from route request schema, detecting optional wrappers. */
-export function buildRequestBody<TApp>(
-  route: ApiRoute<TApp> | ProxyRoute<TApp>,
+/**
+ * Build OpenAPI request body configuration from route request schema, detecting
+ * optional wrappers.
+ *
+ * For API routes, extracts the `requestSchema` and wraps it with the hono-openapi
+ * resolver. Detects ZodOptional/ZodNullable wrappers to set `required: false`.
+ * Proxy routes do not have request schemas.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param route - The route with a potential request schema.
+ * @returns Request body configuration or undefined when no schema exists.
+ */
+export function buildRequestBody<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope> | ProxyRoute<TClaims, TLogScope>,
 ): DescribeRouteOptions['requestBody'] {
   const schema = route.type === 'api' ? route.requestSchema : undefined;
   if (!schema) return undefined;
 
-  const typeName = (schema as { _def?: { typeName?: string } })._def?.typeName;
-  const isOptional = typeName === 'ZodOptional' || typeName === 'ZodNullable';
+  const isOptional = isOptionalSchema(schema);
 
   return {
     content: {
@@ -97,9 +147,22 @@ export function buildRequestBody<TApp>(
   };
 }
 
-/** Build OpenAPI responses object from route metadata or response schema, defaulting to a 200 successful response. */
-export function buildResponses<TApp>(
-  route: ApiRoute<TApp> | ProxyRoute<TApp>,
+/**
+ * Build OpenAPI responses object from route metadata or response schema,
+ * defaulting to a 200 successful response.
+ *
+ * When `route.openapi.responses` is set, uses those status-code-to-schema
+ * mappings. For API routes with a `responseSchema`, generates a 200 response
+ * with the schema resolver. Otherwise returns a minimal 200 response with just
+ * a description.
+ *
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
+ * @param route - The route to build response definitions for.
+ * @returns Responses map for hono-openapi describeRoute.
+ */
+export function buildResponses<TClaims = unknown, TLogScope = unknown>(
+  route: ApiRoute<TClaims, TLogScope> | ProxyRoute<TClaims, TLogScope>,
 ): ResponsesWithResolver {
   const meta = route.openapi;
   const responses: ResponsesWithResolver = {};

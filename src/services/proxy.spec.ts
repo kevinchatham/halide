@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { ProxyRoute } from '../types/api';
-import type { Logger, THalideApp } from '../types/app';
-import { createProxyService } from './proxy';
+import type { HalideContext, Logger } from '../types/app';
+import { buildHonoApp } from '../utils/hono';
+import { createAgentCache, createProxyService } from './proxy';
 
 const noopLogger: Logger<unknown> = {
   debug: (_scope: unknown) => {},
@@ -10,12 +11,13 @@ const noopLogger: Logger<unknown> = {
   warn: (_scope: unknown) => {},
 };
 
-const createApp = (claims?: unknown): THalideApp => ({
+const createApp = (claims?: unknown): HalideContext => ({
   claims,
   logger: noopLogger,
 });
 
 describe('createProxyService', () => {
+  const agentCache = createAgentCache();
   it('creates a handler function', () => {
     const route: ProxyRoute = {
       access: 'public',
@@ -25,7 +27,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -38,7 +40,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -52,7 +54,7 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
@@ -66,14 +68,14 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
+    const handler = createProxyService(route, createApp(), agentCache);
     expect(typeof handler).toBe('function');
   });
 
   it('applies identity headers when claims are provided', async () => {
     const route: ProxyRoute = {
       access: 'private',
-      identity: (_ctx: unknown, app: THalideApp) => ({
+      identity: (_ctx: unknown, app: HalideContext) => ({
         'x-user-id': (app.claims as { sub: string }).sub,
       }),
       methods: ['get'],
@@ -83,9 +85,9 @@ describe('createProxyService', () => {
     };
 
     const app = createApp({ role: 'admin', sub: 'user-123' });
-    const handler = createProxyService(route, app);
+    const handler = createProxyService(route, app, agentCache);
 
-    const honoApp = new Hono();
+    const honoApp = buildHonoApp();
     honoApp.get('/api/users', handler);
 
     const res = await honoApp.request('/api/users');
@@ -107,9 +109,9 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp(), { original: true });
+    const handler = createProxyService(route, createApp(), agentCache, { original: true });
 
-    const app = new Hono<{ Variables: { rawBody?: unknown } }>();
+    const app = new Hono<{ Variables: { parsedBody?: unknown } }>();
     app.post('/api/data', handler);
 
     await app.request('/api/data', {
@@ -132,8 +134,8 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
-    const app = new Hono();
+    const handler = createProxyService(route, createApp(), agentCache);
+    const app = buildHonoApp();
     app.get('/api/data', handler);
 
     const req = new Request('http://localhost/api/data', {
@@ -154,8 +156,8 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
-    const app = new Hono();
+    const handler = createProxyService(route, createApp(), agentCache);
+    const app = buildHonoApp();
     app.get('/api/data', handler);
 
     const req = new Request('http://localhost/api/data', {
@@ -177,8 +179,8 @@ describe('createProxyService', () => {
       type: 'proxy',
     };
 
-    const handler = createProxyService(route, createApp());
-    const app = new Hono();
+    const handler = createProxyService(route, createApp(), agentCache);
+    const app = buildHonoApp();
     app.post('/api/data', handler);
 
     const req = new Request('http://localhost/api/data', {
@@ -194,5 +196,41 @@ describe('createProxyService', () => {
 
     const res = await app.fetch(req);
     expect(res.status).toBeLessThan(600);
+  });
+
+  it('passes agent to upstream request when configured', async () => {
+    const http = await import('node:http');
+    const customAgent = new http.Agent({ keepAlive: true });
+
+    const route: ProxyRoute = {
+      access: 'public',
+      agent: customAgent,
+      methods: ['get'],
+      path: '/api/data',
+      target: 'https://api.example.com',
+      type: 'proxy',
+    };
+
+    const handler = createProxyService(route, createApp(), agentCache);
+    const app = buildHonoApp();
+    app.get('/api/data', handler);
+
+    const res = await app.fetch(new Request('http://localhost/api/data', { method: 'GET' }));
+    expect(res.status).toBeLessThan(600);
+  });
+});
+
+describe('AgentCache', () => {
+  const ac = createAgentCache();
+  it('returns the same agent for identical keys', () => {
+    const agent1 = ac.getAgent('https://api.example.com');
+    const agent2 = ac.getAgent('https://api.example.com');
+    expect(agent1).toBe(agent2);
+  });
+
+  it('returns different agents for different targets', () => {
+    const agent1 = ac.getAgent('https://api.example.com');
+    const agent2 = ac.getAgent('https://other.example.com');
+    expect(agent1).not.toBe(agent2);
   });
 });

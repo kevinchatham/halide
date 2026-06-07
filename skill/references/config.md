@@ -5,12 +5,10 @@
 The top-level configuration object passed to `createServer()`:
 
 ```typescript
-type App = THalideApp<UserClaims>;
-
-type ServerConfig<TApp = THalideApp> = {
-  observability?: ObservabilityConfig<TApp>;
-  apiRoutes?: ApiRoute<TApp, unknown, unknown>[];
-  proxyRoutes?: ProxyRoute<TApp>[];
+type ServerConfig<TClaims = unknown, TLogScope = unknown> = {
+  observability?: ObservabilityConfig<TClaims, TLogScope>;
+  apiRoutes?: ApiRoute<TClaims, TLogScope, unknown, unknown>[];
+  proxyRoutes?: ProxyRoute<TClaims, TLogScope>[];
   security?: SecurityConfig;
   app?: AppConfig;
   openapi?: OpenApiConfig;
@@ -19,12 +17,12 @@ type ServerConfig<TApp = THalideApp> = {
 
 **Critical:** `ServerConfig` uses **separate arrays** — `apiRoutes` and `proxyRoutes`. There is no single `routes` array.
 
-## THalideApp
+## HalideContext
 
 Bundles claims and logger into a single object passed to handlers:
 
 ```typescript
-type THalideApp<TClaims = unknown, TLogScope = unknown> = {
+type HalideContext<TClaims = unknown, TLogScope = unknown> = {
   claims: TClaims | undefined; // decoded JWT (undefined for public routes)
   logger: Logger<TLogScope>; // structured logger
 };
@@ -48,12 +46,13 @@ type AppConfig = {
 type SecurityConfig = {
   auth?: SecurityAuthConfig;
   cors?: CorsConfig;
-  csp?: CspOptions;
+  csp?: CspDirectives;
   rateLimit?: {
     maxRequests?: number; // default: 100
     windowMs?: number; // default: 900000 (15 minutes)
     trustedProxies?: string[]; // optional — trust x-forwarded-for from these IPs/CIDRs
-    maxEntries?: number; // optional — max store entries; oldest evicted
+    maxEntries?: number; // default: 10000 — max store entries; oldest evicted
+    redisClient?: RedisClient; // optional — distributed rate limiting
   };
 };
 
@@ -61,36 +60,43 @@ type SecurityAuthConfig = {
   audience?: string;
   jwksUri?: string;
   strategy?: 'bearer' | 'jwks';
-  secret?: () => string | Promise<string>;
+  secret?: string | (() => string | Promise<string>);
   secretTtl?: number; // default: 60 (seconds)
+  algorithms?: string[]; // default: ['HS256']
 };
 ```
 
 ## Key Types
 
-| Type                             | Description                                                                   |
-| -------------------------------- | ----------------------------------------------------------------------------- |
-| `ServerConfig<TApp>`             | Top-level configuration object                                                |
-| `THalideApp<TClaims, TLogScope>` | Bundled app context: `{ claims, logger }`                                     |
-| `Server`                         | Server instance with `ready`, `start(onReady)`, `stop()`                      |
-| `CreateAppResult`                | Return of `createApp()` — `{ app, rateLimitDispose }`                         |
-| `ApiRoute<TApp, TBody>`          | API route definition                                                          |
-| `ApiRouteHandler<TApp, TBody>`   | Handler signature: `(ctx, app) => Promise<unknown>`                           |
-| `ProxyRoute<TApp>`               | Proxy route definition                                                        |
-| `AuthorizeFn<TApp>`              | `(ctx, app) => boolean \| Promise<boolean>`                                   |
-| `TransformFn`                    | `({ body, headers }) => { body, headers }`                                    |
-| `RequestContext`                 | Normalized request context: `{ method, path, headers, params, query, body? }` |
-| `SecurityConfig`                 | CORS, CSP, auth, rate limit configuration                                     |
-| `SecurityAuthConfig`             | Auth strategy, secret/JWKS, audience                                          |
-| `CorsConfig`                     | Origin, methods, credentials, headers                                         |
-| `CspOptions`                     | CSP directives container                                                      |
-| `CspDirectives`                  | CSP directive map (camelCase keys)                                            |
-| `AppConfig`                      | Static file serving configuration                                             |
-| `ObservabilityConfig<TApp>`      | Logger, requestId, lifecycle hooks                                            |
-| `OpenApiConfig`                  | OpenAPI toggle, path, options                                                 |
-| `OpenApiRouteMeta`               | Per-route OpenAPI metadata                                                    |
-| `Logger<TLogScope>`              | `{ debug, error, info, warn }` interface                                      |
-| `ClaimExtractor<TClaims>`        | Function to extract claims from a Hono Context                                |
+| Type                                                    | Description                                                                   |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ServerConfig<TClaims, TLogScope>`                      | Top-level configuration object                                                |
+| `HalideContext<TClaims, TLogScope>`                     | Bundled app context: `{ claims, logger }`                                     |
+| `Server`                                                | Server instance with `ready`, `start(onReady)`, `stop()`                      |
+| `CreateAppResult`                                       | Return of `createApp()` — `{ app, logger, proxyDispose, rateLimitDispose }`   |
+| `ApiRoute<TClaims, TLogScope, TBody, TResponse>`        | API route definition                                                          |
+| `ApiRouteHandler<TClaims, TLogScope, TBody, TResponse>` | Handler signature: `(ctx, app) => Promise<TResponse \| Response>`             |
+| `ApiRouteInput<TClaims, TLogScope, TBody, TResponse>`   | Input for `apiRoute()` factory — omits `type`, requires `handler`             |
+| `ProxyRoute<TClaims, TLogScope>`                        | Proxy route definition                                                        |
+| `ProxyRouteInput<TClaims, TLogScope>`                   | Input for `proxyRoute()` factory — omits `type`                               |
+| `AuthorizeFn<TClaims, TLogScope>`                       | `(ctx, app) => boolean \| Promise<boolean>`                                   |
+| `TransformFn`                                           | `({ method, body, headers }) => { body, headers }`                            |
+| `RequestContext`                                        | Normalized request context: `{ method, path, headers, params, query, body? }` |
+| `ResponseContext`                                       | `{ statusCode, durationMs, error?, body?, bodyType? }`                        |
+| `SecurityConfig`                                        | CORS, CSP, auth, rate limit configuration                                     |
+| `SecurityAuthConfig`                                    | Auth strategy, secret/JWKS, audience, algorithms                              |
+| `CorsConfig`                                            | Origin, methods, credentials, headers                                         |
+| `CspDirectives`                                         | CSP directive map (camelCase keys)                                            |
+| `CspDirectiveValue`                                     | `string \| ContentSecurityPolicyOptionHandler`                                |
+| `AppConfig`                                             | Static file serving configuration                                             |
+| `ObservabilityConfig<TClaims, TLogScope>`               | Logger, requestId, lifecycle hooks, logScopeFactory, maxCollect               |
+| `OpenApiConfig`                                         | OpenAPI toggle, path, options                                                 |
+| `OpenApiRouteMeta`                                      | Per-route OpenAPI metadata                                                    |
+| `OpenApiSource`                                         | External OpenAPI spec source: `{ path: string }`                              |
+| `ResolvedOpenApiSpec<TClaims, TLogScope>`               | Resolved spec with associated proxy route                                     |
+| `Logger<TLogScope>`                                     | `{ debug, error, info, warn }` interface                                      |
+| `ClaimExtractor<TClaims>`                               | Function to extract claims from a Hono Context                                |
+| `RedisClient`                                           | Minimal Redis interface for distributed rate limiting                         |
 
 ## App Configuration
 
@@ -109,3 +115,41 @@ app: {
 The `apiPrefix` prevents API requests from accidentally returning the app HTML. Set to `''` (empty string) to disable this behavior.
 
 Port resolution: `PORT` env variable → `app.port` config → default **3553**.
+
+## Logger Factories
+
+```typescript
+import { createDefaultLogger, createNoopLogger, createScopedLogger } from 'halide';
+
+// Formatted text logger — colored in TTY, plain text otherwise
+const logger = createDefaultLogger();
+
+// Compact JSON output
+const jsonLogger = createDefaultLogger({ formatMessage: false });
+
+// Silent logger — all methods are no-ops
+const silent = createNoopLogger();
+
+// Wrap a logger with a fixed scope (used internally for per-request loggers)
+const scoped = createScopedLogger(logger, { requestId: 'abc123' });
+
+// Scoped logger merges caller overrides with baked-in scope (last-write-wins)
+scoped.info({ message: 'hello' });
+// Output: [INFO] requestId="abc123" message="hello"
+
+scoped.info({ requestId: 'override' });
+// Output: [INFO] requestId="override"  // caller wins
+```
+
+## Logger Interface
+
+```typescript
+interface Logger<TLogScope = unknown> {
+  debug: (overrides?: Partial<TLogScope>) => void;
+  error: (overrides?: Partial<TLogScope>) => void;
+  info: (overrides?: Partial<TLogScope>) => void;
+  warn: (overrides?: Partial<TLogScope>) => void;
+}
+```
+
+All methods accept a single optional object of overrides. Methods take a single argument — no variadic `...args`.

@@ -1,20 +1,51 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import stripJsonComments from 'strip-json-comments';
+import { cliInfo, cliSuccess } from '../utils/logger.js';
 
-/** Generate the server.ts content for a new Halide project. */
-export function generateServerTs(appName: string, port: number): string {
-  return `import { createServer, apiRoute } from 'halide';
+/**
+ * Generate the full project structure content for a new Halide project.
+ * Creates a multi-file project with typed builder, routes, and server entry.
+ *
+ * @param appName - The application name for the server config.
+ * @param port - The port number to listen on.
+ * @returns Object mapping file paths to their content.
+ */
+export function generateFullProject(appName: string, port: number): Record<string, string> {
+  return {
+    'src/app/builder.ts': `import { defineHalide } from 'halide';
+import type { HalideContext } from 'halide';
+import type { UserClaims, LogScope } from './types';
 
-const healthRoute = apiRoute({
-  access: 'public',
-  handler: async () => ({ status: 'ok' }),
-  method: 'get',
-  path: '/health',
-});
+type App = HalideContext<UserClaims, LogScope>;
+export const { apiRoute, proxyRoute, createServer, createApp } = defineHalide<App>();
+`,
+    'src/app/types.ts': `export interface UserClaims {
+  sub: string;
+  role: 'admin' | 'user';
+}
+
+export interface LogScope {
+  requestId: string;
+  userId?: string;
+}
+`,
+    'src/routes/health.ts': `import { apiRoute } from '../app/builder';
+
+export const healthRoutes = [
+  apiRoute({
+    access: 'public',
+    path: '/health',
+    handler: async (_ctx, _app) => ({ status: 'ok' }),
+  }),
+];
+`,
+    'src/routes/index.ts': `export { healthRoutes } from './health';
+`,
+    'src/server.ts': `import { createServer } from './app/builder';
+import { healthRoutes } from './routes';
 
 const server = createServer({
-  apiRoutes: [healthRoute],
+  apiRoutes: [...healthRoutes],
   app: {
     name: '${appName}',
     port: ${port},
@@ -23,79 +54,97 @@ const server = createServer({
 });
 
 server.start();
-`;
+`,
+  };
 }
 
-/** TypeScript configuration for the server build. Used by `writeTsconfigServer`. */
-export const TSCONFIG_SERVER = `{
+/**
+ * TypeScript configuration template for generated Halide projects.
+ *
+ * Used by `writeTsconfigServer` to create tsconfig.json during the `init` command.
+ * Targets ES2022 with CommonJS modules for the server build.
+ */
+export const TSCONFIG_PROJECT = `{
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "module": "commonjs",
     "outDir": "./dist",
     "resolveJsonModule": true,
+    "rootDir": ".",
     "strict": true,
     "target": "es2022",
     "types": ["node"]
   },
-  "include": ["server.ts"]
+  "include": ["src/"],
+  "exclude": ["**/*.spec.ts"]
 }
 `;
 
-/** Write tsconfig.server.json if it doesn't already exist. */
-export function writeTsconfigServer(cwd: string): void {
-  const tsconfigServerPath = path.join(cwd, 'tsconfig.server.json');
-  if (fs.existsSync(tsconfigServerPath)) {
-    log('✓ tsconfig.server.json already exists — skipping');
-    return;
-  }
-  fs.writeFileSync(tsconfigServerPath, TSCONFIG_SERVER, 'utf8');
-  log('✓ Created tsconfig.server.json');
-}
-
-/** Add tsconfig.server.json reference to tsconfig.json, skipping if already referenced. */
-export function addServerReference(cwd: string): void {
+/**
+ * Write tsconfig.json if it doesn't already exist in the project root.
+ *
+ * Creates a minimal TypeScript config targeting ES2022 with CommonJS modules
+ * for the server build. Skips if the file exists.
+ *
+ * @param cwd - The project working directory.
+ * @param dryRun - When true, logs what would be written without creating files.
+ */
+export function writeTsconfigServer(cwd: string, dryRun = false): void {
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
-  if (!fs.existsSync(tsconfigPath)) return;
-
-  const raw = fs.readFileSync(tsconfigPath, 'utf8');
-  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
-
-  if (!Array.isArray(parsed.references)) return;
-
-  const alreadyReferenced = (parsed.references as Array<Record<string, string>>).some(
-    (ref) => ref.path === './tsconfig.server.json',
-  );
-  if (alreadyReferenced) return;
-
-  parsed.references.push({ path: './tsconfig.server.json' });
-  fs.writeFileSync(tsconfigPath, JSON.stringify(parsed, null, 2), 'utf8');
-  log('✓ Added tsconfig.server.json reference to tsconfig.json');
-}
-
-/** Exclude server.ts from tsconfig.app.json, adding it to the exclude list if not already present. */
-export function excludeServerFromApp(cwd: string): void {
-  const appPath = path.join(cwd, 'tsconfig.app.json');
-  if (!fs.existsSync(appPath)) return;
-
-  const raw = fs.readFileSync(appPath, 'utf8');
-  const parsed = JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
-
-  if (!Array.isArray(parsed.exclude)) {
-    parsed.exclude = ['server.ts'];
-    fs.writeFileSync(appPath, JSON.stringify(parsed, null, 2), 'utf8');
-    log('✓ Added server.ts to tsconfig.app.json exclude list');
+  if (fs.existsSync(tsconfigPath)) {
+    cliSuccess('tsconfig.json already exists — skipping');
     return;
   }
-
-  if ((parsed.exclude as string[]).includes('server.ts')) return;
-
-  (parsed.exclude as string[]).push('server.ts');
-  fs.writeFileSync(appPath, JSON.stringify(parsed, null, 2), 'utf8');
-  log('✓ Added server.ts to tsconfig.app.json exclude list');
+  if (dryRun) {
+    cliInfo('[dry-run] Would create tsconfig.json');
+    return;
+  }
+  fs.writeFileSync(tsconfigPath, TSCONFIG_PROJECT, 'utf8');
+  cliSuccess('Created tsconfig.json');
 }
 
-/** Output a message to stdout with a trailing newline. Used for CLI progress reporting. */
-function log(message: string): void {
-  process.stdout.write(`${message}\n`);
+/**
+ * Minimal package.json template for a new Halide project.
+ *
+ * @param appName - The application name.
+ * @param version - The halide package version (e.g. from `__PKG_VERSION__`).
+ * @returns The package.json content as a string.
+ */
+export function generatePackageJson(appName: string, version: string): string {
+  return `{
+  "name": "${appName}",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "serve": "nodemon",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "halide": "^${version}",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "nodemon": "^3.1.14",
+    "typescript": "~5.9.2"
+  }
+}
+`;
+}
+
+/**
+ * Nodemon configuration template.
+ *
+ * @returns The nodemon.json content as a string.
+ */
+export function generateNodemonJson(): string {
+  const config = {
+    exec: 'npm run build && npm run start',
+    ext: 'ts',
+    ignore: ['dist', 'node_modules'],
+    watch: ['src'],
+  };
+  return `${JSON.stringify(config, null, 2)}\n`;
 }

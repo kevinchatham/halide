@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"/>
   </a>
   <a style="margin-left:8px" href="https://github.com/kevinchatham/halide/tree/main/docs">
-    <img src="https://img.shields.io/badge/docs-0.0.11-cyan" alt="Documentation"/>
+    <img src="https://img.shields.io/badge/docs-0.0.12-cyan" alt="Documentation"/>
   </a>
   <img style="margin-left:8px;" src="https://img.shields.io/npm/v/halide" alt="npm"/>
   <a style="margin-left:8px;" href="https://nodejs.org">
@@ -33,7 +33,7 @@ Halide is not an API gateway, a service mesh, or a full backend framework. It is
 
 See the [demo app](https://github.com/kevinchatham/halide-demo) for a complete example.
 
-Run Halide in an empty project (`npm init`) or add it directly to your existing frontend project. The server runs as a standalone process alongside your SPA build tooling.
+Run Halide in an empty project (`npm init`). The server runs as a standalone process alongside your SPA build tooling.
 
 ```bash
 npx halide init
@@ -41,12 +41,10 @@ npx halide init
 
 This automatically:
 
-1. Detects your package manager
+1. Creates `package.json` and `nodemon.json` if missing
 2. Installs `halide`
-3. Scaffolds a `server.ts` entry point with a health route
-4. Creates `tsconfig.server.json` and updates project references
-5. Adds `halide:start` and `halide:build` scripts to `package.json`
-6. Installs agent skill via native copy from node_modules/halide/skill/
+3. Scaffolds a project structure with `server.ts` entry point and health route
+4. Creates `tsconfig.json` for the server build
 
 ### Manual Installation
 
@@ -56,13 +54,15 @@ npm install halide
 
 ```ts
 // routes.ts
-import { apiRoute, proxyRoute } from 'halide';
+import { defineHalide } from 'halide';
+
+const { apiRoute, proxyRoute } = defineHalide();
 
 export const healthRoute = apiRoute({
   access: 'public',
   method: 'get',
   path: '/api/health',
-  handler: async () => ({ status: 'ok' }),
+  handler: async (_ctx, _app) => ({ status: 'ok' }),
 });
 
 export const userProxyRoute = proxyRoute({
@@ -76,9 +76,11 @@ export const userProxyRoute = proxyRoute({
 ```ts
 // server.ts
 import { healthRoute, userProxyRoute } from './routes';
-import { createServer, type ServerConfig } from 'halide';
+import { defineHalide } from 'halide';
 
-const config: ServerConfig = {
+const { createServer } = defineHalide();
+
+const server = createServer({
   app: {
     root: './browser',
   },
@@ -91,9 +93,7 @@ const config: ServerConfig = {
   },
   apiRoutes: [healthRoute],
   proxyRoutes: [userProxyRoute],
-};
-
-const server = createServer(config);
+});
 
 server.start((port) => console.log(`Serving on ${port}`));
 ```

@@ -1,15 +1,17 @@
-export { type CreateAppResult, createApp, createServer, type Server } from './config/runtime';
-export { apiRoute } from './routes/apiRoute';
-export { proxyRoute } from './routes/proxyRoute';
-export type {
-  AppConfig,
-  Logger,
-  ObservabilityConfig,
-  RequestContext,
-  ResponseContext,
-  ServerConfig,
-  THalideApp,
-} from './types';
+/**
+ * Halide — Backend For Frontend (BFF) framework.
+ *
+ * Re-exports the public API: builder utilities, type definitions, and
+ * configuration helpers. Import from this file to access the full framework.
+ *
+ * @example
+ *   import { defineHalide, createDefaultLogger } from 'halide';
+ *
+ * @module halide
+ */
+export { defineHalide } from './config/builder';
+export { createDefaultLogger, createNoopLogger, createScopedLogger } from './config/defaults';
+export type { CreateAppResult, Server } from './config/runtime';
 export type {
   ApiRoute,
   ApiRouteHandler,
@@ -20,9 +22,16 @@ export type {
   TransformFn,
 } from './types/api';
 export type {
+  AppConfig,
+  HalideContext,
+  Logger,
+  ObservabilityConfig,
+  RequestContext,
+  ResponseContext,
+} from './types/app';
+export type {
   CspDirectives,
   CspDirectiveValue,
-  CspOptions,
 } from './types/csp';
 export type {
   OpenApiConfig,
@@ -31,9 +40,11 @@ export type {
   OpenApiSource,
   ResolvedOpenApiSpec,
 } from './types/openapi';
+export type { RedisClient } from './types/redis-client';
 export type {
   ClaimExtractor,
   CorsConfig,
   SecurityAuthConfig,
   SecurityConfig,
 } from './types/security';
+export type { ServerConfig } from './types/server-config';

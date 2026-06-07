@@ -4,12 +4,14 @@ export type { OpenApiRouteMeta, OpenApiSource } from './api';
 
 /**
  * Resolved OpenAPI specification document with its associated proxy route.
+ * @typeParam TClaims - The type of the decoded JWT claims.
+ * @typeParam TLogScope - The type of the structured log scope object.
  */
-export type ResolvedOpenApiSpec = {
+export type ResolvedOpenApiSpec<TClaims = unknown, TLogScope = unknown> = {
   /** The resolved OpenAPI spec as a plain object. */
   spec: Record<string, unknown>;
   /** The proxy route that owns this spec. */
-  route: ProxyRoute<unknown>;
+  route: ProxyRoute<TClaims, TLogScope>;
 };
 
 /**
